@@ -7,6 +7,9 @@ const { buildMenu } = require('./menu.cjs');
 const { registerIpc } = require('./ipc.cjs');
 const { resolveLaunchTarget, WINDOW_BOUNDS } = require('./windowConfig.cjs');
 const { getCurrentWorkspace } = require('./services/workspaceService.cjs');
+const { detectAgentBinaries } = require('./agents/detect.cjs');
+const { buildBootPayload } = require('./bootPayload.cjs');
+const { BOOT_PAYLOAD_CHANNEL } = require('./agents/constants.cjs');
 
 let mainWindow = null;
 
@@ -37,6 +40,26 @@ function createWindow() {
   } else {
     mainWindow.loadFile(target.file);
   }
+
+  // Push the boot payload (detected agents + auto-restored workspace) to
+  // the renderer the moment the window is ready. Without this, App.jsx
+  // has to make at least two extra IPC roundtrips on mount before the
+  // UI can settle — the v1 auto-boot gate explicitly forbids that.
+  mainWindow.webContents.once('did-finish-load', async () => {
+    try {
+      const payload = await buildBootPayload({
+        detect: () => detectAgentBinaries(),
+        getCurrentWorkspace,
+      });
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(BOOT_PAYLOAD_CHANNEL, payload);
+      }
+    } catch (err) {
+      // Swallow: the renderer can still call detect / getCurrent on
+      // demand. We log so a real failure isn't completely silent.
+      console.error('citybase: failed to build boot payload', err);
+    }
+  });
 
   mainWindow.on('closed', () => { mainWindow = null; });
   return mainWindow;
