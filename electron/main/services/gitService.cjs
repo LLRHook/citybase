@@ -25,7 +25,11 @@ async function getSnapshot(workspace) {
   const [topResult, statusResult, logResult, treeResult] = await Promise.all([
     run('git', ['rev-parse', '--show-toplevel'], { cwd }),
     run('git', ['status', '--porcelain=v2', '--branch'], { cwd }),
-    run('git', ['log', '--oneline', '--decorate', '-n', '30'], { cwd }),
+    // Tab-delimited so titles can contain anything, including the unit
+    // separator we'd otherwise prefer. %h short hash, %cI ISO commit date,
+    // %s subject. -z would be cleaner but git log doesn't honor it for
+    // --pretty=format, so we split on newlines and trim CRs.
+    run('git', ['log', `--pretty=format:%h%x09%cI%x09%s`, '-n', '30'], { cwd }),
     // ls-files lists tracked files only — fast, no untracked noise, gives the
     // city projector a stable folder/file tree even when the working copy is dirty.
     run('git', ['ls-files', '-z'], { cwd, maxBuffer: 16 * 1024 * 1024 }),
@@ -154,12 +158,16 @@ function statusFromXy(xy) {
 
 function parseLog(stdout) {
   return stdout.split('\n')
-    .map(line => line.trim())
+    .map(line => line.replace(/\r$/, ''))
     .filter(Boolean)
     .map(line => {
-      const sp = line.indexOf(' ');
-      if (sp < 0) return { hash: line, title: '' };
-      return { hash: line.slice(0, sp), title: line.slice(sp + 1) };
+      // Format: <hash>\t<isoCommitDate>\t<subject>
+      const parts = line.split('\t');
+      if (parts.length < 3) {
+        // Older format or unexpected line — degrade gracefully.
+        return { hash: parts[0] || '', committedAt: null, title: parts.slice(1).join(' ') };
+      }
+      return { hash: parts[0], committedAt: parts[1], title: parts.slice(2).join('\t') };
     });
 }
 
