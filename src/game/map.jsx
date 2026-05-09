@@ -31,7 +31,7 @@ export function HexPawn({ from, to, progress, color, label }) {
   );
 }
 
-function DistrictTiles({ district, allBuildings, focused, onClick }) {
+function DistrictTiles({ district, allBuildings, dirtyByPath, focused, onClick }) {
   const a = C(district.color);
   const tiles = tilesForDistrict(district);
   const center = hexToPx(district.q, district.r);
@@ -39,6 +39,7 @@ function DistrictTiles({ district, allBuildings, focused, onClick }) {
     const t = tiles[(i + 1) % tiles.length];
     return { ...b, q: t.q, r: t.r };
   });
+  const dirtyLookup = dirtyByPath || null;
 
   return (
     <g
@@ -71,15 +72,41 @@ function DistrictTiles({ district, allBuildings, focused, onClick }) {
         const kind = b.type === 'tower'
           ? 'tower'
           : (i % 5 === 0 ? 'dome' : 'house');
+        const dirtyEntry = dirtyLookup && b.path ? dirtyLookup.get(b.path) : null;
+        // Staged → green; unstaged → amber; both → blended cyan-amber
+        // ring around an amber core to read as 'partial'.
+        const stagedOnly = dirtyEntry && dirtyEntry.staged && !dirtyEntry.unstaged;
+        const unstagedOnly = dirtyEntry && dirtyEntry.unstaged && !dirtyEntry.staged;
+        const both = dirtyEntry && dirtyEntry.staged && dirtyEntry.unstaged;
+        const dotColor = stagedOnly ? NEON.green : NEON.amber;
         return (
-          <IsoBuilding
-            key={i}
-            x={p.x} y={p.y + 8}
-            kind={kind}
-            accent={a}
-            focused={focused}
-            seed={i + district.id.length}
-          />
+          <g key={i}>
+            <IsoBuilding
+              x={p.x} y={p.y + 8}
+              kind={kind}
+              accent={a}
+              focused={focused}
+              seed={i + district.id.length}
+            />
+            {dirtyEntry && (
+              <g
+                data-testid="dirty-glyph"
+                data-staged={dirtyEntry.staged ? '1' : '0'}
+                data-unstaged={dirtyEntry.unstaged ? '1' : '0'}
+              >
+                {both && (
+                  <circle cx={p.x + 7} cy={p.y - 18} r="3.4" fill="none"
+                    stroke={NEON.green} strokeWidth="0.9" opacity="0.85" />
+                )}
+                <circle cx={p.x + 7} cy={p.y - 18} r="2.2" fill={dotColor}>
+                  {unstagedOnly && (
+                    <animate attributeName="opacity" values="1;0.4;1"
+                      dur="1.6s" repeatCount="indefinite" />
+                  )}
+                </circle>
+              </g>
+            )}
+          </g>
         );
       })}
 
@@ -121,7 +148,7 @@ function DistrictTiles({ district, allBuildings, focused, onClick }) {
   );
 }
 
-export function CityMap({ districts, buildings, focusedDistrictId, onSelectDistrict, pawns, connected }) {
+export function CityMap({ districts, buildings, dirtyByPath, focusedDistrictId, onSelectDistrict, pawns, connected }) {
   const W = 820, H = 520;
   const cx = W / 2, cy = H / 2 + 20;
   const safeDistricts = Array.isArray(districts) ? districts : [];
@@ -190,6 +217,7 @@ export function CityMap({ districts, buildings, focusedDistrictId, onSelectDistr
               key={d.id}
               district={d}
               allBuildings={safeBuildings}
+              dirtyByPath={dirtyByPath}
               focused={focusedDistrictId === d.id}
               onClick={onSelectDistrict}
             />
