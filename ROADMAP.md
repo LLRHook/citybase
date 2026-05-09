@@ -212,26 +212,28 @@ Work items:
 - Add approve/reject/continue controls.
 - Preserve enough hidden run data for debugging.
 
-## Phase 5 - Basic Editor Workflows
+## Phase 5 - Basic Editor Workflows (complete)
 
 Goal: make Citybase useful for a single developer on one project.
 
+**Landed.** Five slices on `main`: [#29](https://github.com/LLRHook/citybase/pull/29), [#31](https://github.com/LLRHook/citybase/pull/31), [#34](https://github.com/LLRHook/citybase/pull/34), [#35](https://github.com/LLRHook/citybase/pull/35), [#38](https://github.com/LLRHook/citybase/pull/38).
+
 Definition of done:
 
-- Open workspace.
-- See Git state.
-- Run an agent task.
-- Review visual result.
-- Run tests or lint through approved actions.
-- Commit through an explicit Git action when the user is ready.
+- [x] Open workspace.
+- [x] See Git state.
+- [x] Run an agent task.
+- [x] Review visual result.
+- [x] Run tests or lint through approved actions.
+- [x] Commit through an explicit Git action when the user is ready.
 
 Work items:
 
-- Add branch selector/status.
-- Add staged/unstaged visual state.
-- Add "run checks" action.
-- Add "commit result" action with editable message.
-- Add local run history.
+- [x] Branch selector/status — slice 1.
+- [x] Staged/unstaged visual state — slice 2.
+- [x] "Run checks" action — slice 3.
+- [x] "Commit result" action with editable message + branch checkout — slice 4.
+- [x] Local run history (real, no seed/mock data) — slice 5.
 
 ## v1 Ship Gate
 
@@ -249,11 +251,24 @@ Citybase v1 ships when every item is true:
 - Build, lint, typecheck, and smoke tests are green.
 - README includes setup, app architecture, safety model, and troubleshooting.
 
+### Status (post Phase 5)
+
+The structural plumbing for the v1 ship gate is in place. Each gate item below is annotated with the PR(s) that addressed it; items without a PR reference still need work.
+
+- ✅ **Claude Code adapter functional end-to-end against the real `claude` CLI.** The adapter now uses the real flags (`--print --output-format json --model … --permission-mode bypassPermissions` + the prompt as a positional arg) and `streamEvents` yields real Claude output instead of a synthesized trail. [#36](https://github.com/LLRHook/citybase/pull/36).
+- ✅ **App auto-boots on launch.** Main process pushes a one-shot boot payload over `BOOT_PAYLOAD_CHANNEL` once `did-finish-load` fires, carrying `{ detect, workspace }`. The renderer's `useAgentDetect` hook accepts the cached payload and skips the IPC roundtrip; `useWorkspace` restores the recent workspace via `getCurrentWorkspace`. No clicks needed before the city renders. [#37](https://github.com/LLRHook/citybase/pull/37).
+- ✅ **Local run history is real.** `agentManager.listRuns()` surfaces every dispatched run from the in-memory history Map (cancel-survives, FIFO-bounded). The renderer's Run History panel renders rows for real runs and an explicit "no runs yet" empty state instead of seed data. [#38](https://github.com/LLRHook/citybase/pull/38).
+- ⏭ **End-to-end manual verification on macOS / Windows packaged builds.** Local browser preview is blocked by Docker holding port 5173 throughout this session, so manual UX verification of the auto-boot flow has not happened in this loop.
+- ⏭ **`openPR` via `gh` CLI.** `CliAgentAdapter.openPR` still throws the deferred placeholder. Without it, the "approved write-capable request" gate item only completes locally — the user still finishes in their normal Git tool, which is consistent with the deferred `push` item below but not with "PR creation as part of the run".
+- ⏭ **Token-by-token streaming.** Currently `streamEvents` yields one event after the CLI exits because `processService` does not surface stdout chunks on a child handle. Real-time streaming is a follow-up.
+- ⏭ **README updates** for setup, packaging, safety model, troubleshooting.
+
 ### Out of v1 scope (deferred to v1.1+)
 
 - Codex CLI as a hard ship requirement (the adapter ships, but Codex is not part of the must-pass demo).
 - Multi-workspace switching from inside a running app session (close + relaunch is fine for v1).
 - Push-to-remote action (commit lands locally; the user finishes in their normal Git tool).
+- Any remaining seed/mock data the renderer still imports (`EMPTY_*` stubs in `App.jsx`, `ADV_REPORTS` in `src/data/seed.js`). The renderer already ignores these in production paths thanks to slice 5's run-history surface, but the imports themselves should be deleted in a v1.1 cleanup.
 
 ## Open Questions
 
