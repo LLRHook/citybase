@@ -1,5 +1,5 @@
-// analysis.jsx — Adventurer Analysis (PR + Code Review screen).
-// Frames the PR around the *adventurer*: their reasoning trail, diffs, checks, reviewers, risk.
+// analysis.jsx — Adventurer Analysis (run + review screen).
+// Frames the run around the *adventurer*: their reasoning trail, diffs, checks, reviewers, risk.
 import { NEON, C, alpha } from './palette.js';
 import { hexPath } from './hex.js';
 import {
@@ -69,7 +69,7 @@ function ReasoningTrail({ steps }) {
     edit: { color: 'amber',   icon: '⟲', label: 'EDIT' },
     test: { color: 'green',   icon: '✓', label: 'TEST' },
     lint: { color: 'magenta', icon: '⚯', label: 'LINT' },
-    pr:   { color: 'cyan',    icon: '◉', label: 'PR' },
+    pr:   { color: 'cyan',    icon: '◉', label: 'RUN' },
   };
   return (
     <div style={{ position: 'relative', paddingLeft: 14 }}>
@@ -146,7 +146,7 @@ export function AdventurerAnalysis({ advId, onPickAdv }) {
   if (!report || !adv) {
     return (
       <div style={{ padding: 40, textAlign: 'center' }}>
-        <Mono color="ink3">no analysis available · select an adventurer with an open PR</Mono>
+        <Mono color="ink3">no analysis available · select an adventurer with an open run</Mono>
         <div style={{ marginTop: 12, display: 'flex', gap: 6, justifyContent: 'center' }}>
           {allWithReports.map(a => (
             <NButton key={a.id} accent={a.guild.color} onClick={() => onPickAdv(a.id)}>{a.name}</NButton>
@@ -203,7 +203,7 @@ export function AdventurerAnalysis({ advId, onPickAdv }) {
           </div>
           <Title size={20} weight={700} color="ink" style={{ marginTop: 4 }}>{adv.name}</Title>
           <Mono size={10} color="ink2" style={{ display: 'block', marginTop: 4 }}>
-            <span style={{ color: NEON.cyan }}>PR #{pr.number}</span>
+            <span style={{ color: NEON.cyan }}>RUN #{pr.number}</span>
             <span style={{ color: NEON.ink3 }}> · </span>
             {pr.title}
           </Mono>
@@ -213,7 +213,7 @@ export function AdventurerAnalysis({ advId, onPickAdv }) {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 180 }}>
           <Pill color={pr.status === 'open' ? 'green' : 'amber'}>● {pr.status.toUpperCase()}</Pill>
-          <NButton accent={guild.color}>⎘ Open in Bitbucket</NButton>
+          <NButton accent={guild.color}>Open run log</NButton>
         </div>
       </div>
 

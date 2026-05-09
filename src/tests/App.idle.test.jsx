@@ -21,9 +21,9 @@ describe('App idle defaults (no fake activity)', () => {
     expect(questIds).toHaveLength(0);
   });
 
-  it('shows the NO REMOTE LINK overlay over the city', () => {
+  it('shows the NO WORKSPACE LINK overlay over the city', () => {
     render(<App />);
-    expect(screen.getByText('NO REMOTE LINK')).toBeInTheDocument();
+    expect(screen.getByText('NO WORKSPACE LINK')).toBeInTheDocument();
   });
 
   it('renders the unlinked vitals placeholder instead of a fake repo name', () => {

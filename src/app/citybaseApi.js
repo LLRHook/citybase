@@ -1,0 +1,48 @@
+// citybaseApi.js — renderer-side facade for the desktop API.
+//
+// In Electron we use the `window.citybase` object exposed by preload.cjs.
+// In browser dev mode (no preload) we return a stub with shape-compatible
+// methods that resolve to "no workspace / no git" — this keeps the prototype
+// runnable in `npm run dev` without a desktop shell.
+
+const noopUnsubscribe = () => {};
+
+function browserStub() {
+  return {
+    isDesktop: false,
+    app: {
+      getVersion: async () => '0.1.0-web',
+      getPlatform: async () => 'browser',
+    },
+    workspace: {
+      pick: async () => null,
+      getCurrent: async () => null,
+      setCurrent: async () => null,
+      listRecent: async () => [],
+      forget: async () => undefined,
+    },
+    git: {
+      getSnapshot: async () => null,
+      refresh: async () => null,
+    },
+    menu: {
+      onCommand: () => noopUnsubscribe,
+    },
+  };
+}
+
+function desktop(api) {
+  return {
+    isDesktop: true,
+    app: api.app,
+    workspace: api.workspace,
+    git: api.git,
+    menu: api.menu,
+  };
+}
+
+export const citybaseApi = (typeof window !== 'undefined' && window.citybase)
+  ? desktop(window.citybase)
+  : browserStub();
+
+export const isDesktop = citybaseApi.isDesktop;

@@ -1,4 +1,4 @@
-// kanban.jsx — Jira-style Kanban board, hex/neon styled, with Saga grouping
+// kanban.jsx — local task board, hex/neon styled, with Saga grouping
 import React from 'react';
 import { NEON, C, alpha } from './palette.js';
 import {
@@ -71,7 +71,7 @@ function KanbanCard({ quest, onClick, onOpenAnalysis }) {
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           {quest.points != null && <Pill color={sk.color}>{quest.points} pt</Pill>}
           {quest.lane === 'in-review' && quest.pr && (
-            <Pill color="magenta">PR #{quest.pr.number}</Pill>
+            <Pill color="magenta">RUN #{quest.pr.number}</Pill>
           )}
           {quest.lane === 'blocked' && quest.blockedBy && (
             <Pill color="red">⚠ {quest.blockedBy[0]}</Pill>
@@ -135,7 +135,7 @@ export function KanbanView({ quests, onCardClick, onOpenAnalysis, groupBy, onGro
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <Title size={16} weight={700}>Kanban Board · my-website</Title>
+        <Title size={16} weight={700}>Workspace Board · local project</Title>
         <Pill color="cyan">{quests.length} quests</Pill>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
           <Mono size={9} color="ink3" style={{ alignSelf: 'center', marginRight: 4 }}>GROUP</Mono>

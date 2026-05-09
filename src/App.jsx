@@ -24,6 +24,8 @@ import { useTweaks } from './game/useTweaks.js';
 import {
   TweaksPanel, TweakSection, TweakToggle, TweakRadio,
 } from './game/tweaks.jsx';
+import { useWorkspace } from './app/useWorkspace.js';
+import { isDesktop } from './app/citybaseApi.js';
 
 const TWEAK_DEFAULTS = { role: 'admin', connected: false };
 
@@ -65,6 +67,16 @@ function CodebaseCity() {
   const role = tweaks.role || 'admin';
   const connected = tweaks.connected === true;
 
+  const workspace = useWorkspace();
+  const liveBranch = workspace.snapshot?.branch || null;
+  const liveDirty = !!workspace.snapshot?.isDirty;
+  const branchLabel = liveBranch || '—';
+  const wsLinked = isDesktop ? !!workspace.workspace : connected;
+  const cityConnected = isDesktop ? wsLinked : connected;
+  const wsLinkedLabel = isDesktop
+    ? (workspace.workspace ? `WORKSPACE · ${workspace.workspace.name}` : 'NO WORKSPACE · open one')
+    : (connected ? 'LOCAL GIT + AGENT · linked' : 'unlinked');
+
   const [view, setView] = React.useState('city');
   const [analysisAdv, setAnalysisAdv] = React.useState(null);
   const [kanbanGroup, setKanbanGroup] = React.useState('saga');
@@ -85,6 +97,12 @@ function CodebaseCity() {
   const guilds = EMPTY_GUILDS;
   const districts = EMPTY_DISTRICTS;
   const repo = null;
+  const vitalsRepo = repo ?? (isDesktop && workspace.workspace ? {
+    name: workspace.workspace.name,
+    remote: workspace.workspace.rootPath,
+    branch: liveBranch || '—',
+    commit: workspace.snapshot?.recentCommits?.[0]?.hash || '—',
+  } : null);
   const currentGuild = guilds[0] ?? null;
 
   const hasActiveQuests = quests.some(q => q.status === 'active');
@@ -137,7 +155,7 @@ function CodebaseCity() {
   };
 
   const submitNewQuest = (form) => {
-    const id = (form.source === 'jira' ? 'JIRA-' : 'BB-') + (220 + quests.length);
+    const id = (form.source === 'agent' ? 'RUN-' : 'TASK-') + (220 + quests.length);
     setQuests(prev => [{ ...form, id, status: 'open', lane: 'todo', posted: 'Victor Ivanov' }, ...prev]);
     setActivity(prev => [{ t: '24:18', kind: 'quest', text: `${id} posted by Victor Ivanov` }, ...prev]);
     pushToast({ text: `Quest posted · ${id}`, color: 'amber', icon: '✚' });
@@ -163,13 +181,23 @@ function CodebaseCity() {
           </svg>
           <Title size={14} weight={700} style={{ letterSpacing: 1 }}>CODEBASE COMMAND</Title>
           <Mono size={9} color="ink3">v0.2 · MVP</Mono>
-          {connected && <LivePulse />}
+          {cityConnected && <LivePulse />}
         </div>
 
-        <Pill color={connected ? 'green' : 'red'}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: connected ? NEON.green : NEON.red, boxShadow: `0 0 4px ${connected ? NEON.green : NEON.red}` }} />
-          {connected ? 'BITBUCKET + JIRA · linked' : 'unlinked'}
+        <Pill color={wsLinked ? 'green' : 'red'}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: wsLinked ? NEON.green : NEON.red, boxShadow: `0 0 4px ${wsLinked ? NEON.green : NEON.red}` }} />
+          {wsLinkedLabel}
         </Pill>
+
+        {isDesktop && (
+          <NButton
+            accent={workspace.workspace ? 'cyan' : 'amber'}
+            ghost={!!workspace.workspace}
+            onClick={workspace.workspace ? workspace.refresh : workspace.pick}
+          >
+            {workspace.workspace ? '↻ REFRESH' : '＋ OPEN WORKSPACE'}
+          </NButton>
+        )}
 
         <Pill color={role === 'admin' ? 'amber' : role === 'member' ? 'cyan' : 'ink3'}>
           ROLE · {role}
@@ -205,9 +233,12 @@ function CodebaseCity() {
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
           <Mono size={9} color="ink3">BRANCH</Mono>
-          <Mono size={10} color={connected && repo ? 'cyan' : 'ink3'} weight={700}>
-            {connected && repo ? repo.branch : '—'}
-          </Mono>
+          <Mono size={10} color={liveBranch ? 'cyan' : 'ink3'} weight={700}>{branchLabel}</Mono>
+          {isDesktop && workspace.workspace && (
+            <Pill color={liveDirty ? 'amber' : 'green'}>
+              {liveDirty ? `DIRTY · ${workspace.snapshot?.files?.length || 0}` : 'CLEAN'}
+            </Pill>
+          )}
           <Transport
             playing={playing}
             onToggle={() => setPlaying(p => !p)}
@@ -219,7 +250,7 @@ function CodebaseCity() {
       </div>
 
       {/* VITALS */}
-      <VitalsBar stats={stats} repo={repo} connected={connected} />
+      <VitalsBar stats={stats} repo={vitalsRepo} connected={cityConnected} />
 
       {/* === KANBAN VIEW === */}
       {view === 'kanban' && (
@@ -261,8 +292,8 @@ function CodebaseCity() {
               <CityMap
                 focusedDistrictId={focusedDistrict}
                 onSelectDistrict={(d) => setFocusedDistrict(d.id === focusedDistrict ? null : d.id)}
-                pawns={connected ? pawns : []}
-                connected={connected}
+                pawns={cityConnected ? pawns : []}
+                connected={cityConnected}
               />
               {focusedDistrict && (() => {
                 const d = districts.find(x => x.id === focusedDistrict);
@@ -295,7 +326,7 @@ function CodebaseCity() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {connected && <CodebaseOverview />}
+              {cityConnected && repo && <CodebaseOverview />}
               <ActivityFeed items={activity.slice(0, 6)} />
             </div>
           </div>
@@ -359,7 +390,7 @@ function CodebaseCity() {
       <TweaksPanel title="Tweaks">
         <TweakSection title="Connection">
           <TweakToggle
-            label="Bitbucket + Jira linked"
+            label="Local Git + agent linked"
             value={connected}
             onChange={(v) => setTweak('connected', v)}
           />

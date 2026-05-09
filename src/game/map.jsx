@@ -207,9 +207,9 @@ export function CityMap({ focusedDistrictId, onSelectDistrict, pawns, connected 
           }}
         >
           <div style={{ textAlign: 'center' }}>
-            <Title size={22} color="red" weight={700} style={{ textTransform: 'uppercase', letterSpacing: 4 }}>NO REMOTE LINK</Title>
+            <Title size={22} color="red" weight={700} style={{ textTransform: 'uppercase', letterSpacing: 4 }}>NO WORKSPACE LINK</Title>
             <Mono color="ink2" size={11} style={{ display: 'block', marginTop: 8 }}>
-              Connect a Bitbucket / Jira workspace to summon this city.
+              Open a local Git workspace to summon this city.
             </Mono>
           </div>
         </div>

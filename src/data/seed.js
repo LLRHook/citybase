@@ -7,8 +7,8 @@
 // =================== REPO ===================
 
 export const REPO = {
-  name: 'my-website',
-  remote: 'bitbucket.org/llrhook/my-website',
+  name: 'local-workspace',
+  remote: '~/Projects/local-workspace',
   branch: 'main',
   commit: 'a4a9f82',
 };
@@ -106,7 +106,7 @@ export const SKILL_DEFS = {
   bugfix:    { name: 'Bug Fix',     icon: '✕',  color: 'magenta', desc: 'mend a broken file' },
   refactor:  { name: 'Refactor',    icon: '⟲',  color: 'cyan',    desc: 'simplify a tower' },
   tests:     { name: 'Add Tests',   icon: '✓',  color: 'green',   desc: 'fortify with proofs' },
-  review:    { name: 'Code Review', icon: '◉',  color: 'amber',   desc: 'inspect a PR' },
+  review:    { name: 'Code Review', icon: '◉',  color: 'amber',   desc: 'inspect a result' },
   lint:      { name: 'Lint Pass',   icon: '⚯',  color: 'green',   desc: 'tidy a district' },
   docs:      { name: 'Docs',        icon: '✎',  color: 'cyan',    desc: 'inscribe knowledge' },
 };
@@ -116,10 +116,10 @@ export const SKILL_DEFS = {
 export const ACTIVITY = [
   { t: '24:17', kind: 'xp',    text: 'Alpha-7 gained 240 XP · Refactor complete' },
   { t: '24:15', kind: 'good',  text: 'TimelineSection.tsx tests passed (12/12)' },
-  { t: '24:14', kind: 'quest', text: 'BB-221 posted by Victor Ivanov' },
+  { t: '24:14', kind: 'quest', text: 'GIT-221 posted by Victor Ivanov' },
   { t: '24:12', kind: 'good',  text: 'Delta-3 dispatched to e2e/timeline.spec' },
   { t: '24:09', kind: 'bad',   text: 'Flaky harness · sector e2e' },
-  { t: '24:05', kind: 'good',  text: 'PR #142 opened from Alpha-7' },
+  { t: '24:05', kind: 'good',  text: 'Run #142 completed by Alpha-7' },
 ];
 
 // =================== OBJECTIVES & ALERTS ===================
@@ -128,7 +128,7 @@ export const ACTIVITY = [
 export const OBJECTIVES = [
   { id: 'fix-violations', label: 'Fix new violations',  sub: 'Linters: 3 new',     done: true,  prog: 1.0,  meta: '3/3' },
   { id: 'golden-tests',   label: 'Run golden tests',    sub: 'Coverage ≥ 80%',     done: true,  prog: 0.81, meta: '81%' },
-  { id: 'clean-pr',       label: 'Merge clean PR',      sub: 'Open PRs: 2',         done: false, prog: 0.5,  meta: '1/2' },
+  { id: 'clean-result',   label: 'Review clean result', sub: 'Open runs: 2',        done: false, prog: 0.5,  meta: '1/2' },
   { id: 'harness-green',  label: 'Keep harness green',  sub: 'All systems nominal', done: false, prog: 0.0,  meta: '◯' },
 ];
 
@@ -146,7 +146,7 @@ export const SAGAS = [
     desc: 'Make the work timeline production-ready: stable e2e, refactored sections, accessibility pass.',
     target: 'components-work',
     progress: 0.55,
-    questIds: ['JIRA-140','BB-218','JIRA-150'],
+    questIds: ['TASK-140','GIT-218','TASK-150'],
   },
   {
     id: 'SAGA-08', title: 'GitHub Integration Hardening',
@@ -154,7 +154,7 @@ export const SAGAS = [
     desc: 'Reduce complexity in github.ts, cache responses, document the API surface.',
     target: 'lib',
     progress: 0.40,
-    questIds: ['JIRA-142','BB-221','JIRA-151'],
+    questIds: ['TASK-142','GIT-221','TASK-151'],
   },
   {
     id: 'SAGA-15', title: 'Visual Polish · Aurora & Hero',
@@ -162,7 +162,7 @@ export const SAGAS = [
     desc: 'Cross-browser polish for the aurora background and hero parallax.',
     target: 'components-ui',
     progress: 0.25,
-    questIds: ['JIRA-148','JIRA-149','JIRA-138'],
+    questIds: ['TASK-148','TASK-149','TASK-138'],
   },
 ];
 
@@ -171,7 +171,7 @@ export const SAGAS = [
 
 export const QUESTS_V2 = [
   // ACTIVE / IN-PROGRESS
-  { id: 'JIRA-142', source: 'jira', title: 'Refactor github.ts complexity',
+  { id: 'TASK-142', source: 'local', title: 'Refactor github.ts complexity',
     saga: 'SAGA-08', skill: 'refactor', reward: 240, points: 5,
     target: 'lib', file: 'github.ts',
     status: 'active', lane: 'in-progress',
@@ -180,13 +180,13 @@ export const QUESTS_V2 = [
     desc: 'Cyclomatic complexity in github.ts has crept above threshold. Split into smaller functions and add coverage.',
     posted: 'Victor Ivanov',
     errands: [
-      { id: 'JIRA-142.1', title: 'Extract auth header builder', done: true },
-      { id: 'JIRA-142.2', title: 'Split repo fetch + readme fetch', done: true },
-      { id: 'JIRA-142.3', title: 'Add unit tests for splits', done: false },
-      { id: 'JIRA-142.4', title: 'Update JSDoc', done: false },
+      { id: 'TASK-142.1', title: 'Extract auth header builder', done: true },
+      { id: 'TASK-142.2', title: 'Split repo fetch + readme fetch', done: true },
+      { id: 'TASK-142.3', title: 'Add unit tests for splits', done: false },
+      { id: 'TASK-142.4', title: 'Update JSDoc', done: false },
     ],
   },
-  { id: 'BB-218', source: 'bitbucket', title: 'Flaky e2e on timeline',
+  { id: 'GIT-218', source: 'git', title: 'Flaky e2e on timeline',
     saga: 'SAGA-12', skill: 'tests', reward: 180, points: 3,
     target: 'e2e', file: 'timeline.spec.ts',
     status: 'active', lane: 'in-progress',
@@ -195,14 +195,14 @@ export const QUESTS_V2 = [
     desc: 'Timeline spec fails ~10% of runs. Stabilize selectors and add retries.',
     posted: 'Victor Ivanov',
     errands: [
-      { id: 'BB-218.1', title: 'Reproduce locally', done: true },
-      { id: 'BB-218.2', title: 'Replace nth-child selectors', done: false },
-      { id: 'BB-218.3', title: 'Add retry config', done: false },
+      { id: 'GIT-218.1', title: 'Reproduce locally', done: true },
+      { id: 'GIT-218.2', title: 'Replace nth-child selectors', done: false },
+      { id: 'GIT-218.3', title: 'Add retry config', done: false },
     ],
   },
 
   // IN-REVIEW
-  { id: 'JIRA-150', source: 'jira', title: 'Timeline a11y · keyboard nav',
+  { id: 'TASK-150', source: 'local', title: 'Timeline a11y · keyboard nav',
     saga: 'SAGA-12', skill: 'refactor', reward: 160, points: 3,
     target: 'components-work', file: 'TimelineSection.tsx',
     status: 'active', lane: 'in-review',
@@ -212,52 +212,52 @@ export const QUESTS_V2 = [
     posted: 'Victor Ivanov',
     pr: { number: 150, additions: 84, deletions: 31, files: 4, reviewers: ['alpha-7','victor'] },
     errands: [
-      { id: 'JIRA-150.1', title: 'Roving tabindex', done: true },
-      { id: 'JIRA-150.2', title: 'aria-current on active node', done: true },
-      { id: 'JIRA-150.3', title: 'Reviewer feedback', done: false },
+      { id: 'TASK-150.1', title: 'Roving tabindex', done: true },
+      { id: 'TASK-150.2', title: 'aria-current on active node', done: true },
+      { id: 'TASK-150.3', title: 'Reviewer feedback', done: false },
     ],
   },
 
   // BLOCKED
-  { id: 'JIRA-151', source: 'jira', title: 'Cache GitHub responses · 5m TTL',
+  { id: 'TASK-151', source: 'local', title: 'Cache GitHub responses · 5m TTL',
     saga: 'SAGA-08', skill: 'refactor', reward: 200, points: 5,
     target: 'lib', file: 'github.ts',
     status: 'active', lane: 'blocked',
     adventurer: 'bravo-2', guild: 'victor',
     progress: 0.20, eta: '—',
-    desc: 'Wrap fetches in a TTL cache. Blocked on JIRA-142 (refactor must land first).',
+    desc: 'Wrap fetches in a TTL cache. Blocked on TASK-142 (refactor must land first).',
     posted: 'Victor Ivanov',
-    blockedBy: ['JIRA-142'],
+    blockedBy: ['TASK-142'],
     errands: [
-      { id: 'JIRA-151.1', title: 'Pick cache lib', done: true },
-      { id: 'JIRA-151.2', title: 'Wrap fetchRepos', done: false },
-      { id: 'JIRA-151.3', title: 'Wrap fetchReadme', done: false },
+      { id: 'TASK-151.1', title: 'Pick cache lib', done: true },
+      { id: 'TASK-151.2', title: 'Wrap fetchRepos', done: false },
+      { id: 'TASK-151.3', title: 'Wrap fetchReadme', done: false },
     ],
   },
 
   // TODO
-  { id: 'JIRA-148', source: 'jira', title: 'Bug: aurora flicker on Safari',
+  { id: 'TASK-148', source: 'local', title: 'Bug: aurora flicker on Safari',
     saga: 'SAGA-15', skill: 'bugfix', reward: 150, points: 3,
     target: 'components-ui', file: 'AuroraBackground.tsx',
     status: 'open', lane: 'todo',
     desc: 'Aurora gradient flickers on Safari < 17. Trace the keyframe and apply a will-change fallback.',
     posted: 'Victor Ivanov',
   },
-  { id: 'JIRA-149', source: 'jira', title: 'Add tests for GlassCard',
+  { id: 'TASK-149', source: 'local', title: 'Add tests for GlassCard',
     saga: 'SAGA-15', skill: 'tests', reward: 120, points: 2,
     target: 'components-ui', file: 'GlassCard.tsx',
     status: 'open', lane: 'todo',
     desc: 'GlassCard has no unit coverage. Add render + interaction tests.',
     posted: 'Victor Ivanov',
   },
-  { id: 'BB-221', source: 'bitbucket', title: 'Document the Z-index layering',
+  { id: 'GIT-221', source: 'git', title: 'Document the Z-index layering',
     saga: 'SAGA-08', skill: 'docs', reward: 80, points: 1,
     target: 'core', file: 'layout.tsx',
     status: 'open', lane: 'todo',
     desc: 'README mentions z-index table; layout.tsx itself has no JSDoc. Inscribe.',
     posted: 'Victor Ivanov',
   },
-  { id: 'BB-222', source: 'bitbucket', title: 'Lint pass on api/',
+  { id: 'GIT-222', source: 'git', title: 'Lint pass on api/',
     skill: 'lint', reward: 60, points: 1,
     target: 'api', file: 'readme/route.ts',
     status: 'open', lane: 'todo',
@@ -266,7 +266,7 @@ export const QUESTS_V2 = [
   },
 
   // DONE
-  { id: 'JIRA-140', source: 'jira', title: 'Refactor TimelineSection',
+  { id: 'TASK-140', source: 'local', title: 'Refactor TimelineSection',
     saga: 'SAGA-12', skill: 'refactor', reward: 220, points: 5,
     target: 'components-work', file: 'TimelineSection.tsx',
     status: 'done', lane: 'done',
@@ -275,7 +275,7 @@ export const QUESTS_V2 = [
     posted: 'Victor Ivanov',
     pr: { number: 140, additions: 312, deletions: 188, files: 6, reviewers: ['victor'] },
   },
-  { id: 'JIRA-138', source: 'jira', title: 'Code review PR #138',
+  { id: 'TASK-138', source: 'local', title: 'Review run #138',
     saga: 'SAGA-15', skill: 'review', reward: 90, points: 1,
     target: 'components', file: 'HeroSection.tsx',
     status: 'done', lane: 'done',
@@ -286,7 +286,7 @@ export const QUESTS_V2 = [
   },
 ];
 
-// =================== ADVENTURER REPORTS (PR / review fixtures) ===================
+// =================== ADVENTURER REPORTS (run / review fixtures) ===================
 // Keyed by adventurer id for the analysis view.
 
 export const ADV_REPORTS = {
@@ -340,7 +340,7 @@ export const ADV_REPORTS = {
         { t: '01:08', kind: 'edit',  text: 'Split fetchReadme out of fetchRepos. Added input validation.' },
         { t: '01:36', kind: 'test',  text: 'Wrote 6 unit tests in github.test.ts. All pass.' },
         { t: '01:52', kind: 'lint',  text: 'eslint surfaced 3 unused-import warnings. Cleaned 2; left 1 (intentional re-export).' },
-        { t: '02:04', kind: 'pr',    text: 'Opened PR #142. Tagged Victor + Maya for review.' },
+        { t: '02:04', kind: 'pr',    text: 'Completed run #142. Tagged Victor + Maya for review.' },
       ],
       comments: [
         { who: 'Victor Ivanov', t: '02:18', body: 'Nice split. Can you add a JSDoc to buildAuthHeaders explaining the Bearer prefix?', kind: 'change' },
