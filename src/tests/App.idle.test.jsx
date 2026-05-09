@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../App.jsx';
@@ -57,5 +57,28 @@ describe('App idle defaults (no fake activity)', () => {
     expect(screen.getByText(/no analysis available/i)).toBeInTheDocument();
     expect(screen.queryByText('Alpha-7')).not.toBeInTheDocument();
     expect(screen.queryByText('Delta-3')).not.toBeInTheDocument();
+  });
+
+  it('Tweaks panel renders an Agents section with codex/claude install rows', async () => {
+    render(<App />);
+    expect(screen.getByText('Agents')).toBeInTheDocument();
+    expect(screen.getByText('codex')).toBeInTheDocument();
+    expect(screen.getByText('claude')).toBeInTheDocument();
+    // Browser stub resolves to both not-found, so the rows should land in
+    // the bad/not-installed state once detection completes.
+    await waitFor(() => {
+      const rows = screen.getAllByRole('status');
+      expect(rows.some(r => r.getAttribute('data-state') === 'bad')).toBe(true);
+    });
+  });
+
+  it('Provider radio defaults to Auto', () => {
+    render(<App />);
+    const auto = screen.getByRole('radio', { name: /auto/i });
+    expect(auto.getAttribute('aria-checked')).toBe('true');
+    const codex = screen.getByRole('radio', { name: /^codex$/i });
+    const claude = screen.getByRole('radio', { name: /^claude$/i });
+    expect(codex.getAttribute('aria-checked')).toBe('false');
+    expect(claude.getAttribute('aria-checked')).toBe('false');
   });
 });

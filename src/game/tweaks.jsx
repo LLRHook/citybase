@@ -52,6 +52,21 @@ const TWEAKS_STYLE = `
   .twk-toggle[data-on="1"] i{transform:translateX(14px);background:#5fe39a;
     box-shadow:0 0 6px rgba(95,227,154,.6)}
 
+  .twk-status{display:flex;align-items:center;gap:8px;font-size:10px;color:#9aa3d4;
+    padding:2px 0}
+  .twk-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;
+    background:#5a6296;box-shadow:0 0 4px rgba(255,255,255,.05)}
+  .twk-status[data-state="ok"] .twk-status-dot{background:#5fe39a;
+    box-shadow:0 0 6px rgba(95,227,154,.6)}
+  .twk-status[data-state="bad"] .twk-status-dot{background:#ff6b8a;
+    box-shadow:0 0 6px rgba(255,107,138,.5)}
+  .twk-status[data-state="pending"] .twk-status-dot{background:#5dd4ff;
+    box-shadow:0 0 6px rgba(93,212,255,.4);animation:twk-pulse 1.4s ease-in-out infinite}
+  .twk-status-label{font-weight:600;color:#e8ecff;letter-spacing:0.4px}
+  .twk-status-meta{margin-left:auto;color:#5a6296;font-size:9px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}
+  @keyframes twk-pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
   .twk-fab{position:fixed;right:16px;bottom:16px;z-index:2147483645;
     width:40px;height:40px;border-radius:50%;
     background:rgba(12,17,36,.92);border:1px solid rgba(93,212,255,.5);
@@ -170,6 +185,16 @@ export function TweakToggle({ label, value, onChange }) {
       >
         <i />
       </button>
+    </div>
+  );
+}
+
+export function TweakStatus({ label, state = 'pending', meta }) {
+  return (
+    <div className="twk-status" data-state={state} role="status">
+      <span className="twk-status-dot" aria-hidden="true" />
+      <span className="twk-status-label">{label}</span>
+      {meta && <span className="twk-status-meta" title={meta}>{meta}</span>}
     </div>
   );
 }
