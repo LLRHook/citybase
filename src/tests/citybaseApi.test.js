@@ -34,6 +34,10 @@ describe('citybaseApi — browser stub (no window.citybase)', () => {
     ]);
   });
 
+  it('git.listBranches returns [] in the browser stub', async () => {
+    await expect(citybaseApi.git.listBranches('any-id')).resolves.toEqual([]);
+  });
+
   describe('agents stub', () => {
     it('detect resolves to both not-found', async () => {
       await expect(citybaseApi.agents.detect()).resolves.toEqual({

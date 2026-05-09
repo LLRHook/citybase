@@ -35,6 +35,7 @@ const api = {
   git: {
     getSnapshot: (workspaceId) => invoke('citybase:git.getSnapshot', workspaceId),
     refresh: (workspaceId) => invoke('citybase:git.refresh', workspaceId),
+    listBranches: (workspaceId) => invoke('citybase:git.listBranches', workspaceId),
   },
   agents: {
     detect: () => invoke('citybase:agents.detect'),

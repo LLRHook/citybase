@@ -98,4 +98,18 @@ describe('App idle defaults (no fake activity)', () => {
     render(<App />);
     expect(screen.queryByText(/AGENT REQUESTS APPROVAL/i)).not.toBeInTheDocument();
   });
+
+  it('renders a disabled BranchSelector showing "—" when no workspace is linked', () => {
+    render(<App />);
+    const selector = screen.getByRole('button', { name: /Branch selector/i });
+    expect(selector).toBeInTheDocument();
+    expect(selector).toBeDisabled();
+    expect(selector.textContent).toContain('—');
+  });
+
+  it('does not surface a CLEAN/DIRTY pill in idle (no workspace)', () => {
+    render(<App />);
+    expect(screen.queryByText(/^CLEAN$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^DIRTY/)).not.toBeInTheDocument();
+  });
 });
