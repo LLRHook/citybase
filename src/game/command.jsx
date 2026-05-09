@@ -1,16 +1,12 @@
 // command.jsx — RTS-style command surfaces matching the reference image.
 // Worker Agents row, Action Bar (Actions/Production/Upgrades), Minimap,
 // Objectives checklist, Alerts panel, Codebase Overview w/ sparklines, LIVE transport.
+import { NEON, C, alpha } from './palette.js';
+import { hexPath } from './hex.js';
 import {
-  NEON, C, alpha, hexPath,
   Panel, Pill, Mono, Title,
 } from './theme.jsx';
 import { hpFromContext, fmtTokens } from './data.js';
-import { OBJECTIVES, ALERTS } from '../data/seed.js';
-
-// OBJECTIVES and ALERTS are sourced from src/data/seed.js. They are re-exported
-// from this module so existing importers (App.jsx) keep working unchanged.
-export { OBJECTIVES, ALERTS };
 
 export function ObjectivesPanel({ items }) {
   return (
@@ -244,13 +240,13 @@ export function SelectedUnitCard({ adv, guild, currentTask }) {
 }
 
 // =================== ACTION BAR ===================
-export const ACTION_TABS = [
+const ACTION_TABS = [
   { id: 'actions',    label: 'ACTIONS',    color: 'cyan' },
   { id: 'production', label: 'PRODUCTION', color: 'magenta' },
   { id: 'upgrades',   label: 'UPGRADES',   color: 'amber' },
 ];
 
-export const ACTION_DEFS = {
+const ACTION_DEFS = {
   actions: [
     { id: 'lint',     label: 'RUN LINT',   key: 'L', color: 'cyan',    icon: '⚯', desc: 'Sweep for violations' },
     { id: 'tests',    label: 'RUN TESTS',  key: 'T', color: 'green',   icon: '✓', desc: 'Run golden harness' },

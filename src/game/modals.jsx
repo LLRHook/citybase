@@ -1,7 +1,7 @@
 // modals.jsx — quest detail / accept dialog and post-a-quest modal.
 import React from 'react';
+import { NEON, C, alpha } from './palette.js';
 import {
-  NEON, C, alpha,
   Pill, Mono, Title, NButton,
 } from './theme.jsx';
 import { SKILL_DEFS, DISTRICTS } from './data.js';

@@ -1,18 +1,19 @@
 import React from 'react';
+import { NEON, C, alpha } from './game/palette.js';
+import { hexPath, hexToPx } from './game/hex.js';
 import {
-  NEON, C, alpha, hexPath, hexToPx,
   Mono, Title, Pill, NButton, NeonBar,
 } from './game/theme.jsx';
 import {
   REPO, DISTRICTS, GUILDS, SKILL_DEFS, ACTIVITY,
 } from './game/data.js';
 import { QUESTS_V2 } from './game/sagas.js';
+import { OBJECTIVES, ALERTS } from './data/seed.js';
 import { CityMap } from './game/map.jsx';
 import {
   QuestBoard, GuildRoster, ActivityFeed, VitalsBar,
 } from './game/panels.jsx';
 import {
-  OBJECTIVES, ALERTS,
   ObjectivesPanel, AlertsPanel,
   WorkerAgentsRow, SelectedUnitCard,
   ActionBar, Minimap, CodebaseOverview,
@@ -23,8 +24,9 @@ import {
 } from './game/modals.jsx';
 import { KanbanView } from './game/kanban.jsx';
 import { AdventurerAnalysis } from './game/analysis.jsx';
+import { useTweaks } from './game/useTweaks.js';
 import {
-  useTweaks, TweaksPanel, TweakSection, TweakToggle, TweakRadio,
+  TweaksPanel, TweakSection, TweakToggle, TweakRadio,
 } from './game/tweaks.jsx';
 
 const TWEAK_DEFAULTS = { role: 'admin', connected: true };

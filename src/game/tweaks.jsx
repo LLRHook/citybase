@@ -61,16 +61,6 @@ const TWEAKS_STYLE = `
   .twk-fab:hover{background:rgba(93,212,255,.1)}
 `;
 
-export function useTweaks(defaults) {
-  const [values, setValues] = React.useState(defaults);
-  const setTweak = React.useCallback((keyOrEdits, val) => {
-    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
-      ? keyOrEdits : { [keyOrEdits]: val };
-    setValues(prev => ({ ...prev, ...edits }));
-  }, []);
-  return [values, setTweak];
-}
-
 const PAD = 16;
 
 export function TweaksPanel({ title = 'Tweaks', children }) {
