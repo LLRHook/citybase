@@ -34,9 +34,19 @@ npm run dev:desktop
 | `npm run build` | Production renderer build to `dist/` |
 | `npm run build:desktop` | Build the renderer for Electron loading from `dist/index.html` |
 | `npm run start:desktop` | Launch Electron against the built renderer |
+| `npm run package:dir` | Build the renderer + package an unpacked dev build under `dist-electron/` (no installer, no codesign) |
+| `npm run package:mac` | Build a macOS `.app` directory under `dist-electron/`, ad-hoc / unsigned for local dev |
 | `npm run lint` | ESLint over the project |
 | `npm test` | Run Vitest in watch mode; use `npm test -- --run` for a single pass |
 | `npm run preview` | Preview the production renderer build locally |
+
+### Packaging notes
+
+`package:dir` and `package:mac` are intentionally **dev-only**: no DMG, no notarization, no codesigning identity. They produce a runnable app directory you can hand to a teammate or launch locally. Production-distribution scripts (DMG, signed/notarized macOS, Windows MSI, Linux AppImage) are deferred to a later phase.
+
+`electron-builder` reads its config from the `build` field in `package.json`. Output goes to `dist-electron/` which is gitignored.
+
+**Windows dev note:** running `package:*` from Windows requires either Windows Developer Mode enabled (Settings → Privacy & Security → For Developers) or an admin shell — electron-builder's first run extracts a 7z cache that contains symbolic links, which Windows refuses to create otherwise. macOS and Linux runners (including the CI image) have no such constraint.
 
 ## Project structure
 
