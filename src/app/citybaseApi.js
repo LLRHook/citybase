@@ -35,6 +35,9 @@ function browserStub() {
       produceDiff: async () => ({ files: [] }),
       runChecks: async () => [],
       openPR: async () => { throw new Error('agents are unavailable in browser preview'); },
+      approve: async () => undefined,
+      reject: async () => undefined,
+      listPendingApprovals: async () => [],
       onEvent: () => noopUnsubscribe,
     },
     menu: {

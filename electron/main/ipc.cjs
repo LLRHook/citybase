@@ -18,7 +18,10 @@ const { ClaudeAdapter } = require('./agents/ClaudeAdapter.cjs');
 function buildAgentManager() {
   const codex = new CodexAdapter({ processService });
   const claude = new ClaudeAdapter({ processService });
-  return createAgentManager({ adapters: { codex, claude } });
+  return createAgentManager({
+    adapters: { codex, claude },
+    detect: () => detectAgentBinaries(),
+  });
 }
 
 function registerIpc({ getMainWindow }) {
