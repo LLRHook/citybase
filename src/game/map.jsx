@@ -7,14 +7,6 @@ import {
 } from './theme.jsx';
 import { DISTRICTS, BUILDINGS } from './data.js';
 
-/**
- * Build axial hex-tile coordinates surrounding a district using a fixed candidate offset list.
- * @param {Object} d - District descriptor.
- * @param {number} d.q - District axial q coordinate.
- * @param {number} d.r - District axial r coordinate.
- * @param {number} d.files - Number of files in the district; controls how many offsets are chosen.
- * @returns {Array<{q: number, r: number}>} An array of absolute axial tile coordinates around the district.
- */
 function tilesForDistrict(d) {
   const offsets = [
     [0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1],
@@ -23,11 +15,6 @@ function tilesForDistrict(d) {
   return offsets.map(([dq, dr]) => ({ q: d.q + dq, r: d.r + dr }));
 }
 
-/**
- * Assigns buildings for a district to specific tile coordinates around that district.
- * @param {string} districtId - The id of the district whose buildings will be placed.
- * @returns {Array<Object>} An array of building objects extended with `q` and `r` properties containing the assigned tile coordinates.
- */
 function buildingsPlaced(districtId) {
   const d = DISTRICTS.find(x => x.id === districtId);
   const tiles = tilesForDistrict(d);

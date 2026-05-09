@@ -98,11 +98,6 @@ export const GUILDS = [
   },
 ];
 
-/**
- * Compute remaining context as a percentage for an adventurer.
- * @param {Object} adv - Adventurer object with optional numeric properties `maxContext` and `contextUsed`. `maxContext` defaults to 1 when absent.
- * @returns {number} Remaining context as an integer percentage between 0 and 100; returns 0 if `adv` is falsy.
- */
 export function hpFromContext(adv) {
   if (!adv) return 0;
   const max = adv.maxContext || 1;
@@ -110,12 +105,6 @@ export function hpFromContext(adv) {
   return Math.round((1 - used / max) * 100);
 }
 
-/**
- * Format a token count into a compact, human-readable string.
- *
- * @param {number|null|undefined} n - The token count to format.
- * @returns {string} `'—'` if `n` is `null` or `undefined`; otherwise the token count as a string. Numbers below 1000 are returned unchanged, numbers 1000 and above are divided by 1000 and suffixed with `K` (use one decimal place, e.g. `1.2K`, except for values >= 100000 which omit the decimal, e.g. `120K`).
- */
 export function fmtTokens(n) {
   if (n == null) return '—';
   if (n >= 1000) return (n / 1000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '') + 'K';
