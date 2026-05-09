@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ClaudeAdapter, DEFAULT_MODEL } from '../../electron/main/agents/ClaudeAdapter.cjs';
+import {
+  ClaudeAdapter,
+  DEFAULT_MODEL,
+  buildClaudeArgv,
+  parseClaudeJsonResult,
+} from '../../electron/main/agents/ClaudeAdapter.cjs';
 
 const VALID_PARAMS = {
   questId: 'TASK-1',
@@ -10,10 +15,29 @@ const VALID_PARAMS = {
   promptContext: 'do the thing',
 };
 
+// A realistic stdout envelope from `claude --print --output-format json`.
+const SUCCESS_STDOUT = JSON.stringify({
+  type: 'result',
+  subtype: 'success',
+  is_error: false,
+  duration_ms: 1234,
+  num_turns: 1,
+  result: 'I refactored the file as you asked.',
+  session_id: 's-1',
+  usage: { input_tokens: 100, output_tokens: 200 },
+});
+
+const ERROR_STDOUT = JSON.stringify({
+  type: 'result',
+  subtype: 'error',
+  is_error: true,
+  result: 'rate limit hit; please retry later',
+});
+
 function makeProcessService(overrides = {}) {
   return {
     run: vi.fn(async () => ({
-      ok: true, code: 0, signal: null, stdout: '', stderr: '',
+      ok: true, code: 0, signal: null, stdout: SUCCESS_STDOUT, stderr: '',
       timedOut: false, durationMs: 12, error: null,
     })),
     ...overrides,
@@ -76,34 +100,48 @@ describe('ClaudeAdapter — claude CLI presence', () => {
   });
 });
 
+describe('ClaudeAdapter — buildClaudeArgv (real Claude CLI flags)', () => {
+  it('uses --print and --output-format json (NOT --quiet/--prompt)', () => {
+    const argv = buildClaudeArgv({ params: VALID_PARAMS });
+    expect(argv).toContain('--print');
+    expect(argv[argv.indexOf('--output-format') + 1]).toBe('json');
+    expect(argv).not.toContain('--quiet');
+    expect(argv).not.toContain('--prompt');
+  });
+
+  it('passes the prompt as a positional argument (last item)', () => {
+    const argv = buildClaudeArgv({ params: { ...VALID_PARAMS, promptContext: 'fix the build' } });
+    expect(argv.at(-1)).toBe('fix the build');
+  });
+
+  it('threads --model through with a sane default', () => {
+    expect(buildClaudeArgv({ params: VALID_PARAMS })[
+      buildClaudeArgv({ params: VALID_PARAMS }).indexOf('--model') + 1
+    ]).toBe(DEFAULT_MODEL);
+    const overridden = buildClaudeArgv({ params: { ...VALID_PARAMS, model: 'claude-opus-4-7' } });
+    expect(overridden[overridden.indexOf('--model') + 1]).toBe('claude-opus-4-7');
+  });
+
+  it('sets --permission-mode bypassPermissions for non-interactive runs', () => {
+    const argv = buildClaudeArgv({ params: VALID_PARAMS });
+    expect(argv[argv.indexOf('--permission-mode') + 1]).toBe('bypassPermissions');
+  });
+});
+
 describe('ClaudeAdapter — startTask', () => {
   it('validates params (rejects bad skill)', async () => {
     await expect(makeAdapter().startTask({ ...VALID_PARAMS, skill: 'magic' }))
       .rejects.toThrow(/skill must be one of/);
   });
 
-  it('threads params.model through; defaults to Sonnet when absent', async () => {
-    const ps = makeProcessService();
-    const adapter = makeAdapter({ processService: ps });
-    await adapter.startTask(VALID_PARAMS);
-    let argv = ps.run.mock.calls.at(-1)[1];
-    expect(argv).toContain('--model');
-    expect(argv[argv.indexOf('--model') + 1]).toBe(DEFAULT_MODEL);
-
-    ps.run.mockClear();
-    await adapter.startTask({ ...VALID_PARAMS, model: 'claude-opus-4-7' });
-    argv = ps.run.mock.calls.at(-1)[1];
-    expect(argv[argv.indexOf('--model') + 1]).toBe('claude-opus-4-7');
-  });
-
-  it('builds an argv with --quiet and --prompt', async () => {
+  it('passes the configured argv to processService.run', async () => {
     const ps = makeProcessService();
     const adapter = makeAdapter({ processService: ps });
     await adapter.startTask(VALID_PARAMS);
     const argv = ps.run.mock.calls.at(-1)[1];
-    expect(argv[0]).toBe('--quiet');
-    expect(argv).toContain('--prompt');
+    expect(argv[0]).toBe('--print');
     expect(argv).toContain('do the thing');
+    expect(argv).not.toContain('--quiet');
   });
 
   it('marks the run as done on a clean exit', async () => {
@@ -131,38 +169,106 @@ describe('ClaudeAdapter — startTask', () => {
   });
 });
 
-describe('ClaudeAdapter — streamEvents', () => {
+describe('ClaudeAdapter — streamEvents (real CLI output, no synthetic trail)', () => {
   async function collect(it) {
     const out = [];
     for await (const v of it) out.push(v);
     return out;
   }
 
-  it('emits events that name the binary as "claude"', async () => {
+  it('yields a single edit event with the parsed result text', async () => {
     const adapter = makeAdapter();
     const run = await adapter.startTask(VALID_PARAMS);
     const events = await collect(adapter.streamEvents(run.runId));
-    expect(events.map(e => e.kind)).toEqual(['plan', 'edit', 'test', 'pr']);
-    expect(events[0].text).toContain('claude');
-    expect(events[0].text).not.toContain('codex');
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('edit');
+    expect(events[0].text).toBe('claude: I refactored the file as you asked.');
+    expect(events[0].runId).toBe(run.runId);
+    expect(events[0].t).toMatch(/^\d{2}:\d{2}$/);
   });
 
-  it('emits an error event on a failed run', async () => {
+  it('yields an error event when claude reports is_error in the JSON envelope', async () => {
     const ps = makeProcessService({
       run: vi.fn(async () => ({
-        ok: false, code: 2, signal: null, stdout: '', stderr: '',
+        ok: true, code: 0, signal: null, stdout: ERROR_STDOUT, stderr: '',
+        timedOut: false, durationMs: 12, error: null,
+      })),
+    });
+    const adapter = makeAdapter({ processService: ps });
+    const run = await adapter.startTask(VALID_PARAMS);
+    const events = await collect(adapter.streamEvents(run.runId));
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('error');
+    expect(events[0].text).toContain('rate limit hit');
+  });
+
+  it('yields an error event when the process exits non-zero', async () => {
+    const ps = makeProcessService({
+      run: vi.fn(async () => ({
+        ok: false, code: 2, signal: null, stdout: '', stderr: 'fatal: claude died',
         timedOut: false, durationMs: 5, error: { message: 'exit 2', code: 2 },
       })),
     });
     const adapter = makeAdapter({ processService: ps });
     const run = await adapter.startTask(VALID_PARAMS);
     const events = await collect(adapter.streamEvents(run.runId));
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('error');
+    expect(events[0].text).toContain('fatal: claude died');
+  });
+
+  it('yields an error event with the timeout message when the run timed out', async () => {
+    const ps = makeProcessService({
+      run: vi.fn(async () => ({
+        ok: false, code: null, signal: null, stdout: '', stderr: '',
+        timedOut: true, durationMs: 15_000, error: { message: 'timed out', code: 'ETIMEDOUT' },
+      })),
+    });
+    const adapter = makeAdapter({ processService: ps });
+    const run = await adapter.startTask(VALID_PARAMS);
+    const events = await collect(adapter.streamEvents(run.runId));
     expect(events.at(-1).kind).toBe('error');
+    expect(events.at(-1).text).toMatch(/timed out/);
+  });
+
+  it('yields a cancelled-error event for cancelled runs', async () => {
+    const adapter = makeAdapter();
+    const run = await adapter.startTask(VALID_PARAMS);
+    await adapter.cancel(run.runId);
+    const events = await collect(adapter.streamEvents(run.runId));
+    expect(events.at(-1).kind).toBe('error');
+    expect(events.at(-1).text).toMatch(/cancelled/);
   });
 
   it('throws on unknown runId', async () => {
     await expect(collect(makeAdapter().streamEvents('nope')))
       .rejects.toThrow(/unknown runId/);
+  });
+});
+
+describe('parseClaudeJsonResult', () => {
+  it('returns the result text from a success envelope', () => {
+    const out = parseClaudeJsonResult(SUCCESS_STDOUT);
+    expect(out).toMatchObject({ ok: true, isError: false });
+    expect(out.text).toBe('I refactored the file as you asked.');
+  });
+
+  it('flags is_error and surfaces the result text as the error message', () => {
+    const out = parseClaudeJsonResult(ERROR_STDOUT);
+    expect(out.ok).toBe(false);
+    expect(out.isError).toBe(true);
+    expect(out.text).toContain('rate limit hit');
+  });
+
+  it('treats non-JSON stdout as plain text (claude can fail before printing JSON)', () => {
+    const out = parseClaudeJsonResult('Error: not authenticated; run `claude login`');
+    expect(out.text).toMatch(/not authenticated/);
+  });
+
+  it('returns an error envelope for empty or non-string input', () => {
+    expect(parseClaudeJsonResult('')).toMatchObject({ ok: false, isError: true });
+    expect(parseClaudeJsonResult(null)).toMatchObject({ ok: false, isError: true });
+    expect(parseClaudeJsonResult(undefined)).toMatchObject({ ok: false, isError: true });
   });
 });
 
