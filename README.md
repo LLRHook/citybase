@@ -33,20 +33,46 @@ Open http://localhost:5173.
 
 ```text
 src/
-  App.jsx           — top-level shell (view switching + state)
-  main.jsx          — Vite entry point
+  App.jsx                       — top-level shell (view switching + state)
+  main.jsx                      — Vite entry point
   data/
-    seed.js         — single source of truth for all mock data (the backend will replace this)
+    seed.js                     — single mock data source; the backend will replace this
   game/
-    *.jsx, *.js     — UI components (city map, kanban, analysis, panels, modals)
-    data.js         — re-export shim for legacy import paths (sources from src/data/seed.js)
-    sagas.js        — re-export shim for legacy import paths (sources from src/data/seed.js)
+    palette.js                  — neon color tokens + alpha helper
+    hex.js                      — pointy-top hex grid math (HEX_SIZE, hexToPx, hexPath)
+    theme.jsx                   — UI primitives (Panel, NeonBar, Pill, Title, NButton, Crest, IsoBuilding)
+    useTweaks.js                — runtime-toggles hook
+    map.jsx, kanban.jsx,
+    analysis.jsx, panels.jsx,
+    modals.jsx, command.jsx,
+    tweaks.jsx                  — view + panel components
+    data.js, sagas.js           — re-export shims sourcing from src/data/seed.js (back-compat)
   tests/
-    setup.js
-    *.smoke.test.jsx
+    setup.js                    — Vitest setup (jest-dom + matchMedia shim)
+    *.smoke.test.jsx            — RTL smoke tests against <App />
+
 docs/
-  domain-model.md   — plain-language description of the core entities
-  agent-runtime.md  — provider-neutral agent runtime contract
+  domain-model.md               — plain-language description of the core entities
+  agent-runtime.md              — provider-neutral AgentProvider contract
+
+hooks/
+  commit-msg                    — canonical conventional-commit validator (activated via npm postinstall)
+
+.github/
+  workflows/ci.yml              — install → lint → build → test, SHA-pinned actions
+  dependabot.yml                — weekly bumps for npm + github-actions
+  pull_request_template.md
+
+.claude/
+  settings.json                 — project-level permissions + PreToolUse commit-msg hook
+  hooks/validate-commit-msg.sh  — Bash wrapper that delegates to hooks/commit-msg
+
+CLAUDE.md                       — Claude Code entry point (thin pointer to AGENTS.md)
+AGENTS.md                       — provider-neutral handbook for any AI agent
+CONTRIBUTING.md                 — PR workflow + commit format the hook enforces
+ROADMAP.md                      — phased plan; Phase 0A foundation complete
+.coderabbit.yaml                — advisory AI review (chill profile, advisory mode)
+.gitattributes                  — forces LF on shell scripts (Windows + Git Bash)
 ```
 
 ## Roadmap
