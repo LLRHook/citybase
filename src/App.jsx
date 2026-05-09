@@ -24,6 +24,7 @@ import { useTweaks } from './game/useTweaks.js';
 import {
   TweaksPanel, TweakSection, TweakToggle, TweakRadio, TweakStatus,
 } from './game/tweaks.jsx';
+import { BranchSelector } from './game/branchSelector.jsx';
 import { useWorkspace } from './app/useWorkspace.js';
 import { isDesktop } from './app/citybaseApi.js';
 import { projectRepoTreeToCityModel } from './app/cityModel.js';
@@ -32,7 +33,9 @@ import { useAgentDetect } from './app/useAgentDetect.js';
 import { useApprovalRequests } from './app/useApprovalRequests.js';
 import { citybaseApi } from './app/citybaseApi.js';
 
-const TWEAK_DEFAULTS = { role: 'admin', connected: false, agentProvider: 'auto' };
+const TWEAK_DEFAULTS = {
+  role: 'admin', connected: false, agentProvider: 'auto', selectedBranch: null,
+};
 
 // Phase 0: no provider yet — every projection of the world starts empty.
 // Phase 1+ replaces these with provider-fed values (RepoProvider, GuildProvider, etc).
@@ -294,13 +297,15 @@ function CodebaseCity() {
         </div>
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-          <Mono size={9} color="ink3">BRANCH</Mono>
-          <Mono size={10} color={liveBranch ? 'cyan' : 'ink3'} weight={700}>{branchLabel}</Mono>
-          {isDesktop && workspace.workspace && (
-            <Pill color={liveDirty ? 'amber' : 'green'}>
-              {liveDirty ? `DIRTY · ${workspace.snapshot?.files?.length || 0}` : 'CLEAN'}
-            </Pill>
-          )}
+          <BranchSelector
+            workspaceId={workspace.workspace?.id || null}
+            currentBranch={branchLabel}
+            dirty={liveDirty}
+            fileCount={workspace.snapshot?.files?.length || 0}
+            selectedBranch={tweaks.selectedBranch}
+            onSelect={(name) => setTweak('selectedBranch', name)}
+            api={citybaseApi}
+          />
           <Transport
             playing={playing}
             onToggle={() => setPlaying(p => !p)}
