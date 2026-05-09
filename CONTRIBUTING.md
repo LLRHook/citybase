@@ -28,7 +28,7 @@ If a check fails because of a flaky test or environmental issue, fix the root ca
 
 Follow the existing pattern:
 
-```
+```text
 type: short imperative summary
 
 Optional body explaining why, not what.

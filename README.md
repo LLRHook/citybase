@@ -31,7 +31,7 @@ Open http://localhost:5173.
 
 ## Project structure
 
-```
+```text
 src/
   App.jsx           — top-level shell (view switching + state)
   main.jsx          — Vite entry point
