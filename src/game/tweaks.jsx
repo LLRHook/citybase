@@ -95,9 +95,17 @@ export function TweaksPanel({ title = 'Tweaks', children }) {
     const startRight = window.innerWidth - r.right;
     const startBottom = window.innerHeight - r.bottom;
     let lastX = startRight, lastY = startBottom;
+    const clampX = (x) => {
+      const max = Math.max(PAD, window.innerWidth - panel.offsetWidth - PAD);
+      return Math.min(max, Math.max(PAD, x));
+    };
+    const clampY = (y) => {
+      const max = Math.max(PAD, window.innerHeight - panel.offsetHeight - PAD);
+      return Math.min(max, Math.max(PAD, y));
+    };
     const move = (ev) => {
-      lastX = startRight - (ev.clientX - sx);
-      lastY = startBottom - (ev.clientY - sy);
+      lastX = clampX(startRight - (ev.clientX - sx));
+      lastY = clampY(startBottom - (ev.clientY - sy));
       panel.style.right = lastX + 'px';
       panel.style.bottom = lastY + 'px';
     };
