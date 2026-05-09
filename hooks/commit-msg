@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# hooks/commit-msg — canonical commit-message validator.
+#
+# Enforces conventional-commit format documented in CONTRIBUTING.md.
+# This is the single source of truth: invoked directly by git on every
+# commit, and indirectly by the Claude Code PreToolUse hook
+# (.claude/hooks/validate-commit-msg.sh).
+#
+# Activated by: git config core.hooksPath hooks
+# (the package.json postinstall script does this automatically).
+
+set -u
+
+MSG_FILE="${1:-}"
+if [ -z "$MSG_FILE" ] || [ ! -f "$MSG_FILE" ]; then
+  echo "commit-msg: no message file passed" >&2
+  exit 1
+fi
+
+# First non-comment, non-empty line is the subject. Strip CR for Windows.
+SUBJECT=$(grep -v '^#' "$MSG_FILE" | sed '/^[[:space:]]*$/d' | head -1 | tr -d '\r')
+
+if [ -z "$SUBJECT" ]; then
+  echo "✖ commit message is empty." >&2
+  exit 1
+fi
+
+# Allowed types
+TYPES='feat|fix|refactor|docs|test|chore|ci|style|perf|build|revert'
+
+# Format: <type>(<scope>)?<!>?: <description>
+# Description rules:
+#   - starts with a lowercase letter
+#   - does not end with . ! or ?
+#   - any non-empty content otherwise
+SUBJECT_RE="^(${TYPES})(\([a-z0-9_./-]+\))?(!)?: [a-z][^.!?]*[^.!?]\$"
+
+reject() {
+  cat >&2 <<EOF
+✖ commit subject does not match the project convention.
+
+Got:
+  $SUBJECT
+
+Want:
+  <type>(<scope>)?<!>?: <imperative description>
+
+Allowed types: feat, fix, refactor, docs, test, chore, ci, style, perf, build, revert
+
+Rules:
+  - subject must start with a known type prefix
+  - description (after ": ") starts with a lowercase letter
+  - description must not end with . ! or ?
+  - subject must be at most 72 characters
+  - scope is optional, lowercase only:   fix(lint): drop unused imports
+  - breaking change marker '!' is optional:   feat!: drop legacy data shim
+
+Examples:
+  feat: add agent-runtime adapter contract
+  fix(lint): drop unused React imports
+  refactor: centralize mock data into src/data/seed.js
+  ci: wire CodeRabbit review config
+
+Reason: $1
+
+Fix: rewrite the message and try again. The full message you tried to use
+is preserved in .git/COMMIT_EDITMSG — copy it back if needed.
+EOF
+  exit 1
+}
+
+if ! echo "$SUBJECT" | grep -qE "$SUBJECT_RE"; then
+  reject "subject does not match <type>(<scope>)?<!>?: <description>"
+fi
+
+if [ ${#SUBJECT} -gt 72 ]; then
+  reject "subject is ${#SUBJECT} characters (max 72)"
+fi
+
+exit 0

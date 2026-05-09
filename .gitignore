@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code per-machine state and overrides (settings.json IS tracked)
+.claude/settings.local.json
+.claude/cache/
+.claude/sessions/
+.claude/projects/
+.claude/file-history/

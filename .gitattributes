@@ -1,0 +1,4 @@
+# Force LF endings for shell scripts and hook files so they execute on Linux/macOS
+# and on Windows via Git Bash. CRLF in shebang'd scripts breaks the interpreter lookup.
+hooks/* text eol=lf
+*.sh    text eol=lf
