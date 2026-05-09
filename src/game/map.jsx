@@ -1,8 +1,7 @@
 // map.jsx — the iso city, hex tiles, districts, buildings, animated pawns.
-import React from 'react';
+import { NEON, C, alpha } from './palette.js';
+import { HEX_SIZE, hexToPx, hexPath } from './hex.js';
 import {
-  NEON, C, alpha,
-  HEX_SIZE, hexToPx, hexPath,
   IsoBuilding,
   Title, Mono, Pill,
 } from './theme.jsx';
@@ -16,7 +15,7 @@ function tilesForDistrict(d) {
   return offsets.map(([dq, dr]) => ({ q: d.q + dq, r: d.r + dr }));
 }
 
-export function buildingsPlaced(districtId) {
+function buildingsPlaced(districtId) {
   const d = DISTRICTS.find(x => x.id === districtId);
   const tiles = tilesForDistrict(d);
   return BUILDINGS.filter(b => b.d === districtId).map((b, i) => {

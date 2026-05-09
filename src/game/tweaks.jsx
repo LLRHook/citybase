@@ -61,21 +61,12 @@ const TWEAKS_STYLE = `
   .twk-fab:hover{background:rgba(93,212,255,.1)}
 `;
 
-export function useTweaks(defaults) {
-  const [values, setValues] = React.useState(defaults);
-  const setTweak = React.useCallback((keyOrEdits, val) => {
-    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
-      ? keyOrEdits : { [keyOrEdits]: val };
-    setValues(prev => ({ ...prev, ...edits }));
-  }, []);
-  return [values, setTweak];
-}
+const PAD = 16;
 
 export function TweaksPanel({ title = 'Tweaks', children }) {
   const [open, setOpen] = React.useState(true);
+  const [pos, setPos] = React.useState({ x: PAD, y: PAD });
   const dragRef = React.useRef(null);
-  const offsetRef = React.useRef({ x: 16, y: 16 });
-  const PAD = 16;
 
   const clampToViewport = React.useCallback(() => {
     const panel = dragRef.current;
@@ -83,12 +74,10 @@ export function TweaksPanel({ title = 'Tweaks', children }) {
     const w = panel.offsetWidth, h = panel.offsetHeight;
     const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
     const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
-    offsetRef.current = {
-      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
-      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
-    };
-    panel.style.right = offsetRef.current.x + 'px';
-    panel.style.bottom = offsetRef.current.y + 'px';
+    setPos(prev => ({
+      x: Math.min(maxRight, Math.max(PAD, prev.x)),
+      y: Math.min(maxBottom, Math.max(PAD, prev.y)),
+    }));
   }, []);
 
   React.useEffect(() => {
@@ -105,16 +94,25 @@ export function TweaksPanel({ title = 'Tweaks', children }) {
     const sx = e.clientX, sy = e.clientY;
     const startRight = window.innerWidth - r.right;
     const startBottom = window.innerHeight - r.bottom;
+    let lastX = startRight, lastY = startBottom;
+    const clampX = (x) => {
+      const max = Math.max(PAD, window.innerWidth - panel.offsetWidth - PAD);
+      return Math.min(max, Math.max(PAD, x));
+    };
+    const clampY = (y) => {
+      const max = Math.max(PAD, window.innerHeight - panel.offsetHeight - PAD);
+      return Math.min(max, Math.max(PAD, y));
+    };
     const move = (ev) => {
-      offsetRef.current = {
-        x: startRight - (ev.clientX - sx),
-        y: startBottom - (ev.clientY - sy),
-      };
-      clampToViewport();
+      lastX = clampX(startRight - (ev.clientX - sx));
+      lastY = clampY(startBottom - (ev.clientY - sy));
+      panel.style.right = lastX + 'px';
+      panel.style.bottom = lastY + 'px';
     };
     const up = () => {
       window.removeEventListener('mousemove', move);
       window.removeEventListener('mouseup', up);
+      setPos({ x: lastX, y: lastY });
     };
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
@@ -128,7 +126,7 @@ export function TweaksPanel({ title = 'Tweaks', children }) {
       )}
       {open && (
         <div ref={dragRef} className="twk-panel"
-          style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+          style={{ right: pos.x, bottom: pos.y }}>
           <div className="twk-hd" onMouseDown={onDragStart}>
             <b>{title}</b>
             <button

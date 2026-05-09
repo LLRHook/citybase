@@ -1,14 +1,14 @@
 // kanban.jsx — Jira-style Kanban board, hex/neon styled, with Saga grouping
 import React from 'react';
+import { NEON, C, alpha } from './palette.js';
 import {
-  NEON, C, alpha,
   NeonBar, Pill, Mono, Title,
 } from './theme.jsx';
 import { SKILL_DEFS, GUILDS } from './data.js';
 import { SAGAS } from './sagas.js';
 import { QuestSourceBadge } from './panels.jsx';
 
-export const LANES = [
+const LANES = [
   { id: 'todo',        label: 'TO DO',        color: 'ink3' },
   { id: 'in-progress', label: 'IN PROGRESS',  color: 'cyan' },
   { id: 'in-review',   label: 'IN REVIEW',    color: 'magenta' },
