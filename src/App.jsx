@@ -78,7 +78,22 @@ function CodebaseCity() {
   const role = tweaks.role || 'admin';
   const connected = tweaks.connected === true;
   const agentProvider = tweaks.agentProvider || 'auto';
-  const agentDetect = useAgentDetect();
+
+  // The main process pushes a one-shot boot payload on did-finish-load
+  // carrying the initial agent-detection result + auto-restored
+  // workspace. Subscribing here lets useAgentDetect skip its own IPC
+  // roundtrip when the payload arrived first — the v1 auto-boot gate.
+  const [bootDetect, setBootDetect] = React.useState(
+    () => citybaseApi.app?.getBoot?.()?.detect || null,
+  );
+  React.useEffect(() => {
+    if (typeof citybaseApi.app?.onBoot !== 'function') return undefined;
+    return citybaseApi.app.onBoot((payload) => {
+      if (payload && payload.detect) setBootDetect(payload.detect);
+    });
+  }, []);
+
+  const agentDetect = useAgentDetect({ initial: bootDetect });
   const approval = useApprovalRequests();
   const dispatchCounterRef = React.useRef(0);
 

@@ -13,6 +13,8 @@ function browserStub() {
     app: {
       getVersion: async () => '0.1.0-web',
       getPlatform: async () => 'browser',
+      onBoot: () => noopUnsubscribe,
+      getBoot: () => null,
     },
     workspace: {
       pick: async () => null,

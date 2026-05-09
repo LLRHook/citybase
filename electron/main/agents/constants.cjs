@@ -4,4 +4,10 @@
 
 const AGENT_EVENT_CHANNEL = 'citybase:agent.event';
 
-module.exports = { AGENT_EVENT_CHANNEL };
+// One-shot payload pushed by main.cjs once webContents.did-finish-load
+// fires; the renderer subscribes via citybaseApi.app.onBoot. Carries the
+// initial agent-detection result and the auto-restored workspace so the
+// renderer doesn't need to make two extra IPC roundtrips on mount.
+const BOOT_PAYLOAD_CHANNEL = 'citybase:boot.payload';
+
+module.exports = { AGENT_EVENT_CHANNEL, BOOT_PAYLOAD_CHANNEL };

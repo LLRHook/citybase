@@ -2,7 +2,7 @@
 // We expose ONLY a typed `window.citybase` object via contextBridge — never
 // raw ipcRenderer, fs, or shell. The renderer treats this object as its API.
 const { contextBridge, ipcRenderer } = require('electron');
-const { AGENT_EVENT_CHANNEL } = require('../main/agents/constants.cjs');
+const { AGENT_EVENT_CHANNEL, BOOT_PAYLOAD_CHANNEL } = require('../main/agents/constants.cjs');
 
 const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -20,10 +20,39 @@ ipcRenderer.on(AGENT_EVENT_CHANNEL, (_evt, payload) => {
   }
 });
 
+// Boot payload: arrives once shortly after did-finish-load. We cache the
+// last value so a late subscriber (e.g. a hook that mounts after the
+// payload already fired) still sees the data instead of hanging on
+// pending. The cache also lets us replay synchronously to new callbacks.
+let cachedBootPayload = null;
+const bootListeners = new Set();
+ipcRenderer.on(BOOT_PAYLOAD_CHANNEL, (_evt, payload) => {
+  cachedBootPayload = payload || null;
+  for (const cb of bootListeners) {
+    try { cb(payload); } catch (err) { console.error('citybase boot listener', err); }
+  }
+});
+
 const api = {
   app: {
     getVersion: () => invoke('citybase:app.getVersion'),
     getPlatform: () => invoke('citybase:app.getPlatform'),
+    // One-shot boot payload from the main process. If a payload has
+    // already arrived, we replay it on the microtask queue so the
+    // subscriber doesn't have to handle "maybe sync, maybe async".
+    onBoot: (cb) => {
+      bootListeners.add(cb);
+      if (cachedBootPayload) {
+        const payload = cachedBootPayload;
+        queueMicrotask(() => {
+          if (bootListeners.has(cb)) {
+            try { cb(payload); } catch (err) { console.error('citybase boot replay', err); }
+          }
+        });
+      }
+      return () => { bootListeners.delete(cb); };
+    },
+    getBoot: () => cachedBootPayload,
   },
   workspace: {
     pick: () => invoke('citybase:workspace.pick'),

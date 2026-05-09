@@ -34,6 +34,16 @@ describe('citybaseApi — browser stub (no window.citybase)', () => {
     ]);
   });
 
+  it('app.onBoot returns a no-op unsubscribe (browser has no main process)', () => {
+    const off = citybaseApi.app.onBoot(() => {});
+    expect(typeof off).toBe('function');
+    expect(() => off()).not.toThrow();
+  });
+
+  it('app.getBoot returns null in the browser stub', () => {
+    expect(citybaseApi.app.getBoot()).toBeNull();
+  });
+
   it('git.listBranches returns [] in the browser stub', async () => {
     await expect(citybaseApi.git.listBranches('any-id')).resolves.toEqual([]);
   });
@@ -92,7 +102,12 @@ describe('citybaseApi — browser stub (no window.citybase)', () => {
 describe('citybaseApi — desktop bridge (window.citybase present)', () => {
   beforeEach(async () => {
     window.citybase = {
-      app: { getVersion: async () => '1.0.0', getPlatform: async () => 'win32' },
+      app: {
+        getVersion: async () => '1.0.0',
+        getPlatform: async () => 'win32',
+        onBoot: () => () => {},
+        getBoot: () => null,
+      },
       workspace: { pick: async () => null, getCurrent: async () => null, setCurrent: async () => null, listRecent: async () => [], forget: async () => undefined },
       git: {
         getSnapshot: async () => null, refresh: async () => null,
