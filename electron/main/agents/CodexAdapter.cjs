@@ -171,7 +171,14 @@ class CodexAdapter extends AgentAdapter {
     const results = [];
     for (const script of wanted) {
       if (typeof scripts[script] !== 'string') continue;
-      const r = await this._processService.run('npm', ['run', script, '--silent'], { cwd: entry.cwd });
+      // npm separates script args with a literal '--'; downstream args
+      // get forwarded to the script process. '--run' makes Vitest exit
+      // after a single pass instead of staying in watch mode (which
+      // would hang the check forever). It's a no-op for runners that
+      // don't recognize it.
+      const argv = ['run', script, '--silent'];
+      if (script === 'test') argv.push('--', '--run');
+      const r = await this._processService.run('npm', argv, { cwd: entry.cwd });
       const state = r.timedOut ? 'fail' : (r.ok ? 'pass' : 'fail');
       const meta = r.timedOut
         ? `timed out after ${r.durationMs}ms`
