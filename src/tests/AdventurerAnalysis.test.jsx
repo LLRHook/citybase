@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { AdventurerAnalysis } from '../game/analysis.jsx';
+import { AdventurerAnalysis, RunHistoryPanel } from '../game/analysis.jsx';
 import { GUILDS, ADV_REPORTS } from '../data/seed.js';
 
 const DISTRICTS = [
@@ -194,5 +194,92 @@ describe('AdventurerAnalysis (no-code review layout)', () => {
     await user.type(textarea, '   feat: did it   ');
     await user.click(screen.getByRole('button', { name: /Commit$/ }));
     expect(onCommit).toHaveBeenCalledWith('feat: did it');
+  });
+
+  it('renders the Run History panel in the empty state with the empty-run message', () => {
+    render(
+      <AdventurerAnalysis
+        advId={null}
+        guilds={GUILDS}
+        advReports={ADV_REPORTS}
+        districts={DISTRICTS}
+        onPickAdv={() => {}}
+        runs={[]}
+      />,
+    );
+    expect(screen.getByText('Run History')).toBeInTheDocument();
+    expect(screen.getByText(/no runs yet · dispatch an agent/i)).toBeInTheDocument();
+  });
+
+  it('lists real runs in the empty state when the runs prop is non-empty', () => {
+    render(
+      <AdventurerAnalysis
+        advId={null}
+        guilds={GUILDS}
+        advReports={ADV_REPORTS}
+        districts={DISTRICTS}
+        onPickAdv={() => {}}
+        runs={[
+          { runId: 'aaaaaaaaXX', status: 'done', provider: 'claude', branch: 'main',
+            questId: 'TASK-A', adventurerId: 'a1', startedAt: 1_700_000_000_000 },
+        ]}
+      />,
+    );
+    expect(screen.queryByText(/no runs yet/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/TASK-A · aaaaaaaa/)).toBeInTheDocument();
+    expect(screen.getByTestId('run-history-row')).toBeInTheDocument();
+  });
+
+  it('renders the Run History panel in the right column when a report is selected', () => {
+    render(
+      <AdventurerAnalysis
+        advId="alpha-7"
+        guilds={GUILDS}
+        advReports={ADV_REPORTS}
+        districts={DISTRICTS}
+        onPickAdv={() => {}}
+        runs={[
+          { runId: 'rrrrrrrr12', status: 'failed', provider: 'claude',
+            questId: 'TASK-FAIL', adventurerId: 'a1', startedAt: 1_700_000_000_000 },
+        ]}
+      />,
+    );
+    // The seeded report renders, AND the run history shows up alongside.
+    expect(screen.getByText('Changed Districts')).toBeInTheDocument();
+    expect(screen.getByText('Run History')).toBeInTheDocument();
+    expect(screen.getByText(/TASK-FAIL · rrrrrrrr/)).toBeInTheDocument();
+  });
+});
+
+describe('RunHistoryPanel', () => {
+  it('renders the empty-state message when runs is empty or non-array', () => {
+    const { rerender } = render(<RunHistoryPanel runs={[]} />);
+    expect(screen.getByText(/no runs yet · dispatch an agent/i)).toBeInTheDocument();
+    rerender(<RunHistoryPanel runs={null} />);
+    expect(screen.getByText(/no runs yet · dispatch an agent/i)).toBeInTheDocument();
+  });
+
+  it('renders one row per run with status, provider, branch, and id prefix', () => {
+    render(<RunHistoryPanel runs={[
+      { runId: '12345678abcd', status: 'running', provider: 'claude',
+        branch: 'feature/x', questId: 'Q1', startedAt: 1_700_000_000_000 },
+      { runId: 'cancelledAA1', status: 'cancelled', provider: 'claude',
+        branch: 'main', questId: 'Q2', startedAt: 1_700_000_000_500 },
+    ]} />);
+    const rows = screen.getAllByTestId('run-history-row');
+    expect(rows).toHaveLength(2);
+    expect(screen.getByText(/Q1 · 12345678/)).toBeInTheDocument();
+    expect(screen.getByText(/Q2 · cancelle/)).toBeInTheDocument();
+    // Status pills appear at least once each.
+    expect(screen.getByText('running')).toBeInTheDocument();
+    expect(screen.getByText('cancelled')).toBeInTheDocument();
+  });
+
+  it('falls back to "(no quest)" when questId is missing', () => {
+    render(<RunHistoryPanel runs={[
+      { runId: 'noquest123z', status: 'done', provider: 'claude' },
+    ]} />);
+    // The id is sliced to 8 chars in the rendered row.
+    expect(screen.getByText(/\(no quest\) · noquest1/)).toBeInTheDocument();
   });
 });

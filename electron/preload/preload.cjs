@@ -79,6 +79,7 @@ const api = {
     startRun: (params) => invoke('citybase:agent.startRun', params),
     cancel: (runId) => invoke('citybase:agent.cancel', runId),
     getRun: (runId) => invoke('citybase:agent.getRun', runId),
+    listRuns: (opts) => invoke('citybase:agent.listRuns', opts),
     reportUsage: (runId) => invoke('citybase:agent.reportUsage', runId),
     produceDiff: (runId) => invoke('citybase:agent.produceDiff', runId),
     runChecks: (runId) => invoke('citybase:agent.runChecks', runId),

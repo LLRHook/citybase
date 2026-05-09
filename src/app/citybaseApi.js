@@ -39,6 +39,7 @@ function browserStub() {
       startRun: async () => { throw new Error('agents are unavailable in browser preview'); },
       cancel: async () => undefined,
       getRun: async () => null,
+      listRuns: async () => [],
       reportUsage: async () => ({ contextUsed: 0, maxContext: 0 }),
       produceDiff: async () => ({ files: [] }),
       runChecks: async () => [],

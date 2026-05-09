@@ -31,6 +31,7 @@ import { projectRepoTreeToCityModel } from './app/cityModel.js';
 import { projectSnapshotToActivity } from './app/activity.js';
 import { useAgentDetect } from './app/useAgentDetect.js';
 import { useApprovalRequests } from './app/useApprovalRequests.js';
+import { useRunHistory } from './app/useRunHistory.js';
 import { citybaseApi } from './app/citybaseApi.js';
 
 const TWEAK_DEFAULTS = {
@@ -95,6 +96,7 @@ function CodebaseCity() {
 
   const agentDetect = useAgentDetect({ initial: bootDetect });
   const approval = useApprovalRequests();
+  const runHistory = useRunHistory();
   const dispatchCounterRef = React.useRef(0);
 
   const workspace = useWorkspace();
@@ -450,6 +452,7 @@ function CodebaseCity() {
           onPickAdv={setAnalysisAdv}
           workspaceDirty={workspace.snapshot?.files?.length || 0}
           onCommit={commitWorkspace}
+          runs={runHistory}
         />
       )}
 
