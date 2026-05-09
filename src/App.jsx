@@ -22,14 +22,15 @@ import { KanbanView } from './game/kanban.jsx';
 import { AdventurerAnalysis } from './game/analysis.jsx';
 import { useTweaks } from './game/useTweaks.js';
 import {
-  TweaksPanel, TweakSection, TweakToggle, TweakRadio,
+  TweaksPanel, TweakSection, TweakToggle, TweakRadio, TweakStatus,
 } from './game/tweaks.jsx';
 import { useWorkspace } from './app/useWorkspace.js';
 import { isDesktop } from './app/citybaseApi.js';
 import { projectRepoTreeToCityModel } from './app/cityModel.js';
 import { projectSnapshotToActivity } from './app/activity.js';
+import { useAgentDetect } from './app/useAgentDetect.js';
 
-const TWEAK_DEFAULTS = { role: 'admin', connected: false };
+const TWEAK_DEFAULTS = { role: 'admin', connected: false, agentProvider: 'auto' };
 
 // Phase 0: no provider yet — every projection of the world starts empty.
 // Phase 1+ replaces these with provider-fed values (RepoProvider, GuildProvider, etc).
@@ -71,6 +72,8 @@ function CodebaseCity() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const role = tweaks.role || 'admin';
   const connected = tweaks.connected === true;
+  const agentProvider = tweaks.agentProvider || 'auto';
+  const agentDetect = useAgentDetect();
 
   const workspace = useWorkspace();
   const liveBranch = workspace.snapshot?.branch || null;
@@ -441,6 +444,44 @@ function CodebaseCity() {
               { value: 'admin',  label: 'Admin' },
               { value: 'member', label: 'Member' },
               { value: 'viewer', label: 'Viewer' },
+            ]}
+          />
+        </TweakSection>
+        <TweakSection title="Agents">
+          <TweakStatus
+            label="codex"
+            state={
+              agentDetect.status === 'pending' ? 'pending'
+                : agentDetect.result.codex.found ? 'ok'
+                : 'bad'
+            }
+            meta={
+              agentDetect.status === 'pending' ? 'detecting…'
+                : agentDetect.result.codex.found ? agentDetect.result.codex.path
+                : 'not installed'
+            }
+          />
+          <TweakStatus
+            label="claude"
+            state={
+              agentDetect.status === 'pending' ? 'pending'
+                : agentDetect.result.claude.found ? 'ok'
+                : 'bad'
+            }
+            meta={
+              agentDetect.status === 'pending' ? 'detecting…'
+                : agentDetect.result.claude.found ? agentDetect.result.claude.path
+                : 'not installed'
+            }
+          />
+          <TweakRadio
+            label="Provider"
+            value={agentProvider}
+            onChange={(v) => setTweak('agentProvider', v)}
+            options={[
+              { value: 'auto',   label: 'Auto' },
+              { value: 'codex',  label: 'Codex' },
+              { value: 'claude', label: 'Claude' },
             ]}
           />
         </TweakSection>
