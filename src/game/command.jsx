@@ -7,19 +7,11 @@ import {
   Panel, Pill, Mono, Title,
 } from './theme.jsx';
 import { hpFromContext, fmtTokens } from './data.js';
+import { OBJECTIVES, ALERTS } from '../data/seed.js';
 
-// =================== OBJECTIVES ===================
-export const OBJECTIVES = [
-  { id: 'fix-violations', label: 'Fix new violations',  sub: 'Linters: 3 new',     done: true,  prog: 1.0,  meta: '3/3' },
-  { id: 'golden-tests',   label: 'Run golden tests',    sub: 'Coverage ≥ 80%',     done: true,  prog: 0.81, meta: '81%' },
-  { id: 'clean-pr',       label: 'Merge clean PR',      sub: 'Open PRs: 2',         done: false, prog: 0.5,  meta: '1/2' },
-  { id: 'harness-green',  label: 'Keep harness green',  sub: 'All systems nominal', done: false, prog: 0.0,  meta: '◯' },
-];
-
-export const ALERTS = [
-  { id: 'a1', sev: 'high', title: 'Cyclomatic complexity high', loc: 'lib/github.ts',          who: 'Linters' },
-  { id: 'a2', sev: 'med',  title: 'Flaky test detected',         loc: 'e2e/timeline.spec.ts',  who: 'Tests' },
-];
+// OBJECTIVES and ALERTS are sourced from src/data/seed.js. They are re-exported
+// from this module so existing importers (App.jsx) keep working unchanged.
+export { OBJECTIVES, ALERTS };
 
 export function ObjectivesPanel({ items }) {
   return (
