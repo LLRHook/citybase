@@ -248,8 +248,8 @@ const ACTION_TABS = [
 
 const ACTION_DEFS = {
   actions: [
-    { id: 'dispatch-agent', label: 'DISPATCH', key: 'A', color: 'magenta', icon: '⚒', desc: 'Send agent run' },
-    { id: 'lint',     label: 'RUN LINT',   key: 'L', color: 'cyan',    icon: '⚯', desc: 'Sweep for violations' },
+    { id: 'dispatch-agent', label: 'DISPATCH',   key: 'A', color: 'magenta', icon: '⚒', desc: 'Send agent run' },
+    { id: 'run-checks',     label: 'RUN CHECKS', key: 'L', color: 'cyan',    icon: '⚯', desc: 'lint · test · typecheck' },
     { id: 'tests',    label: 'RUN TESTS',  key: 'T', color: 'green',   icon: '✓', desc: 'Run golden harness' },
     { id: 'refactor', label: 'REFACTOR',   key: 'R', color: 'magenta', icon: '⟲', desc: 'Reduce complexity' },
     { id: 'review',   label: 'REVIEW RUN', key: 'P', color: 'amber',   icon: '◉', desc: 'Inspect open result' },

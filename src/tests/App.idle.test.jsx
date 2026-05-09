@@ -112,4 +112,16 @@ describe('App idle defaults (no fake activity)', () => {
     expect(screen.queryByText(/^CLEAN$/)).not.toBeInTheDocument();
     expect(screen.queryByText(/^DIRTY/)).not.toBeInTheDocument();
   });
+
+  it('renders a RUN CHECKS tile in the city ActionBar', () => {
+    render(<App />);
+    expect(screen.getByRole('button', { name: /RUN CHECKS/ })).toBeInTheDocument();
+  });
+
+  it('clicking RUN CHECKS without a workspace surfaces "Open a workspace first" toast', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: /RUN CHECKS/ }));
+    expect(await screen.findByText(/Open a workspace first/i)).toBeInTheDocument();
+  });
 });

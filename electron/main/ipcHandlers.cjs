@@ -22,6 +22,7 @@ function createIpcHandlers({
   detectAgentBinaries,
   sendAgentEvent,
   getMainWindow,
+  runWorkspaceChecks,
 } = {}) {
   if (!app || typeof app.getVersion !== 'function') {
     throw new TypeError('createIpcHandlers: app is required');
@@ -39,6 +40,9 @@ function createIpcHandlers({
   }
   if (typeof getMainWindow !== 'function') {
     throw new TypeError('createIpcHandlers: getMainWindow must be a function');
+  }
+  if (typeof runWorkspaceChecks !== 'function') {
+    throw new TypeError('createIpcHandlers: runWorkspaceChecks must be a function');
   }
 
   const handleGitSnapshot = async (_evt, workspaceId) => {
@@ -85,6 +89,12 @@ function createIpcHandlers({
       if (!ws) throw new Error(`unknown workspace id: ${workspaceId}`);
       if (typeof gitService.getBranches !== 'function') return [];
       return gitService.getBranches(ws);
+    },
+
+    'citybase:checks.run': async (_evt, workspaceId) => {
+      const ws = await workspaceService.getWorkspaceById(workspaceId);
+      if (!ws) throw new Error(`unknown workspace id: ${workspaceId}`);
+      return runWorkspaceChecks({ workspace: ws });
     },
 
     'citybase:agents.detect': () => detectAgentBinaries(),
