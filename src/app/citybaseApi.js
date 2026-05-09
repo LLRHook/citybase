@@ -2,8 +2,8 @@
 //
 // In Electron we use the `window.citybase` object exposed by preload.cjs.
 // In browser dev mode (no preload) we return a stub with shape-compatible
-// methods that resolve to "no workspace / no git" — this keeps the prototype
-// runnable in `npm run dev` without a desktop shell.
+// methods that resolve to "no workspace / no git / no agents" — this keeps
+// the prototype runnable in `npm run dev` without a desktop shell.
 
 const noopUnsubscribe = () => {};
 
@@ -25,6 +25,18 @@ function browserStub() {
       getSnapshot: async () => null,
       refresh: async () => null,
     },
+    agents: {
+      detect: async () => ({ codex: { found: false }, claude: { found: false } }),
+      list: async () => [],
+      startRun: async () => { throw new Error('agents are unavailable in browser preview'); },
+      cancel: async () => undefined,
+      getRun: async () => null,
+      reportUsage: async () => ({ contextUsed: 0, maxContext: 0 }),
+      produceDiff: async () => ({ files: [] }),
+      runChecks: async () => [],
+      openPR: async () => { throw new Error('agents are unavailable in browser preview'); },
+      onEvent: () => noopUnsubscribe,
+    },
     menu: {
       onCommand: () => noopUnsubscribe,
     },
@@ -37,6 +49,7 @@ function desktop(api) {
     app: api.app,
     workspace: api.workspace,
     git: api.git,
+    agents: api.agents,
     menu: api.menu,
   };
 }
