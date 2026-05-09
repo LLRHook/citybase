@@ -5,7 +5,6 @@ import {
   IsoBuilding,
   Title, Mono, Pill,
 } from './theme.jsx';
-import { DISTRICTS, BUILDINGS } from './data.js';
 
 function tilesForDistrict(d) {
   const offsets = [
@@ -32,11 +31,11 @@ export function HexPawn({ from, to, progress, color, label }) {
   );
 }
 
-function DistrictTiles({ district, focused, onClick }) {
+function DistrictTiles({ district, allBuildings, focused, onClick }) {
   const a = C(district.color);
   const tiles = tilesForDistrict(district);
   const center = hexToPx(district.q, district.r);
-  const buildings = BUILDINGS.filter(b => b.d === district.id).map((b, i) => {
+  const buildings = allBuildings.filter(b => b.d === district.id).map((b, i) => {
     const t = tiles[(i + 1) % tiles.length];
     return { ...b, q: t.q, r: t.r };
   });
@@ -122,9 +121,11 @@ function DistrictTiles({ district, focused, onClick }) {
   );
 }
 
-export function CityMap({ focusedDistrictId, onSelectDistrict, pawns, connected }) {
+export function CityMap({ districts, buildings, focusedDistrictId, onSelectDistrict, pawns, connected }) {
   const W = 820, H = 520;
   const cx = W / 2, cy = H / 2 + 20;
+  const safeDistricts = Array.isArray(districts) ? districts : [];
+  const safeBuildings = Array.isArray(buildings) ? buildings : [];
 
   return (
     <div
@@ -168,7 +169,7 @@ export function CityMap({ focusedDistrictId, onSelectDistrict, pawns, connected 
             })}
           </g>
 
-          {connected && DISTRICTS.filter(d => d.id !== 'core').map(d => {
+          {connected && safeDistricts.filter(d => d.id !== 'core').map(d => {
             const pos = hexToPx(d.q, d.r);
             const col = C(d.color);
             return (
@@ -184,10 +185,11 @@ export function CityMap({ focusedDistrictId, onSelectDistrict, pawns, connected 
             );
           })}
 
-          {connected && DISTRICTS.map(d => (
+          {connected && safeDistricts.map(d => (
             <DistrictTiles
               key={d.id}
               district={d}
+              allBuildings={safeBuildings}
               focused={focusedDistrictId === d.id}
               onClick={onSelectDistrict}
             />
@@ -221,9 +223,9 @@ export function CityMap({ focusedDistrictId, onSelectDistrict, pawns, connected 
         </div>
       )}
 
-      {connected && (
+      {connected && safeDistricts.length > 0 && (
         <div style={{ position: 'absolute', bottom: 10, left: 10, display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: 480 }}>
-          {DISTRICTS.map(d => (
+          {safeDistricts.map(d => (
             <Pill key={d.id} color={d.color}>
               <span style={{ display: 'inline-block', width: 6, height: 6, background: C(d.color), borderRadius: '50%', boxShadow: `0 0 4px ${C(d.color)}` }} />
               {d.name}
