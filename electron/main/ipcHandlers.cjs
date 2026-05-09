@@ -80,6 +80,12 @@ function createIpcHandlers({
 
     'citybase:git.getSnapshot': handleGitSnapshot,
     'citybase:git.refresh': handleGitSnapshot,
+    'citybase:git.listBranches': async (_evt, workspaceId) => {
+      const ws = await workspaceService.getWorkspaceById(workspaceId);
+      if (!ws) throw new Error(`unknown workspace id: ${workspaceId}`);
+      if (typeof gitService.getBranches !== 'function') return [];
+      return gitService.getBranches(ws);
+    },
 
     'citybase:agents.detect': () => detectAgentBinaries(),
     'citybase:agents.list': () => agentManager.listProviders(),

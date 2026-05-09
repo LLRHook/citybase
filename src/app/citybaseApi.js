@@ -24,6 +24,7 @@ function browserStub() {
     git: {
       getSnapshot: async () => null,
       refresh: async () => null,
+      listBranches: async () => [],
     },
     agents: {
       detect: async () => ({ codex: { found: false }, claude: { found: false } }),

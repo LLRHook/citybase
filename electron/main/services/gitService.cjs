@@ -171,4 +171,39 @@ function parseLog(stdout) {
     });
 }
 
-module.exports = { getSnapshot };
+// Pure parser for `git branch --format='%(refname:short)\t%(HEAD)\t%(upstream:short)' --no-color`.
+// Each non-empty line is tab-separated: name<TAB>head-marker<TAB>upstream.
+// %(HEAD) emits '*' for the current branch and ' ' (space) otherwise.
+// %(upstream:short) is empty when no upstream is configured.
+function parseBranchList(stdout) {
+  if (typeof stdout !== 'string' || stdout.length === 0) return [];
+  return stdout.split('\n')
+    .map(line => line.replace(/\r$/, ''))
+    .filter(Boolean)
+    .map(line => {
+      const parts = line.split('\t');
+      const name = (parts[0] || '').trim();
+      const head = (parts[1] || '').trim();
+      const upstream = (parts[2] || '').trim();
+      if (!name) return null;
+      return {
+        name,
+        isCurrent: head === '*',
+        upstream: upstream || null,
+      };
+    })
+    .filter(Boolean);
+}
+
+async function getBranches(workspace) {
+  if (!workspace || !workspace.rootPath) return [];
+  const result = await run(
+    'git',
+    ['branch', '--format=%(refname:short)\t%(HEAD)\t%(upstream:short)', '--no-color'],
+    { cwd: workspace.rootPath, maxBuffer: 4 * 1024 * 1024 },
+  );
+  if (!result.ok) return [];
+  return parseBranchList(result.stdout || '');
+}
+
+module.exports = { getSnapshot, getBranches, parseBranchList };
