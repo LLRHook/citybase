@@ -1,5 +1,4 @@
 // map.jsx — the iso city, hex tiles, districts, buildings, animated pawns.
-import React from 'react';
 import {
   NEON, C, alpha,
   HEX_SIZE, hexToPx, hexPath,

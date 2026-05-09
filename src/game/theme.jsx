@@ -1,5 +1,4 @@
 // theme.jsx — palette, hex-grid math, primitives shared across panels.
-import React from 'react';
 
 export const NEON = {
   bg0: '#070914',

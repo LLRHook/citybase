@@ -1,7 +1,6 @@
 // command.jsx — RTS-style command surfaces matching the reference image.
 // Worker Agents row, Action Bar (Actions/Production/Upgrades), Minimap,
 // Objectives checklist, Alerts panel, Codebase Overview w/ sparklines, LIVE transport.
-import React from 'react';
 import {
   NEON, C, alpha, hexPath,
   Panel, Pill, Mono, Title,

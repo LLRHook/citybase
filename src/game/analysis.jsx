@@ -1,6 +1,5 @@
 // analysis.jsx — Adventurer Analysis (PR + Code Review screen).
 // Frames the PR around the *adventurer*: their reasoning trail, diffs, checks, reviewers, risk.
-import React from 'react';
 import {
   NEON, C, alpha, hexPath,
   Panel, Pill, Mono, Title, NButton,

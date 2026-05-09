@@ -17,5 +17,17 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // Files in src/game/ legitimately co-locate small constants with components
+      // (palette, hex math, mock-data shims). Splitting every file purely for HMR
+      // would bloat the prototype. Treat this as a hint, not a blocker.
+      'react-refresh/only-export-components': 'warn',
+    },
+  },
+  {
+    files: ['src/tests/**/*.{js,jsx}'],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.node },
+    },
   },
 ])
