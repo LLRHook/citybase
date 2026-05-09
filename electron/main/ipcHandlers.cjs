@@ -97,6 +97,24 @@ function createIpcHandlers({
       return runWorkspaceChecks({ workspace: ws });
     },
 
+    'citybase:git.checkout': async (_evt, workspaceId, branchName) => {
+      const ws = await workspaceService.getWorkspaceById(workspaceId);
+      if (!ws) throw new Error(`unknown workspace id: ${workspaceId}`);
+      if (typeof gitService.checkout !== 'function') {
+        return { ok: false, error: { message: 'checkout not available' } };
+      }
+      return gitService.checkout(ws, branchName);
+    },
+
+    'citybase:git.commit': async (_evt, workspaceId, params) => {
+      const ws = await workspaceService.getWorkspaceById(workspaceId);
+      if (!ws) throw new Error(`unknown workspace id: ${workspaceId}`);
+      if (typeof gitService.commit !== 'function') {
+        return { ok: false, error: { message: 'commit not available' } };
+      }
+      return gitService.commit(ws, params);
+    },
+
     'citybase:agents.detect': () => detectAgentBinaries(),
     'citybase:agents.list': () => agentManager.listProviders(),
 
