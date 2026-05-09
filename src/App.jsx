@@ -302,6 +302,7 @@ function CodebaseCity() {
           advId={analysisAdv}
           guilds={guilds}
           advReports={advReports}
+          districts={districts}
           onPickAdv={setAnalysisAdv}
         />
       )}

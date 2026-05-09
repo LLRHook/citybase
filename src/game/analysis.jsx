@@ -1,15 +1,30 @@
-// analysis.jsx — Adventurer Analysis (run + review screen).
-// Frames the run around the *adventurer*: their reasoning trail, diffs, checks, reviewers, risk.
+// analysis.jsx — Adventurer Analysis (no-code review screen).
+//
+// Phase 4 layout:
+//   - Header: adventurer + intent (run title)
+//   - Primary column: 'Changed Districts' rendered as district pills with
+//     file counts and per-file kind chips. Reasoning trail underneath.
+//   - Side column: CI Checks, Risk Assessment (level + score + factors),
+//     a single conspicuous Next Action label.
+//   - Bottom: collapsible 'Raw diff (debug)' drawer that contains the
+//     prior DiffHunk rendering. Closed by default.
+//
+// The rendering is driven by projectRunReview so the screen consumes the
+// same shape a real AgentRun produces. Seed-driven adventurers still
+// work because seed pr.diffs has the same fields modulo the additions /
+// deletions key naming, which we normalize on input.
+import React from 'react';
 import { NEON, C, alpha } from './palette.js';
 import { hexPath } from './hex.js';
 import {
   Panel, Pill, Mono, Title, NButton,
 } from './theme.jsx';
+import { projectRunReview } from '../app/runReview.js';
 
 function CheckRow({ check }) {
   const map = { pass: 'green', fail: 'red', warn: 'amber', running: 'cyan' };
   const sigil = { pass: '✓', fail: '✕', warn: '⚠', running: '…' };
-  const c = C(map[check.state]);
+  const c = C(map[check.state] || 'ink3');
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px',
@@ -17,7 +32,7 @@ function CheckRow({ check }) {
       border: `1px solid ${alpha(c, 0.2)}`,
       borderLeft: `3px solid ${c}`,
     }}>
-      <span style={{ color: c, fontFamily: 'JetBrains Mono', fontWeight: 700 }}>{sigil[check.state]}</span>
+      <span style={{ color: c, fontFamily: 'JetBrains Mono', fontWeight: 700 }}>{sigil[check.state] || '·'}</span>
       <Mono size={10} color="ink" weight={600} style={{ flex: 1 }}>{check.name}</Mono>
       <Mono size={9} color="ink3">{check.meta}</Mono>
     </div>
@@ -26,6 +41,8 @@ function CheckRow({ check }) {
 
 function DiffHunk({ diff }) {
   const kindColor = { add: 'green', modify: 'amber', delete: 'red' }[diff.kind] || 'cyan';
+  const additions = diff.additions != null ? diff.additions : diff.add;
+  const deletions = diff.deletions != null ? diff.deletions : diff.del;
   return (
     <div style={{ marginBottom: 8, border: `1px solid ${NEON.line}`, background: NEON.bg0 }}>
       <div style={{
@@ -36,12 +53,12 @@ function DiffHunk({ diff }) {
         <Pill color={kindColor}>{diff.kind}</Pill>
         <Mono size={10} color="ink" weight={600}>{diff.file}</Mono>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-          <Mono size={9} color="green">+{diff.add}</Mono>
-          <Mono size={9} color="red">−{diff.del}</Mono>
+          <Mono size={9} color="green">+{additions}</Mono>
+          <Mono size={9} color="red">−{deletions}</Mono>
         </span>
       </div>
       <div style={{ fontFamily: 'JetBrains Mono', fontSize: 10, lineHeight: 1.55 }}>
-        {diff.hunks.map((h, i) => {
+        {(diff.hunks || []).map((h, i) => {
           const c = h.type === 'add' ? NEON.green : h.type === 'del' ? NEON.red : NEON.ink2;
           const bg = h.type === 'add' ? alpha(NEON.green, 0.06) : h.type === 'del' ? alpha(NEON.red, 0.06) : 'transparent';
           const sigil = h.type === 'add' ? '+' : h.type === 'del' ? '−' : ' ';
@@ -112,34 +129,130 @@ function ReviewerCell({ r }) {
   );
 }
 
-function RiskMeter({ risk }) {
-  const colorMap = { low: 'green', medium: 'amber', high: 'red' };
-  const c = C(colorMap[risk.level]);
+const RISK_COLOR = { low: 'green', medium: 'amber', high: 'red' };
+
+function RiskMeter({ level, score, factors }) {
+  const c = C(RISK_COLOR[level] || 'ink3');
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 6 }}>
         <Mono size={8} color="ink3">RISK</Mono>
-        <Title size={16} color={colorMap[risk.level]} weight={700} style={{ textTransform: 'uppercase' }}>{risk.level}</Title>
-        <Mono size={9} color={colorMap[risk.level]}>· score {risk.score}/100</Mono>
+        <Title size={16} color={RISK_COLOR[level] || 'ink3'} weight={700} style={{ textTransform: 'uppercase' }}>{level}</Title>
+        <Mono size={9} color={RISK_COLOR[level] || 'ink3'}>· score {score}/100</Mono>
       </div>
       <div style={{ height: 4, background: NEON.bg0, border: `1px solid ${NEON.line}`, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ width: `${risk.score}%`, height: '100%', background: c, boxShadow: `0 0 8px ${c}` }} />
+        <div style={{ width: `${score}%`, height: '100%', background: c, boxShadow: `0 0 8px ${c}` }} />
       </div>
       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {risk.factors.map((f, i) => (
+        {(factors || []).map((f, i) => (
           <Mono key={i} size={9} color="ink2">· {f}</Mono>
+        ))}
+        {(!factors || factors.length === 0) && (
+          <Mono size={9} color="ink3">· no risk signals raised</Mono>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const NEXT_ACTION_COLOR = {
+  approve: 'green',
+  'request changes': 'amber',
+  'request fixes': 'red',
+  cancel: 'ink3',
+};
+
+function NextActionCard({ action }) {
+  const color = NEXT_ACTION_COLOR[action] || 'cyan';
+  const c = C(color);
+  return (
+    <div style={{
+      padding: 10,
+      border: `1px solid ${alpha(c, 0.5)}`,
+      borderLeft: `3px solid ${c}`,
+      background: alpha(c, 0.08),
+    }}>
+      <Mono size={8} color="ink3" style={{ letterSpacing: 1.4 }}>NEXT ACTION</Mono>
+      <Title size={14} color={color} weight={700} style={{ marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+        {action}
+      </Title>
+    </div>
+  );
+}
+
+function ChangedDistricts({ changedDistricts, files }) {
+  if (!changedDistricts || changedDistricts.length === 0) {
+    return <Mono color="ink3">no files changed</Mono>;
+  }
+  return (
+    <div>
+      <Mono size={9} color="ink3" style={{ display: 'block', marginBottom: 6, letterSpacing: 1 }}>
+        {files} FILE{files === 1 ? '' : 'S'} ACROSS {changedDistricts.length} DISTRICT{changedDistricts.length === 1 ? '' : 'S'}
+      </Mono>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {changedDistricts.map((d) => (
+          <div key={d.districtId} style={{
+            padding: 10,
+            border: `1px solid ${NEON.line}`,
+            background: alpha(NEON.bg1, 0.5),
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Pill color={d.districtId === '__unmapped__' ? 'ink3' : 'cyan'}>
+                {d.districtName}
+              </Pill>
+              <Mono size={9} color="ink3">{d.files.length} file{d.files.length === 1 ? '' : 's'}</Mono>
+            </div>
+            <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {d.files.map((f, i) => {
+                const kindColor = { add: 'green', modify: 'amber', delete: 'red' }[f.kind] || 'cyan';
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Pill color={kindColor}>{f.kind}</Pill>
+                    <Mono size={10} color="ink2">{f.file}</Mono>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         ))}
       </div>
     </div>
   );
 }
 
-export function AdventurerAnalysis({ advId, guilds, advReports, onPickAdv }) {
+// Adapt the seed 'pr' object into the inputs runReview expects.
+function buildRunReviewInputs({ pr, adv, districts }) {
+  const run = {
+    runId: `seed-${pr.number}`,
+    questId: pr.questId || `seed-quest-${pr.number}`,
+    adventurerId: adv.id,
+    status: pr.status === 'open' ? 'done' : 'done',
+    contextUsed: 0,
+    maxContext: adv.maxContext || 200_000,
+    branch: pr.branch,
+  };
+  const diff = {
+    files: (pr.diffs || []).map((d) => ({
+      file: d.file,
+      kind: d.kind,
+      additions: d.additions != null ? d.additions : d.add,
+      deletions: d.deletions != null ? d.deletions : d.del,
+      hunks: d.hunks || [],
+    })),
+  };
+  const checks = pr.checks || [];
+  const intent = pr.title;
+  return { run, diff, checks, districts: districts || [], intent };
+}
+
+export function AdventurerAnalysis({ advId, guilds, advReports, districts, onPickAdv }) {
   const report = advReports[advId];
   const adv = guilds.flatMap(g => g.adventurers.map(a => ({ ...a, guild: g }))).find(x => x.id === advId);
   const allWithReports = Object.keys(advReports)
     .map(id => guilds.flatMap(g => g.adventurers.map(a => ({ ...a, guild: g }))).find(x => x.id === id))
     .filter(Boolean);
+
+  const [rawDiffOpen, setRawDiffOpen] = React.useState(false);
 
   if (!report || !adv) {
     return (
@@ -156,6 +269,7 @@ export function AdventurerAnalysis({ advId, guilds, advReports, onPickAdv }) {
 
   const pr = report.pr;
   const guild = adv.guild;
+  const review = projectRunReview(buildRunReviewInputs({ pr, adv, districts }));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -181,6 +295,7 @@ export function AdventurerAnalysis({ advId, guilds, advReports, onPickAdv }) {
         })}
       </div>
 
+      {/* Header card */}
       <div style={{
         padding: 14,
         background: `linear-gradient(180deg, ${alpha(C(guild.color), 0.08)}, ${NEON.bg1})`,
@@ -203,10 +318,10 @@ export function AdventurerAnalysis({ advId, guilds, advReports, onPickAdv }) {
           <Mono size={10} color="ink2" style={{ display: 'block', marginTop: 4 }}>
             <span style={{ color: NEON.cyan }}>RUN #{pr.number}</span>
             <span style={{ color: NEON.ink3 }}> · </span>
-            {pr.title}
+            {review.intent || pr.title}
           </Mono>
           <Mono size={9} color="ink3" style={{ display: 'block', marginTop: 2 }}>
-            {pr.branch} → {pr.base} · {pr.commits} commits · <span style={{ color: NEON.green }}>+{pr.additions}</span> <span style={{ color: NEON.red }}>−{pr.deletions}</span> across {pr.files} files
+            {pr.branch} → {pr.base} · {pr.commits} commits
           </Mono>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 180 }}>
@@ -215,43 +330,40 @@ export function AdventurerAnalysis({ advId, guilds, advReports, onPickAdv }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr 280px', gap: 10 }}>
-        <Panel title="Reasoning Trail · adventurer log" accent={guild.color}>
-          <ReasoningTrail steps={pr.reasoning} />
-        </Panel>
-
-        <Panel
-          title={`Code Changes · ${pr.files} files`}
-          accent="cyan"
-          headerRight={<Pill color="cyan">{pr.additions + pr.deletions} lines</Pill>}
-        >
-          {pr.diffs.map((d, i) => <DiffHunk key={i} diff={d} />)}
-        </Panel>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <Panel title="Changed Districts" accent="cyan">
+            <ChangedDistricts changedDistricts={review.changedDistricts} files={review.changedDistricts.reduce((n, d) => n + d.files.length, 0)} />
+          </Panel>
+          <Panel title="Reasoning Trail · adventurer log" accent={guild.color}>
+            <ReasoningTrail steps={pr.reasoning || []} />
+          </Panel>
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <NextActionCard action={review.nextAction} />
           <Panel title="CI Checks" accent="green">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {pr.checks.map((c, i) => <CheckRow key={i} check={c} />)}
+              {review.checks.map((c, i) => <CheckRow key={i} check={c} />)}
+              {review.checks.length === 0 && (
+                <Mono size={9} color="ink3">no checks reported</Mono>
+              )}
             </div>
           </Panel>
-
-          <Panel title="Reviewers" accent="amber">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {pr.reviewers.map((r, i) => <ReviewerCell key={i} r={r} />)}
-            </div>
-            <div style={{ marginTop: 8, display: 'flex', gap: 4 }}>
-              <NButton accent="green">✓ Approve</NButton>
-              <NButton accent="red" ghost>✕ Request</NButton>
-            </div>
+          <Panel title="Risk Assessment" accent={RISK_COLOR[review.riskLevel] || 'amber'}>
+            <RiskMeter level={review.riskLevel} score={review.riskScore} factors={review.riskFactors} />
           </Panel>
-
-          <Panel title="Risk Assessment" accent="amber">
-            <RiskMeter risk={pr.risk} />
-          </Panel>
+          {(pr.reviewers && pr.reviewers.length > 0) && (
+            <Panel title="Reviewers" accent="amber">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {pr.reviewers.map((r, i) => <ReviewerCell key={i} r={r} />)}
+              </div>
+            </Panel>
+          )}
         </div>
       </div>
 
-      {pr.comments.length > 0 && (
+      {pr.comments && pr.comments.length > 0 && (
         <Panel title={`Comments · ${pr.comments.length}`} accent="magenta">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {pr.comments.map((c, i) => {
@@ -276,6 +388,32 @@ export function AdventurerAnalysis({ advId, guilds, advReports, onPickAdv }) {
             })}
           </div>
         </Panel>
+      )}
+
+      {pr.diffs && pr.diffs.length > 0 && (
+        <div style={{ border: `1px dashed ${NEON.line}`, padding: 10, background: alpha(NEON.bg0, 0.4) }}>
+          <button
+            type="button"
+            onClick={() => setRawDiffOpen((v) => !v)}
+            aria-expanded={rawDiffOpen}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+              background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
+              color: NEON.ink2, fontFamily: 'JetBrains Mono', fontSize: 10, letterSpacing: 1,
+            }}
+          >
+            <span style={{ color: NEON.ink3 }}>{rawDiffOpen ? '▾' : '▸'}</span>
+            <span>RAW DIFF · DEBUG</span>
+            <Mono size={9} color="ink3" style={{ marginLeft: 'auto' }}>
+              {pr.diffs.length} file{pr.diffs.length === 1 ? '' : 's'}
+            </Mono>
+          </button>
+          {rawDiffOpen && (
+            <div style={{ marginTop: 10 }}>
+              {pr.diffs.map((d, i) => <DiffHunk key={i} diff={d} />)}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
