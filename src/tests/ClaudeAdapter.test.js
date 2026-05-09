@@ -296,12 +296,22 @@ describe('ClaudeAdapter — produceDiff / runChecks / openPR / cancel', () => {
     expect(npmCalls.find(a => a[1] === 'test')).toEqual(['run', 'test', '--silent', '--', '--run']);
   });
 
-  it('openPR throws the Phase-5-deferred placeholder, named for claude', async () => {
-    const adapter = makeAdapter();
+  it('openPR shells out to gh and returns { prNumber, url }', async () => {
+    // First call goes to claude (the run); subsequent call is gh pr create.
+    const ps = makeProcessService();
+    const adapter = makeAdapter({ processService: ps });
     const run = await adapter.startTask(VALID_PARAMS);
-    await expect(adapter.openPR(run.runId, {
+    ps.run.mockClear();
+    ps.run.mockResolvedValueOnce({
+      ok: true, code: 0, signal: null,
+      stdout: 'https://github.com/owner/repo/pull/42\n',
+      stderr: '', timedOut: false, durationMs: 7, error: null,
+    });
+    const out = await adapter.openPR(run.runId, {
       title: 't', body: 'b', sourceBranch: 'feat', targetBranch: 'main',
-    })).rejects.toThrow(/openPR not yet supported by claudeAdapter.*Phase 5/);
+    });
+    expect(out).toEqual({ prNumber: 42, url: 'https://github.com/owner/repo/pull/42' });
+    expect(ps.run.mock.calls[0][0]).toBe('gh');
   });
 
   it('cancel marks the run cancelled and is idempotent', async () => {

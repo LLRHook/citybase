@@ -316,12 +316,21 @@ describe('CodexAdapter — runChecks', () => {
 });
 
 describe('CodexAdapter — openPR + cancel', () => {
-  it('openPR throws the deferred-to-Phase-5 placeholder error', async () => {
-    const adapter = makeAdapter();
+  it('openPR shells out to gh and returns { prNumber, url }', async () => {
+    const ps = makeProcessService();
+    const adapter = makeAdapter({ processService: ps });
     const run = await adapter.startTask(VALID_PARAMS);
-    await expect(adapter.openPR(run.runId, {
+    ps.run.mockClear();
+    ps.run.mockResolvedValueOnce({
+      ok: true, code: 0, signal: null,
+      stdout: 'https://github.com/owner/repo/pull/13\n',
+      stderr: '', timedOut: false, durationMs: 9, error: null,
+    });
+    const out = await adapter.openPR(run.runId, {
       title: 't', body: 'b', sourceBranch: 'feat', targetBranch: 'main',
-    })).rejects.toThrow(/openPR not yet supported.*Phase 5/);
+    });
+    expect(out).toEqual({ prNumber: 13, url: 'https://github.com/owner/repo/pull/13' });
+    expect(ps.run.mock.calls[0][0]).toBe('gh');
   });
 
   it('cancel marks the run cancelled and is idempotent', async () => {
