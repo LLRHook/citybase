@@ -26,6 +26,9 @@ function browserStub() {
       refresh: async () => null,
       listBranches: async () => [],
     },
+    checks: {
+      run: async () => [],
+    },
     agents: {
       detect: async () => ({ codex: { found: false }, claude: { found: false } }),
       list: async () => [],
@@ -53,6 +56,7 @@ function desktop(api) {
     app: api.app,
     workspace: api.workspace,
     git: api.git,
+    checks: api.checks,
     agents: api.agents,
     menu: api.menu,
   };

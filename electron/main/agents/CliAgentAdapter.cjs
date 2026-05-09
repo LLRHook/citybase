@@ -15,12 +15,12 @@
 //   - streamEvents synthesizes a trail from the buffered exit state.
 //     Real token-by-token streaming waits on a processService change
 //     that surfaces stdout chunks.
-const path = require('node:path');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const { AgentAdapter, validateStartTaskParams } = require('./AgentAdapter.cjs');
 const { detectAgentBinaries } = require('./detect.cjs');
 const { parseUnifiedDiff } = require('./parseUnifiedDiff.cjs');
+const { runWorkspaceChecks } = require('../services/workspaceChecks.cjs');
 
 function defaultBuildArgv({ params }) {
   return [
@@ -158,30 +158,11 @@ class CliAgentAdapter extends AgentAdapter {
 
   async runChecks(runId) {
     const entry = this._requireRun(runId);
-    const pkgPath = path.join(entry.cwd, 'package.json');
-    let pkg = null;
-    try {
-      const raw = this._readFileSync(pkgPath, 'utf8');
-      pkg = JSON.parse(raw);
-    } catch {
-      return [];
-    }
-    const scripts = (pkg && pkg.scripts) || {};
-    const wanted = ['lint', 'test', 'typecheck'];
-    const results = [];
-    for (const script of wanted) {
-      if (typeof scripts[script] !== 'string') continue;
-      const argv = ['run', script, '--silent'];
-      // '--run' keeps Vitest from entering watch mode; harmless on other runners.
-      if (script === 'test') argv.push('--', '--run');
-      const r = await this._processService.run('npm', argv, { cwd: entry.cwd });
-      const state = r.timedOut ? 'fail' : (r.ok ? 'pass' : 'fail');
-      const meta = r.timedOut
-        ? `timed out after ${r.durationMs}ms`
-        : (r.ok ? `clean in ${r.durationMs}ms` : `exited ${r.code}`);
-      results.push({ name: `${script} · npm run ${script}`, state, meta });
-    }
-    return results;
+    return runWorkspaceChecks({
+      workspace: { rootPath: entry.cwd },
+      processService: this._processService,
+      readFileSync: this._readFileSync,
+    });
   }
 
   async openPR(runId, _params) {
