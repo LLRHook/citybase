@@ -4,7 +4,19 @@
 import { NEON, C, alpha } from './palette.js';
 import { hexPath } from './hex.js';
 
-// ── Iso conversion (for buildings drawn on hex tiles) ──
+/**
+ * Render an isometric box as three SVG polygons (left, right, top) with an optional glow outline.
+ * @param {object} props - Component props.
+ * @param {number} props.x - X coordinate of the box origin.
+ * @param {number} props.y - Y coordinate of the box base.
+ * @param {number} [props.w=22] - Width along the isometric X axis.
+ * @param {number} [props.d=22] - Depth along the isometric Y axis.
+ * @param {number} [props.h=26] - Height of the box.
+ * @param {string} [props.fill] - Face fill color; defaults to the theme background color.
+ * @param {string} [props.stroke] - Edge stroke color; defaults to the theme ink color.
+ * @param {string|false} [props.glow] - If truthy, applies a glow tint to the top face and adds a stroked top outline.
+ * @returns {JSX.Element} An SVG <g> element containing the three polygons that form the isometric box.
+ */
 function IsoBox({ x, y, w = 22, d = 22, h = 26, fill, stroke, glow }) {
   const c = stroke || NEON.ink2;
   const f = fill || NEON.bg2;

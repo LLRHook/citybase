@@ -8,6 +8,19 @@ import {
 } from './theme.jsx';
 import { hpFromContext, fmtTokens } from './data.js';
 
+/**
+ * Render an "Objectives" panel that lists objective rows with status, metadata, subtitle, and progress.
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.items - List of objectives to display. Each item should contain:
+ *   - {string|number} id - Unique identifier for the objective.
+ *   - {string} label - Main label text.
+ *   - {string} meta - Short metadata pill text.
+ *   - {string} sub - Subtitle or secondary text.
+ *   - {number} prog - Progress value between 0 and 1.
+ *   - {boolean} done - Completion flag that affects styling.
+ * @return {import('react').ReactElement} The rendered Objectives panel.
+ */
 export function ObjectivesPanel({ items }) {
   return (
     <Panel title="Objectives" accent="cyan">
@@ -167,7 +180,14 @@ export function WorkerAgentsRow({ guilds, selectedAdvId, onSelect }) {
   );
 }
 
-// =================== SELECTED UNIT CARD ===================
+/**
+ * Render the selected unit card panel showing the unit emblem, identity, role/task/file, HP bar, and context usage.
+ *
+ * @param {Object|null} adv - The selected adventurer object; when falsy the component renders a dim "no unit selected" placeholder.
+ * @param {Object} guild - Guild metadata used for accent color and crest (expects at least `color`, `name`, and `crest`).
+ * @param {Object} [currentTask] - Optional task object providing `title` and `file` to display the unit's current assignment.
+ * @returns {JSX.Element} The panel element representing the selected unit or the placeholder when no unit is selected.
+ */
 export function SelectedUnitCard({ adv, guild, currentTask }) {
   if (!adv) {
     return (

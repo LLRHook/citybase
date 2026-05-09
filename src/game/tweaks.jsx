@@ -63,6 +63,13 @@ const TWEAKS_STYLE = `
 
 const PAD = 16;
 
+/**
+ * Render a floating, draggable tweaks panel with an open/close control and custom content.
+ * @param {{title?: string, children?: import('react').ReactNode}} props
+ * @param {string} [props.title='Tweaks'] - Panel title shown in the header.
+ * @param {import('react').ReactNode} [props.children] - Content rendered inside the panel body.
+ * @returns {import('react').ReactElement} A React element: the tweaks panel when open, or a floating action button to reopen it when closed.
+ */
 export function TweaksPanel({ title = 'Tweaks', children }) {
   const [open, setOpen] = React.useState(true);
   const [pos, setPos] = React.useState({ x: PAD, y: PAD });

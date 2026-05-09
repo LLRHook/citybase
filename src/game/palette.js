@@ -20,6 +20,16 @@ export const NEON = {
 
 export const C = (k) => NEON[k] || k;
 
+/**
+ * Append an 8-bit alpha channel to a hex color string.
+ *
+ * If `hex` is a 3-digit form (`#rgb`) it is expanded to `#rrggbb` before appending.
+ * If `hex` is not a `#...` string it is returned unchanged.
+ *
+ * @param {string} hex - A color string in `#rrggbb` or `#rgb` form (or any other value which will be returned unchanged).
+ * @param {number} a - Alpha as a number between 0 and 1 where 0 is fully transparent and 1 is fully opaque.
+ * @returns {string} The color string with a two-digit alpha hex appended (`#rrggbbaa`), or the original `hex` value if it was not a `#`-prefixed string.
+ */
 export function alpha(hex, a) {
   if (typeof hex === 'string' && hex.startsWith('#')) {
     const h = hex.length === 4 ? '#'+hex[1]+hex[1]+hex[2]+hex[2]+hex[3]+hex[3] : hex;
