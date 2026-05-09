@@ -15,6 +15,8 @@ const desktopBridge = {
   app: {
     getVersion: vi.fn(async () => '1.0.0'),
     getPlatform: vi.fn(async () => 'darwin'),
+    onBoot: vi.fn(() => () => {}),
+    getBoot: vi.fn(() => null),
   },
   workspace: {
     pick: vi.fn(),
@@ -132,5 +134,43 @@ describe('App auto-boot (desktop bridge present)', () => {
     await waitFor(() => {
       expect(desktopBridge.agents.detect).toHaveBeenCalled();
     });
+  });
+
+  it('skips the agents.detect IPC roundtrip when the boot payload was already cached', async () => {
+    // Simulate the main process having pushed the boot payload before
+    // App mounted. With the cached value, useAgentDetect should start
+    // in 'ready' and never call agents.detect.
+    desktopBridge.app.getBoot.mockImplementationOnce(() => ({
+      detect: { codex: { found: true, path: '/x' }, claude: { found: true, path: '/c' } },
+      workspace: null,
+      timestamp: 0,
+    }));
+    render(<App />);
+    // The status rows render directly from useAgentDetect's initial state.
+    await waitFor(() => {
+      const rows = screen.getAllByRole('status');
+      // both codex and claude found -> two 'ok' rows
+      expect(rows.filter(r => r.getAttribute('data-state') === 'ok').length).toBeGreaterThanOrEqual(2);
+    });
+    expect(desktopBridge.agents.detect).not.toHaveBeenCalled();
+  });
+
+  it('falls back to agents.detect when onBoot fires AFTER mount with detect data', async () => {
+    // No cached value at mount, but a payload arrives mid-render via
+    // onBoot. The hook should still have triggered the IPC fallback
+    // already, but the boot data updates state on arrival.
+    let bootCb = null;
+    desktopBridge.app.onBoot.mockImplementationOnce((cb) => {
+      bootCb = cb;
+      return () => {};
+    });
+    render(<App />);
+    await waitFor(() => {
+      expect(desktopBridge.agents.detect).toHaveBeenCalled();
+    });
+    // After this, even firing the onBoot late shouldn't break anything.
+    if (bootCb) {
+      bootCb({ detect: { codex: { found: false }, claude: { found: false } }, workspace: null });
+    }
   });
 });

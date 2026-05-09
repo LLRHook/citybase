@@ -2,8 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { useAgentDetect } from '../app/useAgentDetect.js';
 
-function Probe({ api }) {
-  const state = useAgentDetect({ api });
+function Probe({ api, initial }) {
+  const state = useAgentDetect({ api, initial });
   return (
     <div>
       <span data-testid="status">{state.status}</span>
@@ -70,6 +70,34 @@ describe('useAgentDetect', () => {
     });
     expect(screen.getByTestId('error').textContent).toBe('bridge offline');
     expect(screen.getByTestId('codex').textContent).toBe('false');
+  });
+
+  it('starts in ready when an initial detect result is supplied (auto-boot)', () => {
+    const api = makeApi(vi.fn());
+    render(<Probe api={api} initial={{
+      codex: { found: true, path: '/from/boot/codex' },
+      claude: { found: true, path: '/from/boot/claude' },
+    }} />);
+    // Synchronously ready — no awaiting waitFor.
+    expect(screen.getByTestId('status').textContent).toBe('ready');
+    expect(screen.getByTestId('codex').textContent).toBe('true');
+    expect(screen.getByTestId('codex-path').textContent).toBe('/from/boot/codex');
+    expect(screen.getByTestId('claude').textContent).toBe('true');
+    // The IPC roundtrip MUST be skipped — that's the whole point.
+    expect(api.agents.detect).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the IPC roundtrip when initial is malformed', async () => {
+    const api = makeApi(vi.fn(async () => ({
+      codex: { found: false }, claude: { found: true, path: '/c' },
+    })));
+    render(<Probe api={api} initial={{ wrongShape: true }} />);
+    expect(screen.getByTestId('status').textContent).toBe('pending');
+    await waitFor(() => {
+      expect(screen.getByTestId('status').textContent).toBe('ready');
+    });
+    expect(api.agents.detect).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('claude').textContent).toBe('true');
   });
 
   it('does not write back state if the component unmounts before resolve', async () => {
