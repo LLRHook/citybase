@@ -8,11 +8,12 @@
 //
 // This is the only place in the main process that should call execFile/spawn.
 const { execFile } = require('node:child_process');
+const path = require('node:path');
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_MAX_BUFFER = 4 * 1024 * 1024; // 4 MB
 
-function run(command, args, { cwd, timeoutMs, maxBuffer, env } = {}) {
+function run(command, args, { cwd, timeoutMs, maxBuffer, env, stdin } = {}) {
   if (typeof command !== 'string' || command.length === 0) {
     throw new TypeError('processService.run: command must be a non-empty string');
   }
@@ -25,29 +26,60 @@ function run(command, args, { cwd, timeoutMs, maxBuffer, env } = {}) {
 
   return new Promise((resolve) => {
     const start = Date.now();
-    const child = execFile(command, args, {
-      cwd,
-      timeout: timeoutMs ?? DEFAULT_TIMEOUT_MS,
-      maxBuffer: maxBuffer ?? DEFAULT_MAX_BUFFER,
-      env: env || augmentedEnv(),
-      windowsHide: true,
-    }, (err, stdout, stderr) => {
+    const invocation = buildInvocation(command, args, env || process.env);
+    let child = null;
+    const finish = (err, stdout, stderr) => {
       const durationMs = Date.now() - start;
       const code = err && typeof err.code === 'number' ? err.code
         : err && err.code === 'ETIMEDOUT' ? null
+        : err ? null
         : 0;
       resolve({
         ok: !err,
         code,
-        signal: child.signalCode || null,
+        signal: child?.signalCode || null,
         stdout: stdout ?? '',
         stderr: stderr ?? '',
         timedOut: !!(err && err.killed && err.signal === 'SIGTERM'),
         durationMs,
         error: err ? { message: err.message, code: err.code } : null,
       });
-    });
+    };
+
+    try {
+      child = execFile(invocation.command, invocation.args, {
+        cwd,
+        timeout: timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        maxBuffer: maxBuffer ?? DEFAULT_MAX_BUFFER,
+        env: env || augmentedEnv(),
+        windowsHide: true,
+        windowsVerbatimArguments: invocation.windowsVerbatimArguments === true,
+      }, finish);
+      if (stdin !== undefined && child.stdin) {
+        child.stdin.end(stdin);
+      }
+    } catch (err) {
+      finish(err, '', '');
+    }
   });
+}
+
+function buildInvocation(command, args, env, platform = process.platform) {
+  if (platform !== 'win32') return { command, args };
+  const ext = path.extname(command).toLowerCase();
+  if (ext !== '.cmd' && ext !== '.bat') return { command, args };
+  const commandLine = [command, ...args].map(quoteCmdArg).join(' ');
+  return {
+    command: (env && env.ComSpec) || process.env.ComSpec || 'cmd.exe',
+    args: ['/d', '/s', '/c', `"${commandLine}"`],
+    windowsVerbatimArguments: true,
+  };
+}
+
+function quoteCmdArg(value) {
+  const s = String(value);
+  if (s.length === 0) return '""';
+  return `"${s.replace(/(["^&|<>%])/g, '^$1')}"`;
 }
 
 // Apps launched from Finder on macOS inherit a thin PATH that omits
@@ -65,4 +97,4 @@ function augmentedEnv() {
   return env;
 }
 
-module.exports = { run };
+module.exports = { run, buildInvocation };

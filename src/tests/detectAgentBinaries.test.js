@@ -92,6 +92,36 @@ describe('detectAgentBinaries — Windows', () => {
     });
     expect(out.claude.path).toBe('C:\\bin\\claude.exe');
   });
+
+  it('also checks the user-local Codex install directory when PATH omits it', () => {
+    const out = detectAgentBinaries({
+      env: { Path: 'C:\\Windows\\System32', USERPROFILE: 'C:\\Users\\Victor' },
+      platform: 'win32',
+      fsExists: existing(['C:\\Users\\Victor\\.local\\bin\\codex.cmd']),
+    });
+    expect(out.codex).toEqual({
+      found: true,
+      path: 'C:\\Users\\Victor\\.local\\bin\\codex.cmd',
+    });
+  });
+
+  it('prefers the stable npm Codex shim over the auto-updating .local wrapper', () => {
+    const out = detectAgentBinaries({
+      env: {
+        Path: 'C:\\Users\\Victor\\.local\\bin',
+        APPDATA: 'C:\\Users\\Victor\\AppData\\Roaming',
+      },
+      platform: 'win32',
+      fsExists: existing([
+        'C:\\Users\\Victor\\.local\\bin\\codex.cmd',
+        'C:\\Users\\Victor\\AppData\\Roaming\\npm\\codex.cmd',
+      ]),
+    });
+    expect(out.codex).toEqual({
+      found: true,
+      path: 'C:\\Users\\Victor\\AppData\\Roaming\\npm\\codex.cmd',
+    });
+  });
 });
 
 describe('detectAgentBinaries — overrides', () => {

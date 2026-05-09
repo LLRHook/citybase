@@ -22,6 +22,9 @@ const { detectAgentBinaries } = require('./detect.cjs');
 const { parseUnifiedDiff } = require('./parseUnifiedDiff.cjs');
 const { runWorkspaceChecks } = require('../services/workspaceChecks.cjs');
 
+const DEFAULT_TASK_TIMEOUT_MS = 10 * 60 * 1000;
+const DEFAULT_TASK_MAX_BUFFER = 16 * 1024 * 1024;
+
 function defaultBuildArgv({ params }) {
   return [
     '--quiet',
@@ -30,22 +33,52 @@ function defaultBuildArgv({ params }) {
   ];
 }
 
-function synthesizeTrail({ binaryName, runId, now, skill, exitState }) {
+function cleanCliResponse(stdout = '') {
+  return String(stdout)
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .filter(line => !line.startsWith('SUCCESS: The process with PID '))
+    .join('\n')
+    .trim();
+}
+
+function oneLine(text, max = 260) {
+  const compact = String(text || '').replace(/\s+/g, ' ').trim();
+  if (compact.length <= max) return compact;
+  return `${compact.slice(0, max - 1)}...`;
+}
+
+function synthesizeTrail({ binaryName, runId, now, skill, exitState, stdout, stderr }) {
   const t = (offsetMs) => {
     const d = new Date((now || Date.now()) + offsetMs);
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
+  const response = cleanCliResponse(stdout);
   const trail = [
     { runId, t: t(0),       kind: 'plan', text: `${binaryName}: planning a ${skill} run` },
     { runId, t: t(60_000),  kind: 'edit', text: `${binaryName}: edits applied (buffered output, see analysis)` },
   ];
   if (exitState === 'pass') {
     trail.push({ runId, t: t(120_000), kind: 'test', text: `${binaryName}: completed without raising errors` });
-    trail.push({ runId, t: t(180_000), kind: 'pr',   text: `${binaryName}: ready for review` });
+    trail.push({
+      runId,
+      t: t(180_000),
+      kind: 'pr',
+      text: response ? `${binaryName}: ${oneLine(response)}` : `${binaryName}: ready for review`,
+      payload: response ? { response } : undefined,
+    });
   } else if (exitState === 'timeout') {
     trail.push({ runId, t: t(120_000), kind: 'error', text: `${binaryName}: timed out before completing` });
   } else {
-    trail.push({ runId, t: t(120_000), kind: 'error', text: `${binaryName}: exited with non-zero status` });
+    const failure = cleanCliResponse(stderr) || cleanCliResponse(stdout);
+    trail.push({
+      runId,
+      t: t(120_000),
+      kind: 'error',
+      text: failure ? `${binaryName}: ${oneLine(failure)}` : `${binaryName}: exited with non-zero status`,
+      payload: failure ? { response: failure } : undefined,
+    });
   }
   return trail;
 }
@@ -59,6 +92,8 @@ class CliAgentAdapter extends AgentAdapter {
     fsExists,
     readFileSync,
     binaryPath,
+    taskTimeoutMs,
+    taskMaxBuffer,
     now,
   } = {}) {
     super();
@@ -74,6 +109,8 @@ class CliAgentAdapter extends AgentAdapter {
     this._fsExists = fsExists || ((p) => { try { return fs.existsSync(p); } catch { return false; } });
     this._readFileSync = readFileSync || ((p, enc) => fs.readFileSync(p, enc));
     this._binaryPathOverride = typeof binaryPath === 'string' && binaryPath.length > 0 ? binaryPath : null;
+    this._taskTimeoutMs = Number.isFinite(taskTimeoutMs) ? taskTimeoutMs : DEFAULT_TASK_TIMEOUT_MS;
+    this._taskMaxBuffer = Number.isFinite(taskMaxBuffer) ? taskMaxBuffer : DEFAULT_TASK_MAX_BUFFER;
     this._now = typeof now === 'function' ? now : () => Date.now();
     // runId -> { run, cwd, skill, stdout, stderr, exitState, cancelled }
     this._runs = new Map();
@@ -95,14 +132,21 @@ class CliAgentAdapter extends AgentAdapter {
     validateStartTaskParams(params);
     const binary = this._resolveBinary();
     const skill = params.skill;
-    const args = this._buildArgv({ params, skill });
+    const invocation = this._buildArgv({ params, skill });
+    const args = Array.isArray(invocation) ? invocation : invocation?.args;
+    const stdin = Array.isArray(invocation) ? undefined : invocation?.stdin;
     if (!Array.isArray(args)) {
-      throw new TypeError(`${this._binaryName}Adapter: buildArgv must return a string array`);
+      throw new TypeError(`${this._binaryName}Adapter: buildArgv must return a string array or { args, stdin }`);
     }
 
     const runId = crypto.randomUUID();
     const cwd = params.repoUrl;
-    const result = await this._processService.run(binary, args, { cwd });
+    const result = await this._processService.run(binary, args, {
+      cwd,
+      timeoutMs: this._taskTimeoutMs,
+      maxBuffer: this._taskMaxBuffer,
+      stdin,
+    });
     let exitState = 'pass';
     if (result.timedOut) exitState = 'timeout';
     else if (!result.ok) exitState = 'fail';
@@ -138,6 +182,8 @@ class CliAgentAdapter extends AgentAdapter {
       now: this._now(),
       skill: entry.skill,
       exitState: entry.cancelled ? 'cancelled' : entry.exitState,
+      stdout: entry.stdout,
+      stderr: entry.stderr,
     });
     for (const event of trail) yield event;
   }
@@ -184,4 +230,4 @@ class CliAgentAdapter extends AgentAdapter {
   }
 }
 
-module.exports = { CliAgentAdapter, defaultBuildArgv };
+module.exports = { CliAgentAdapter, defaultBuildArgv, cleanCliResponse };

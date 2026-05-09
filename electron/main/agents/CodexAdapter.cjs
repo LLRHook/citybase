@@ -6,23 +6,31 @@ const { CliAgentAdapter } = require('./CliAgentAdapter.cjs');
 
 const NOT_FOUND_MESSAGE = 'codex CLI not found on PATH';
 
-const SKILL_FLAG = {
-  bugfix: ['--mode', 'edit'],
-  refactor: ['--mode', 'edit'],
-  tests: ['--mode', 'edit'],
-  review: ['--mode', 'review'],
-  lint: ['--mode', 'edit'],
-  docs: ['--mode', 'edit'],
+const SKILL_PROMPT = {
+  bugfix: 'Fix the bug described below.',
+  refactor: 'Make the focused refactor described below.',
+  tests: 'Add or improve tests for the task described below.',
+  review: 'Review the repository changes described below.',
+  lint: 'Run a focused lint cleanup for the task described below.',
+  docs: 'Update documentation for the task described below.',
 };
 
 function buildCodexArgv({ params, skill }) {
+  const prompt = [
+    SKILL_PROMPT[skill] || 'Work on the task described below.',
+    '',
+    params.promptContext,
+  ].join('\n');
   const args = [
-    '--quiet',
-    ...(SKILL_FLAG[skill] || []),
-    '--prompt', params.promptContext,
+    'exec',
+    '--cd', params.repoUrl,
+    '--sandbox', 'workspace-write',
+    '-c', 'approval_policy=never',
+    '--color', 'never',
   ];
   if (params.model) args.push('--model', params.model);
-  return args;
+  args.push('-');
+  return { args, stdin: prompt };
 }
 
 class CodexAdapter extends CliAgentAdapter {

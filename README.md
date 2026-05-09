@@ -25,6 +25,10 @@ To run the Electron shell during development:
 npm run dev:desktop
 ```
 
+After `npm run build:desktop`, `npm run start:desktop` launches the built Electron shell.
+
+For the current desktop prototype, Citybase defaults to opening this Citybase repository itself as the workspace when no saved workspace exists.
+
 ## Available scripts
 
 | Script | What it does |

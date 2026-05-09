@@ -4,7 +4,7 @@ import { hexPath, hexToPx } from './game/hex.js';
 import {
   Mono, Title, Pill, NButton, NeonBar,
 } from './game/theme.jsx';
-import { SKILL_DEFS } from './game/data.js';
+import { GUILDS, SKILL_DEFS } from './game/data.js';
 import { CityMap } from './game/map.jsx';
 import {
   QuestBoard, GuildRoster, ActivityFeed, VitalsBar,
@@ -44,6 +44,21 @@ const EMPTY_DISTRICTS = Object.freeze([]);
 const EMPTY_BUILDINGS = Object.freeze([]);
 const EMPTY_SAGAS = Object.freeze([]);
 const EMPTY_ADV_REPORTS = Object.freeze({});
+
+function findDefaultDispatchUnit(guilds) {
+  for (const guild of guilds) {
+    const adv = guild.adventurers.find(a => a.skills?.includes('refactor')) || guild.adventurers[0];
+    if (adv) return { adv, guild };
+  }
+  return null;
+}
+
+function activityKindForAgentEvent(kind) {
+  if (kind === 'error') return 'bad';
+  if (kind === 'test' || kind === 'lint' || kind === 'pr') return 'good';
+  if (kind === 'edit') return 'quest';
+  return 'xp';
+}
 
 class ErrBoundary extends React.Component {
   constructor(props) {
@@ -109,7 +124,7 @@ function CodebaseCity() {
   const [speed, setSpeed] = React.useState(1);
   const [actionTab, setActionTab] = React.useState('actions');
 
-  const guilds = EMPTY_GUILDS;
+  const guilds = cityConnected ? GUILDS : EMPTY_GUILDS;
   const sagas = EMPTY_SAGAS;
   const advReports = EMPTY_ADV_REPORTS;
   const repo = null;
@@ -156,6 +171,8 @@ function CodebaseCity() {
     commit: workspace.snapshot?.recentCommits?.[0]?.hash || '—',
   } : null);
   const currentGuild = guilds[0] ?? null;
+  const defaultDispatchUnit = findDefaultDispatchUnit(guilds);
+  const activeUnit = selectedAdv ?? defaultDispatchUnit;
 
   const hasActiveQuests = quests.some(q => q.status === 'active');
   React.useEffect(() => {
@@ -188,7 +205,7 @@ function CodebaseCity() {
   };
 
   const dispatchAgent = async () => {
-    const adv = selectedAdv?.adv;
+    const adv = activeUnit?.adv;
     if (!cityConnected || !workspace.workspace) {
       pushToast({ text: 'Open a workspace first', color: 'amber', icon: '⚠' });
       return;
@@ -206,7 +223,7 @@ function CodebaseCity() {
         skill: 'refactor',
         repoUrl: workspace.workspace.rootPath,
         branch: workspace.snapshot?.branch || 'main',
-        promptContext: 'investigate the workspace and propose a small refactor',
+        promptContext: 'checking',
       });
       pushToast({ text: `Run dispatched · ${run.runId.slice(0, 8)}`, color: 'green', icon: '★' });
     } catch (err) {
@@ -246,6 +263,20 @@ function CodebaseCity() {
     setToasts(prev => [...prev, { id, ...t }]);
     setTimeout(() => setToasts(prev => prev.filter(x => x.id !== id)), 2400);
   };
+
+  React.useEffect(() => {
+    if (!citybaseApi.agents?.onEvent) return undefined;
+    const off = citybaseApi.agents.onEvent((payload) => {
+      const event = payload?.event;
+      if (!event || !event.text) return;
+      setActivity(prev => [{
+        t: event.t || '00:00',
+        kind: activityKindForAgentEvent(event.kind),
+        text: event.text,
+      }, ...prev].slice(0, 24));
+    });
+    return typeof off === 'function' ? off : undefined;
+  }, []);
 
   const acceptQuest = (quest, advId) => {
     if (!currentGuild) return;
@@ -446,7 +477,7 @@ function CodebaseCity() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {cityConnected && repo && <CodebaseOverview />}
-              <ActivityFeed items={liveActivity.length > 0 ? liveActivity : activity.slice(0, 6)} />
+              <ActivityFeed items={[...activity, ...liveActivity].slice(0, 6)} />
             </div>
           </div>
 
@@ -460,13 +491,13 @@ function CodebaseCity() {
             />
             <WorkerAgentsRow
               guilds={guilds}
-              selectedAdvId={selectedAdv?.adv?.id}
+              selectedAdvId={activeUnit?.adv?.id}
               onSelect={(adv, guild) => setSelectedAdv({ adv, guild })}
             />
             <SelectedUnitCard
-              adv={selectedAdv?.adv}
-              guild={selectedAdv?.guild}
-              currentTask={quests.find(q => q.adventurer === selectedAdv?.adv?.id && q.status === 'active')}
+              adv={activeUnit?.adv}
+              guild={activeUnit?.guild}
+              currentTask={quests.find(q => q.adventurer === activeUnit?.adv?.id && q.status === 'active')}
             />
             <ActionBar
               tab={actionTab}
@@ -485,7 +516,7 @@ function CodebaseCity() {
               guilds={guilds}
               expandedGuilds={expandedGuilds}
               onToggleGuild={toggleGuild}
-              selectedAdv={selectedAdv?.adv}
+              selectedAdv={activeUnit?.adv}
               onSelectAdv={(adv, guild) => setSelectedAdv({ adv, guild })}
             />
           </div>

@@ -2,7 +2,10 @@
 // We expose ONLY a typed `window.citybase` object via contextBridge — never
 // raw ipcRenderer, fs, or shell. The renderer treats this object as its API.
 const { contextBridge, ipcRenderer } = require('electron');
-const { AGENT_EVENT_CHANNEL } = require('../main/agents/constants.cjs');
+
+// Keep preload self-contained: sandboxed Electron preloads can require
+// Electron's built-ins, but local module loading is not reliable there.
+const AGENT_EVENT_CHANNEL = 'citybase:agent.event';
 
 const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
 
