@@ -31,9 +31,9 @@ TYPES='feat|fix|refactor|docs|test|chore|ci|style|perf|build|revert'
 # Format: <type>(<scope>)?<!>?: <description>
 # Description rules:
 #   - starts with a lowercase letter
-#   - does not end with . ! or ?
+#   - does NOT end with . ! or ?  (intermediate dots are fine — filenames OK)
 #   - any non-empty content otherwise
-SUBJECT_RE="^(${TYPES})(\([a-z0-9_./-]+\))?(!)?: [a-z][^.!?]*[^.!?]\$"
+SUBJECT_RE="^(${TYPES})(\([a-z0-9_./-]+\))?(!)?: [a-z].*[^.!?]\$"
 
 reject() {
   cat >&2 <<EOF
