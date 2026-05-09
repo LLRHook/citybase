@@ -36,6 +36,11 @@ function makeStubs(overrides = {}) {
     })()),
     cancel: vi.fn(async () => undefined),
     getRun: vi.fn((runId) => (runId === 'run-1' ? { runId, status: 'running' } : null)),
+    listRuns: vi.fn(() => [
+      { runId: 'run-1', questId: 'Q', adventurerId: 'A', status: 'running',
+        branch: 'main', contextUsed: 0, maxContext: 200_000,
+        provider: 'claude', startedAt: 1_700_000_000_000 },
+    ]),
     reportUsage: vi.fn(async () => ({ contextUsed: 0, maxContext: 200_000 })),
     produceDiff: vi.fn(async () => ({ files: [] })),
     runChecks: vi.fn(async () => []),
@@ -99,6 +104,7 @@ describe('createIpcHandlers — channel set', () => {
       'citybase:agent.cancel',
       'citybase:agent.getRun',
       'citybase:agent.listPendingApprovals',
+      'citybase:agent.listRuns',
       'citybase:agent.openPR',
       'citybase:agent.produceDiff',
       'citybase:agent.reject',
@@ -362,6 +368,23 @@ describe('createIpcHandlers — agent.{cancel,getRun,reportUsage,produceDiff,run
     const { handlers } = build(stubs);
     expect(handlers['citybase:agent.getRun'](null, 'run-1')).toEqual({ runId: 'run-1', status: 'running' });
     expect(handlers['citybase:agent.getRun'](null, 'nope')).toBeNull();
+  });
+
+  it('listRuns forwards options and returns the manager result', () => {
+    const stubs = makeStubs();
+    const { handlers } = build(stubs);
+    const out = handlers['citybase:agent.listRuns'](null, { limit: 10 });
+    expect(stubs.agentManager.listRuns).toHaveBeenCalledWith({ limit: 10 });
+    expect(out).toEqual([
+      expect.objectContaining({ runId: 'run-1', provider: 'claude', status: 'running' }),
+    ]);
+  });
+
+  it('listRuns coerces undefined options to an empty object', () => {
+    const stubs = makeStubs();
+    const { handlers } = build(stubs);
+    handlers['citybase:agent.listRuns'](null);
+    expect(stubs.agentManager.listRuns).toHaveBeenCalledWith({});
   });
 
   it('reportUsage / produceDiff / runChecks / openPR forward correctly', async () => {
