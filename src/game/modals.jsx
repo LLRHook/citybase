@@ -4,7 +4,7 @@ import { NEON, C, alpha } from './palette.js';
 import {
   Pill, Mono, Title, NButton,
 } from './theme.jsx';
-import { SKILL_DEFS, DISTRICTS } from './data.js';
+import { SKILL_DEFS } from './data.js';
 import { QuestSourceBadge, QuestCard } from './panels.jsx';
 
 function Backdrop({ onClose, children }) {
@@ -22,10 +22,10 @@ function Backdrop({ onClose, children }) {
   );
 }
 
-export function QuestDetailModal({ quest, onClose, onAccept, currentGuild }) {
+export function QuestDetailModal({ quest, onClose, onAccept, currentGuild, districts = [] }) {
   const sk = SKILL_DEFS[quest.skill];
   const a = C(sk.color);
-  const district = DISTRICTS.find(d => d.id === quest.target);
+  const district = districts.find(d => d.id === quest.target);
   const isOpen = quest.status === 'open';
   const eligible = isOpen && currentGuild && currentGuild.adventurers.filter(adv => adv.skills.includes(quest.skill));
   const [picked, setPicked] = React.useState(eligible && eligible[0] ? eligible[0].id : null);
@@ -120,7 +120,7 @@ export function QuestDetailModal({ quest, onClose, onAccept, currentGuild }) {
   );
 }
 
-export function PostQuestModal({ onClose, onSubmit }) {
+export function PostQuestModal({ onClose, onSubmit, districts = [] }) {
   const [form, setForm] = React.useState({
     source: 'local', title: '', desc: '', skill: 'bugfix',
     target: 'lib', file: 'github.ts', reward: 100,
@@ -164,7 +164,7 @@ export function PostQuestModal({ onClose, onSubmit }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Field label="DISTRICT (FOLDER)">
               <Select value={form.target} onChange={v => upd('target', v)}
-                options={DISTRICTS.map(d => ({ v: d.id, label: d.name }))} />
+                options={districts.map(d => ({ v: d.id, label: d.name }))} />
             </Field>
             <Field label="FILE">
               <Input value={form.file} onChange={v => upd('file', v)} placeholder="github.ts" />

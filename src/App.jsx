@@ -38,8 +38,12 @@ const TWEAK_DEFAULTS = {
   role: 'admin', connected: false, agentProvider: 'auto', selectedBranch: null,
 };
 
-// Phase 0: no provider yet — every projection of the world starts empty.
-// Phase 1+ replaces these with provider-fed values (RepoProvider, GuildProvider, etc).
+// Stable empty references for shapes the renderer still expects but
+// for which we have no provider yet. Districts and buildings get
+// replaced by projectRepoTreeToCityModel() once a workspace lands;
+// guilds / sagas / advReports stay empty in v1 since the visual-RPG
+// projection over real entities is post-v1 work. Frozen module-level
+// constants so prop equality stays stable across renders.
 const EMPTY_GUILDS = Object.freeze([]);
 const EMPTY_DISTRICTS = Object.freeze([]);
 const EMPTY_BUILDINGS = Object.freeze([]);
@@ -571,12 +575,14 @@ function CodebaseCity() {
           onClose={() => setSelectedQuest(null)}
           onAccept={acceptQuest}
           currentGuild={currentGuild}
+          districts={districts}
         />
       )}
       {showPost && role === 'admin' && (
         <PostQuestModal
           onClose={() => setShowPost(false)}
           onSubmit={submitNewQuest}
+          districts={districts}
         />
       )}
       <LootToast toasts={toasts} />
