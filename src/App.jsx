@@ -26,6 +26,7 @@ import {
 } from './game/tweaks.jsx';
 import { useWorkspace } from './app/useWorkspace.js';
 import { isDesktop } from './app/citybaseApi.js';
+import { projectRepoTreeToCityModel } from './app/cityModel.js';
 
 const TWEAK_DEFAULTS = { role: 'admin', connected: false };
 
@@ -33,6 +34,7 @@ const TWEAK_DEFAULTS = { role: 'admin', connected: false };
 // Phase 1+ replaces these with provider-fed values (RepoProvider, GuildProvider, etc).
 const EMPTY_GUILDS = Object.freeze([]);
 const EMPTY_DISTRICTS = Object.freeze([]);
+const EMPTY_BUILDINGS = Object.freeze([]);
 const EMPTY_SAGAS = Object.freeze([]);
 const EMPTY_ADV_REPORTS = Object.freeze({});
 
@@ -97,10 +99,26 @@ function CodebaseCity() {
   const [actionTab, setActionTab] = React.useState('actions');
 
   const guilds = EMPTY_GUILDS;
-  const districts = EMPTY_DISTRICTS;
   const sagas = EMPTY_SAGAS;
   const advReports = EMPTY_ADV_REPORTS;
   const repo = null;
+
+  // Project the workspace's real Git tree into the city's district + building
+  // shape. Idle (no workspace) keeps the empty defaults so map.jsx still falls
+  // back to the 'NO WORKSPACE LINK' overlay path. Keyed on the snapshot
+  // reference because snapshots are produced atomically by useWorkspace —
+  // deriving repoTree / dirtyPaths inside avoids a fresh `[]` on each render.
+  const snapshot = workspace.snapshot;
+  const cityModel = React.useMemo(() => {
+    const repoTree = snapshot?.repoTree;
+    if (!repoTree || repoTree.length === 0) {
+      return { districts: EMPTY_DISTRICTS, buildings: EMPTY_BUILDINGS };
+    }
+    const dirtyPaths = snapshot?.files?.map(f => f.path) ?? [];
+    return projectRepoTreeToCityModel(repoTree, dirtyPaths);
+  }, [snapshot]);
+  const districts = cityModel.districts;
+  const buildings = cityModel.buildings;
   const vitalsRepo = repo ?? (isDesktop && workspace.workspace ? {
     name: workspace.workspace.name,
     remote: workspace.workspace.rootPath,
@@ -301,6 +319,8 @@ function CodebaseCity() {
 
             <div style={{ position: 'relative' }}>
               <CityMap
+                districts={districts}
+                buildings={buildings}
                 focusedDistrictId={focusedDistrict}
                 onSelectDistrict={(d) => setFocusedDistrict(d.id === focusedDistrict ? null : d.id)}
                 pawns={cityConnected ? pawns : []}
