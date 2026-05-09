@@ -20,6 +20,8 @@ function makeStubs(overrides = {}) {
       { name: 'main', isCurrent: true, upstream: 'origin/main' },
       { name: 'feature/x', isCurrent: false, upstream: null },
     ]),
+    checkout: vi.fn(async (_ws, name) => ({ ok: true, branch: name })),
+    commit: vi.fn(async () => ({ ok: true, commitHash: 'abc1234' })),
     ...(overrides.gitService || {}),
   };
   const agentManager = {
@@ -108,6 +110,8 @@ describe('createIpcHandlers — channel set', () => {
       'citybase:app.getPlatform',
       'citybase:app.getVersion',
       'citybase:checks.run',
+      'citybase:git.checkout',
+      'citybase:git.commit',
       'citybase:git.getSnapshot',
       'citybase:git.listBranches',
       'citybase:git.refresh',
@@ -215,6 +219,59 @@ describe('createIpcHandlers — app + workspace + git (regression)', () => {
     await expect(handlers['citybase:checks.run'](null, 'nope'))
       .rejects.toThrow(/unknown workspace id: nope/);
     expect(stubs.runWorkspaceChecks).not.toHaveBeenCalled();
+  });
+
+  it('git.checkout looks up the workspace then asks gitService.checkout', async () => {
+    const stubs = makeStubs();
+    const { handlers } = build(stubs);
+    const out = await handlers['citybase:git.checkout'](null, 'ws-1', 'feature/x');
+    expect(stubs.workspaceService.getWorkspaceById).toHaveBeenCalledWith('ws-1');
+    expect(stubs.gitService.checkout).toHaveBeenCalledWith(
+      { id: 'ws-1', rootPath: '/repo' }, 'feature/x',
+    );
+    expect(out).toEqual({ ok: true, branch: 'feature/x' });
+  });
+
+  it('git.checkout throws on unknown workspace id', async () => {
+    const stubs = makeStubs();
+    const { handlers } = build(stubs);
+    await expect(handlers['citybase:git.checkout'](null, 'nope', 'main'))
+      .rejects.toThrow(/unknown workspace id: nope/);
+    expect(stubs.gitService.checkout).not.toHaveBeenCalled();
+  });
+
+  it('git.checkout returns a structured error when gitService is missing the helper', async () => {
+    const stubs = makeStubs();
+    delete stubs.gitService.checkout;
+    const { handlers } = build(stubs);
+    const out = await handlers['citybase:git.checkout'](null, 'ws-1', 'main');
+    expect(out).toEqual({ ok: false, error: { message: 'checkout not available' } });
+  });
+
+  it('git.commit looks up the workspace then asks gitService.commit', async () => {
+    const stubs = makeStubs();
+    const { handlers } = build(stubs);
+    const params = { message: 'feat: thing', addAll: true };
+    const out = await handlers['citybase:git.commit'](null, 'ws-1', params);
+    expect(stubs.gitService.commit).toHaveBeenCalledWith(
+      { id: 'ws-1', rootPath: '/repo' }, params,
+    );
+    expect(out).toEqual({ ok: true, commitHash: 'abc1234' });
+  });
+
+  it('git.commit throws on unknown workspace id', async () => {
+    const stubs = makeStubs();
+    const { handlers } = build(stubs);
+    await expect(handlers['citybase:git.commit'](null, 'nope', { message: 'x' }))
+      .rejects.toThrow(/unknown workspace id: nope/);
+  });
+
+  it('git.commit returns a structured error when gitService is missing the helper', async () => {
+    const stubs = makeStubs();
+    delete stubs.gitService.commit;
+    const { handlers } = build(stubs);
+    const out = await handlers['citybase:git.commit'](null, 'ws-1', { message: 'x' });
+    expect(out).toEqual({ ok: false, error: { message: 'commit not available' } });
   });
 });
 

@@ -130,6 +130,74 @@ describe('BranchSelector', () => {
     expect(screen.queryByText(/^→ /)).not.toBeInTheDocument();
   });
 
+  it('shows a CHECKOUT button when workspace is clean and selectedBranch differs', async () => {
+    const onCheckout = vi.fn();
+    render(
+      <BranchSelector
+        workspaceId="ws-1"
+        currentBranch="main"
+        dirty={false}
+        selectedBranch="feature/x"
+        api={fakeApi([])}
+        onSelect={() => {}}
+        onCheckout={onCheckout}
+      />,
+    );
+    const button = screen.getByRole('button', { name: /Checkout feature\/x/i });
+    expect(button).toBeInTheDocument();
+    expect(screen.queryByText('→ feature/x')).not.toBeInTheDocument();
+  });
+
+  it('clicking CHECKOUT calls onCheckout with the picked branch name', async () => {
+    const user = userEvent.setup();
+    const onCheckout = vi.fn();
+    render(
+      <BranchSelector
+        workspaceId="ws-1"
+        currentBranch="main"
+        dirty={false}
+        selectedBranch="feature/x"
+        api={fakeApi([])}
+        onSelect={() => {}}
+        onCheckout={onCheckout}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /Checkout feature\/x/i }));
+    expect(onCheckout).toHaveBeenCalledWith('feature/x');
+  });
+
+  it('shows a "commit first" pill instead of CHECKOUT when the workspace is dirty', () => {
+    render(
+      <BranchSelector
+        workspaceId="ws-1"
+        currentBranch="main"
+        dirty
+        fileCount={2}
+        selectedBranch="feature/x"
+        api={fakeApi([])}
+        onSelect={() => {}}
+        onCheckout={() => {}}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /Checkout feature\/x/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/feature\/x \(commit first\)/)).toBeInTheDocument();
+  });
+
+  it('falls back to the static "→" pill when no onCheckout handler is provided', () => {
+    render(
+      <BranchSelector
+        workspaceId="ws-1"
+        currentBranch="main"
+        dirty={false}
+        selectedBranch="feature/x"
+        api={fakeApi([])}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /Checkout/i })).not.toBeInTheDocument();
+    expect(screen.getByText('→ feature/x')).toBeInTheDocument();
+  });
+
   it('renders an error state when the api rejects', async () => {
     const user = userEvent.setup();
     const api = {

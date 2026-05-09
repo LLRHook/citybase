@@ -42,6 +42,15 @@ describe('citybaseApi — browser stub (no window.citybase)', () => {
     await expect(citybaseApi.checks.run('any-id')).resolves.toEqual([]);
   });
 
+  it('git.checkout / git.commit return a structured failure in the browser stub', async () => {
+    const checkout = await citybaseApi.git.checkout('ws-1', 'main');
+    expect(checkout.ok).toBe(false);
+    expect(checkout.error.message).toMatch(/git not available in browser preview/);
+    const c = await citybaseApi.git.commit('ws-1', { message: 'x' });
+    expect(c.ok).toBe(false);
+    expect(c.error.message).toMatch(/git not available in browser preview/);
+  });
+
   describe('agents stub', () => {
     it('detect resolves to both not-found', async () => {
       await expect(citybaseApi.agents.detect()).resolves.toEqual({
@@ -85,7 +94,12 @@ describe('citybaseApi — desktop bridge (window.citybase present)', () => {
     window.citybase = {
       app: { getVersion: async () => '1.0.0', getPlatform: async () => 'win32' },
       workspace: { pick: async () => null, getCurrent: async () => null, setCurrent: async () => null, listRecent: async () => [], forget: async () => undefined },
-      git: { getSnapshot: async () => null, refresh: async () => null, listBranches: async () => [] },
+      git: {
+        getSnapshot: async () => null, refresh: async () => null,
+        listBranches: async () => [],
+        checkout: async (_id, name) => ({ ok: true, branch: name }),
+        commit: async () => ({ ok: true, commitHash: 'abc' }),
+      },
       checks: { run: async () => [{ name: 'lint', state: 'pass', meta: 'clean in 5ms' }] },
       agents: {
         detect: async () => ({ codex: { found: true, path: '/x' }, claude: { found: false } }),

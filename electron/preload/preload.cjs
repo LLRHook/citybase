@@ -36,6 +36,10 @@ const api = {
     getSnapshot: (workspaceId) => invoke('citybase:git.getSnapshot', workspaceId),
     refresh: (workspaceId) => invoke('citybase:git.refresh', workspaceId),
     listBranches: (workspaceId) => invoke('citybase:git.listBranches', workspaceId),
+    checkout: (workspaceId, branchName) =>
+      invoke('citybase:git.checkout', workspaceId, branchName),
+    commit: (workspaceId, params) =>
+      invoke('citybase:git.commit', workspaceId, params),
   },
   checks: {
     run: (workspaceId) => invoke('citybase:checks.run', workspaceId),

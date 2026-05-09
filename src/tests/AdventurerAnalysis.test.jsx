@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AdventurerAnalysis } from '../game/analysis.jsx';
 import { GUILDS, ADV_REPORTS } from '../data/seed.js';
 
@@ -124,5 +124,75 @@ describe('AdventurerAnalysis (no-code review layout)', () => {
       />,
     );
     expect(screen.getByText('(unmapped)')).toBeInTheDocument();
+  });
+
+  it('renders the COMMIT RESULT card only when the workspace has dirty files', () => {
+    const { rerender } = render(
+      <AdventurerAnalysis
+        advId="alpha-7"
+        guilds={GUILDS}
+        advReports={ADV_REPORTS}
+        districts={DISTRICTS}
+        onPickAdv={() => {}}
+        workspaceDirty={0}
+        onCommit={() => {}}
+      />,
+    );
+    expect(screen.queryByText('COMMIT RESULT')).not.toBeInTheDocument();
+
+    rerender(
+      <AdventurerAnalysis
+        advId="alpha-7"
+        guilds={GUILDS}
+        advReports={ADV_REPORTS}
+        districts={DISTRICTS}
+        onPickAdv={() => {}}
+        workspaceDirty={3}
+        onCommit={() => {}}
+      />,
+    );
+    expect(screen.getByText('COMMIT RESULT')).toBeInTheDocument();
+    expect(screen.getByText('3 dirty files')).toBeInTheDocument();
+  });
+
+  it('the Commit button is disabled until a non-empty message is typed', async () => {
+    const user = userEvent.setup();
+    const onCommit = vi.fn(async () => ({ ok: true, commitHash: 'abc' }));
+    render(
+      <AdventurerAnalysis
+        advId="alpha-7"
+        guilds={GUILDS}
+        advReports={ADV_REPORTS}
+        districts={DISTRICTS}
+        onPickAdv={() => {}}
+        workspaceDirty={2}
+        onCommit={onCommit}
+      />,
+    );
+    const button = screen.getByRole('button', { name: /Commit$/ });
+    expect(button).toBeDisabled();
+    const textarea = screen.getByLabelText(/Commit message/i);
+    await user.type(textarea, 'feat: did the thing');
+    expect(button).toBeEnabled();
+  });
+
+  it('clicking Commit calls onCommit with the trimmed message and clears on success', async () => {
+    const user = userEvent.setup();
+    const onCommit = vi.fn(async () => ({ ok: true, commitHash: 'abc' }));
+    render(
+      <AdventurerAnalysis
+        advId="alpha-7"
+        guilds={GUILDS}
+        advReports={ADV_REPORTS}
+        districts={DISTRICTS}
+        onPickAdv={() => {}}
+        workspaceDirty={1}
+        onCommit={onCommit}
+      />,
+    );
+    const textarea = screen.getByLabelText(/Commit message/i);
+    await user.type(textarea, '   feat: did it   ');
+    await user.click(screen.getByRole('button', { name: /Commit$/ }));
+    expect(onCommit).toHaveBeenCalledWith('feat: did it');
   });
 });
