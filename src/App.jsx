@@ -135,6 +135,20 @@ function CodebaseCity() {
   // then commit history newest-first. Idle (no snapshot) leaves activity
   // empty so the panel renders blank.
   const liveActivity = React.useMemo(() => projectSnapshotToActivity(snapshot), [snapshot]);
+
+  // Per-path dirty lookup so map.jsx can stamp staged/unstaged glyphs on
+  // each affected building. Map<path, { staged, unstaged }>.
+  const dirtyByPath = React.useMemo(() => {
+    const m = new Map();
+    for (const f of snapshot?.files || []) {
+      if (!f || typeof f.path !== 'string') continue;
+      m.set(f.path, {
+        staged: !!f.staged,
+        unstaged: f.unstaged !== false,
+      });
+    }
+    return m;
+  }, [snapshot]);
   const vitalsRepo = repo ?? (isDesktop && workspace.workspace ? {
     name: workspace.workspace.name,
     remote: workspace.workspace.rootPath,
@@ -367,6 +381,7 @@ function CodebaseCity() {
               <CityMap
                 districts={districts}
                 buildings={buildings}
+                dirtyByPath={dirtyByPath}
                 focusedDistrictId={focusedDistrict}
                 onSelectDistrict={(d) => setFocusedDistrict(d.id === focusedDistrict ? null : d.id)}
                 pawns={cityConnected ? pawns : []}
