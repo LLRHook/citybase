@@ -34,6 +34,9 @@ function makeStubs(overrides = {}) {
     produceDiff: vi.fn(async () => ({ files: [] })),
     runChecks: vi.fn(async () => []),
     openPR: vi.fn(async () => ({ prNumber: 1, url: '' })),
+    approveRun: vi.fn(),
+    rejectRun: vi.fn(),
+    listPendingApprovals: vi.fn(() => []),
     ...(overrides.agentManager || {}),
   };
   const detectAgentBinaries = overrides.detectAgentBinaries
@@ -78,10 +81,13 @@ describe('createIpcHandlers — channel set', () => {
   it('exposes the full citybase: channel surface', () => {
     const { handlers } = build(makeStubs());
     expect(Object.keys(handlers).sort()).toEqual([
+      'citybase:agent.approve',
       'citybase:agent.cancel',
       'citybase:agent.getRun',
+      'citybase:agent.listPendingApprovals',
       'citybase:agent.openPR',
       'citybase:agent.produceDiff',
+      'citybase:agent.reject',
       'citybase:agent.reportUsage',
       'citybase:agent.runChecks',
       'citybase:agent.startRun',
@@ -251,6 +257,27 @@ describe('createIpcHandlers — agent.{cancel,getRun,reportUsage,produceDiff,run
     expect(stubs.agentManager.produceDiff).toHaveBeenCalledWith('run-1');
     expect(stubs.agentManager.runChecks).toHaveBeenCalledWith('run-1');
     expect(stubs.agentManager.openPR).toHaveBeenCalledWith('run-1', expect.objectContaining({ title: 't' }));
+  });
+
+  it('approve / reject / listPendingApprovals forward to the manager', async () => {
+    const stubs = makeStubs({
+      agentManager: {
+        listProviders: () => ['codex'],
+        startRun: vi.fn(), streamEvents: vi.fn(), cancel: vi.fn(),
+        getRun: vi.fn(), reportUsage: vi.fn(), produceDiff: vi.fn(),
+        runChecks: vi.fn(), openPR: vi.fn(),
+        approveRun: vi.fn(),
+        rejectRun: vi.fn(),
+        listPendingApprovals: vi.fn(() => [{ runId: 'run-1', summary: { files: 2 } }]),
+      },
+    });
+    const { handlers } = build(stubs);
+    await handlers['citybase:agent.approve'](null, 'run-1');
+    await handlers['citybase:agent.reject'](null, 'run-2');
+    const pending = await handlers['citybase:agent.listPendingApprovals'](null);
+    expect(stubs.agentManager.approveRun).toHaveBeenCalledWith('run-1');
+    expect(stubs.agentManager.rejectRun).toHaveBeenCalledWith('run-2');
+    expect(pending).toEqual([{ runId: 'run-1', summary: { files: 2 } }]);
   });
 });
 

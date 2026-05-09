@@ -46,6 +46,9 @@ const api = {
     produceDiff: (runId) => invoke('citybase:agent.produceDiff', runId),
     runChecks: (runId) => invoke('citybase:agent.runChecks', runId),
     openPR: (runId, prParams) => invoke('citybase:agent.openPR', runId, prParams),
+    approve: (runId) => invoke('citybase:agent.approve', runId),
+    reject: (runId) => invoke('citybase:agent.reject', runId),
+    listPendingApprovals: () => invoke('citybase:agent.listPendingApprovals'),
     onEvent: (cb) => {
       agentEventListeners.add(cb);
       return () => { agentEventListeners.delete(cb); };
