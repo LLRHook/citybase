@@ -30,12 +30,16 @@ describe('citybaseApi — browser stub (no window.citybase)', () => {
 
   it('exposes the same namespaces as the desktop API', () => {
     expect(Object.keys(citybaseApi).sort()).toEqual([
-      'agents', 'app', 'git', 'isDesktop', 'menu', 'workspace',
+      'agents', 'app', 'checks', 'git', 'isDesktop', 'menu', 'workspace',
     ]);
   });
 
   it('git.listBranches returns [] in the browser stub', async () => {
     await expect(citybaseApi.git.listBranches('any-id')).resolves.toEqual([]);
+  });
+
+  it('checks.run returns [] in the browser stub', async () => {
+    await expect(citybaseApi.checks.run('any-id')).resolves.toEqual([]);
   });
 
   describe('agents stub', () => {
@@ -81,7 +85,8 @@ describe('citybaseApi — desktop bridge (window.citybase present)', () => {
     window.citybase = {
       app: { getVersion: async () => '1.0.0', getPlatform: async () => 'win32' },
       workspace: { pick: async () => null, getCurrent: async () => null, setCurrent: async () => null, listRecent: async () => [], forget: async () => undefined },
-      git: { getSnapshot: async () => null, refresh: async () => null },
+      git: { getSnapshot: async () => null, refresh: async () => null, listBranches: async () => [] },
+      checks: { run: async () => [{ name: 'lint', state: 'pass', meta: 'clean in 5ms' }] },
       agents: {
         detect: async () => ({ codex: { found: true, path: '/x' }, claude: { found: false } }),
         list: async () => ['codex'],

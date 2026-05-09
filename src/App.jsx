@@ -214,6 +214,33 @@ function CodebaseCity() {
     }
   };
 
+  const runChecks = async () => {
+    if (!cityConnected || !workspace.workspace) {
+      pushToast({ text: 'Open a workspace first', color: 'amber', icon: '⚠' });
+      return;
+    }
+    pushToast({ text: 'Running checks…', color: 'cyan', icon: '⚯' });
+    try {
+      const results = await citybaseApi.checks.run(workspace.workspace.id);
+      if (!Array.isArray(results) || results.length === 0) {
+        pushToast({ text: 'No checks declared in package.json', color: 'amber', icon: '⚯' });
+        return;
+      }
+      const summary = results.map((r) => {
+        const short = r.name.split(' · ')[0];
+        return `${short} ${r.state}`;
+      }).join(' · ');
+      const anyFail = results.some((r) => r.state === 'fail');
+      pushToast({
+        text: `Checks: ${summary}`,
+        color: anyFail ? 'red' : 'green',
+        icon: anyFail ? '✕' : '✓',
+      });
+    } catch (err) {
+      pushToast({ text: err?.message || 'checks failed', color: 'red', icon: '✕' });
+    }
+  };
+
   const pushToast = (t) => {
     const id = Math.random().toString(36).slice(2);
     setToasts(prev => [...prev, { id, ...t }]);
@@ -446,6 +473,7 @@ function CodebaseCity() {
               onTabChange={setActionTab}
               onFire={(act) => {
                 if (act.id === 'dispatch-agent') { dispatchAgent(); return; }
+                if (act.id === 'run-checks') { runChecks(); return; }
                 pushToast({ text: `${act.label} dispatched`, color: act.color, icon: act.icon });
               }}
             />

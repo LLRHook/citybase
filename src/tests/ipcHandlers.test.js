@@ -46,9 +46,11 @@ function makeStubs(overrides = {}) {
   const detectAgentBinaries = overrides.detectAgentBinaries
     ?? vi.fn(() => ({ codex: { found: true, path: '/usr/bin/codex' }, claude: { found: false } }));
   const sendAgentEvent = overrides.sendAgentEvent ?? vi.fn();
+  const runWorkspaceChecks = overrides.runWorkspaceChecks
+    ?? vi.fn(async () => [{ name: 'lint · npm run lint', state: 'pass', meta: 'clean in 80ms' }]);
   return {
     app, workspaceService, gitService, agentManager,
-    detectAgentBinaries, sendAgentEvent, getMainWindow, fakeWindow,
+    detectAgentBinaries, sendAgentEvent, runWorkspaceChecks, getMainWindow, fakeWindow,
   };
 }
 
@@ -78,6 +80,12 @@ describe('createIpcHandlers — required deps', () => {
       agentManager: { startRun: () => {} },
       detectAgentBinaries: () => ({}), sendAgentEvent: () => {},
     })).toThrow(/getMainWindow/);
+    expect(() => createIpcHandlers({
+      ...partial, workspaceService: {}, gitService: {},
+      agentManager: { startRun: () => {} },
+      detectAgentBinaries: () => ({}), sendAgentEvent: () => {},
+      getMainWindow: () => ({}),
+    })).toThrow(/runWorkspaceChecks/);
   });
 });
 
@@ -99,6 +107,7 @@ describe('createIpcHandlers — channel set', () => {
       'citybase:agents.list',
       'citybase:app.getPlatform',
       'citybase:app.getVersion',
+      'citybase:checks.run',
       'citybase:git.getSnapshot',
       'citybase:git.listBranches',
       'citybase:git.refresh',
@@ -185,6 +194,27 @@ describe('createIpcHandlers — app + workspace + git (regression)', () => {
     delete stubs.gitService.getBranches;
     const { handlers } = build(stubs);
     expect(await handlers['citybase:git.listBranches'](null, 'ws-1')).toEqual([]);
+  });
+
+  it('checks.run looks up the workspace then asks runWorkspaceChecks', async () => {
+    const stubs = makeStubs();
+    const { handlers } = build(stubs);
+    const out = await handlers['citybase:checks.run'](null, 'ws-1');
+    expect(stubs.workspaceService.getWorkspaceById).toHaveBeenCalledWith('ws-1');
+    expect(stubs.runWorkspaceChecks).toHaveBeenCalledWith({
+      workspace: { id: 'ws-1', rootPath: '/repo' },
+    });
+    expect(out).toEqual([
+      { name: 'lint · npm run lint', state: 'pass', meta: 'clean in 80ms' },
+    ]);
+  });
+
+  it('checks.run throws on unknown workspace id', async () => {
+    const stubs = makeStubs();
+    const { handlers } = build(stubs);
+    await expect(handlers['citybase:checks.run'](null, 'nope'))
+      .rejects.toThrow(/unknown workspace id: nope/);
+    expect(stubs.runWorkspaceChecks).not.toHaveBeenCalled();
   });
 });
 
