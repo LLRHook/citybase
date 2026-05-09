@@ -6,6 +6,7 @@
 // Pure function — every input is injected. Tests stub fsExists with a Set
 // of paths and assert the right combinations.
 const path = require('node:path');
+const fs = require('node:fs');
 
 const DEFAULT_CANDIDATES = Object.freeze({
   codex: Object.freeze(['codex']),
@@ -28,6 +29,39 @@ function pickPathDelimiter(platform) {
 // the renderer/test runner is running on.
 function pickJoin(platform) {
   return platform === 'win32' ? path.win32.join : path.posix.join;
+}
+
+function extraPathDirs({ env, platform }) {
+  if (!env || typeof env !== 'object') return [];
+  if (platform === 'win32') {
+    return [
+      env.USERPROFILE ? path.win32.join(env.USERPROFILE, '.local', 'bin') : null,
+      env.APPDATA ? path.win32.join(env.APPDATA, 'npm') : null,
+      env.LOCALAPPDATA ? path.win32.join(env.LOCALAPPDATA, 'Microsoft', 'WinGet', 'Links') : null,
+    ].filter(Boolean);
+  }
+  if (platform === 'darwin') {
+    return [
+      env.HOME ? path.posix.join(env.HOME, '.local', 'bin') : null,
+      '/opt/homebrew/bin',
+      '/usr/local/bin',
+    ].filter(Boolean);
+  }
+  return [
+    env.HOME ? path.posix.join(env.HOME, '.local', 'bin') : null,
+  ].filter(Boolean);
+}
+
+function preferStableWindowsCodex(codexPath, env, fsExists) {
+  if (!codexPath) return codexPath;
+  const normalized = codexPath.toLowerCase();
+  if (!normalized.endsWith('\\.local\\bin\\codex.cmd')) return codexPath;
+
+  const stableCandidates = [
+    env.APPDATA ? path.win32.join(env.APPDATA, 'npm', 'codex.cmd') : null,
+    env.LOCALAPPDATA ? path.win32.join(env.LOCALAPPDATA, 'Microsoft', 'WinGet', 'Links', 'codex.exe') : null,
+  ].filter(Boolean);
+  return stableCandidates.find(p => fsExists(p)) || codexPath;
 }
 
 /**
@@ -64,21 +98,27 @@ function findBinary({ candidates, pathDirs, extensions, join, fsExists }) {
 function detectAgentBinaries({
   env = process.env,
   platform = process.platform,
-  fsExists = () => false,
+  fsExists = fs.existsSync,
   candidates = DEFAULT_CANDIDATES,
 } = {}) {
   // Windows surfaces both PATH and Path depending on shell; fall back to
   // either. POSIX always uses PATH.
   const rawPath = (env && (env.PATH || env.Path)) || '';
   const delimiter = pickPathDelimiter(platform);
-  const pathDirs = rawPath.split(delimiter).filter(Boolean);
+  const pathDirs = [
+    ...rawPath.split(delimiter).filter(Boolean),
+    ...extraPathDirs({ env, platform }),
+  ];
   const extensions = pickExtensions(platform);
 
   const codexNames = candidates.codex || DEFAULT_CANDIDATES.codex;
   const claudeNames = candidates.claude || DEFAULT_CANDIDATES.claude;
 
   const join = pickJoin(platform);
-  const codexPath = findBinary({ candidates: codexNames, pathDirs, extensions, join, fsExists });
+  const rawCodexPath = findBinary({ candidates: codexNames, pathDirs, extensions, join, fsExists });
+  const codexPath = platform === 'win32'
+    ? preferStableWindowsCodex(rawCodexPath, env || {}, fsExists)
+    : rawCodexPath;
   const claudePath = findBinary({ candidates: claudeNames, pathDirs, extensions, join, fsExists });
 
   return {

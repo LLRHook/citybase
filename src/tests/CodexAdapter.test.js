@@ -82,18 +82,34 @@ describe('CodexAdapter — startTask', () => {
       .rejects.toThrow(/skill must be one of/);
   });
 
-  it('builds an argv with --quiet, mode, and --prompt; threads model through', async () => {
+  it('builds a non-interactive codex exec argv; threads model through', async () => {
     const ps = makeProcessService();
     const adapter = makeAdapter({ processService: ps });
     await adapter.startTask({ ...VALID_PARAMS, model: 'gpt-5-codex' });
-    const [, args] = ps.run.mock.calls[0];
-    expect(args[0]).toBe('--quiet');
-    expect(args).toContain('--mode');
-    expect(args).toContain('edit');
-    expect(args).toContain('--prompt');
-    expect(args).toContain('do the thing');
+    const [, args, options] = ps.run.mock.calls[0];
+    expect(args.slice(0, 9)).toEqual([
+      'exec',
+      '--cd', '/abs/repo',
+      '--sandbox', 'workspace-write',
+      '-c', 'approval_policy=never',
+      '--color', 'never',
+    ]);
     expect(args).toContain('--model');
     expect(args).toContain('gpt-5-codex');
+    expect(args.at(-1)).toBe('-');
+    expect(options.stdin).toContain('Make the focused refactor');
+    expect(options.stdin).toContain('do the thing');
+  });
+
+  it('gives CLI runs a longer timeout and larger output buffer than the process default', async () => {
+    const ps = makeProcessService();
+    const adapter = makeAdapter({ processService: ps });
+    await adapter.startTask(VALID_PARAMS);
+    expect(ps.run.mock.calls[0][2]).toEqual(expect.objectContaining({
+      cwd: '/abs/repo',
+      timeoutMs: 10 * 60 * 1000,
+      maxBuffer: 16 * 1024 * 1024,
+    }));
   });
 
   it('marks the run as done and returns AgentRun shape on a clean exit', async () => {
@@ -159,6 +175,29 @@ describe('CodexAdapter — streamEvents', () => {
       expect(e.t).toMatch(/^\d{2}:\d{2}$/);
       expect(typeof e.text).toBe('string');
     }
+  });
+
+  it('surfaces the buffered Codex response in the final event', async () => {
+    const ps = makeProcessService({
+      run: vi.fn(async () => ({
+        ok: true, code: 0, signal: null,
+        stdout: [
+          'SUCCESS: The process with PID 123 has been terminated.',
+          'Here and ready. I received checking.',
+        ].join('\n'),
+        stderr: '',
+        timedOut: false, durationMs: 20, error: null,
+      })),
+    });
+    const adapter = makeAdapter({ processService: ps });
+    const run = await adapter.startTask({ ...VALID_PARAMS, promptContext: 'checking' });
+    const events = await collect(adapter.streamEvents(run.runId));
+    const final = events.at(-1);
+
+    expect(final.kind).toBe('pr');
+    expect(final.text).toContain('Here and ready. I received checking.');
+    expect(final.text).not.toContain('SUCCESS: The process');
+    expect(final.payload.response).toBe('Here and ready. I received checking.');
   });
 
   it('emits an error event on a failed run', async () => {

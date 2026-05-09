@@ -10,13 +10,19 @@ const STATE_FILENAME = 'workspaces.json';
 const MAX_RECENT = 12;
 
 function statePath() {
-  return path.join(app.getPath('userData'), STATE_FILENAME);
+  const userData = app && typeof app.getPath === 'function'
+    ? app.getPath('userData')
+    : process.env.CITYBASE_USER_DATA;
+  if (!userData) {
+    throw new Error('workspaceService: userData path unavailable');
+  }
+  return path.join(userData, STATE_FILENAME);
 }
 
 async function readState() {
   try {
     const raw = await fs.readFile(statePath(), 'utf8');
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(stripBom(raw));
     if (!parsed || typeof parsed !== 'object') return emptyState();
     return {
       currentId: typeof parsed.currentId === 'string' ? parsed.currentId : null,
@@ -27,6 +33,10 @@ async function readState() {
     console.warn('citybase: failed to read workspace state, starting empty', err);
     return emptyState();
   }
+}
+
+function stripBom(raw) {
+  return raw && raw.charCodeAt(0) === 0xFEFF ? raw.slice(1) : raw;
 }
 
 function emptyState() {
@@ -78,6 +88,41 @@ async function rememberWorkspace(rootPath) {
   return ws;
 }
 
+async function pathExists(p) {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function findSelfWorkspaceRoot() {
+  if (process.env.CITYBASE_DISABLE_SELF_WORKSPACE === '1') return null;
+  const candidates = [
+    process.env.CITYBASE_DEFAULT_WORKSPACE,
+    app && typeof app.getAppPath === 'function' ? app.getAppPath() : null,
+    process.cwd(),
+  ].filter(Boolean);
+  const seen = new Set();
+  for (const candidate of candidates) {
+    const real = await fs.realpath(candidate).catch(() => null);
+    if (!real || seen.has(real)) continue;
+    seen.add(real);
+    const stat = await fs.stat(real).catch(() => null);
+    if (!stat?.isDirectory()) continue;
+    const hasProjectMarker = await pathExists(path.join(real, 'package.json'));
+    const hasGitMarker = await pathExists(path.join(real, '.git'));
+    if (hasProjectMarker && hasGitMarker) return real;
+  }
+  return null;
+}
+
+async function rememberSelfWorkspace() {
+  const root = await findSelfWorkspaceRoot();
+  return root ? rememberWorkspace(root) : null;
+}
+
 async function pickWorkspace({ window } = {}) {
   const result = await dialog.showOpenDialog(window || undefined, {
     title: 'Open Workspace',
@@ -90,6 +135,8 @@ async function pickWorkspace({ window } = {}) {
 }
 
 async function getCurrentWorkspace() {
+  const selfWorkspace = await rememberSelfWorkspace();
+  if (selfWorkspace) return selfWorkspace;
   const state = await readState();
   if (!state.currentId) return null;
   return state.workspaces.find(w => w.id === state.currentId) || null;
@@ -130,4 +177,6 @@ module.exports = {
   listRecentWorkspaces,
   forgetWorkspace,
   getWorkspaceById,
+  findSelfWorkspaceRoot,
+  stripBom,
 };
