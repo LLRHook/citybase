@@ -16,7 +16,7 @@ import {
   LivePulse, Transport,
 } from './game/command.jsx';
 import {
-  QuestDetailModal, PostQuestModal, LootToast,
+  QuestDetailModal, PostQuestModal, LootToast, ApprovalModal,
 } from './game/modals.jsx';
 import { KanbanView } from './game/kanban.jsx';
 import { AdventurerAnalysis } from './game/analysis.jsx';
@@ -29,6 +29,8 @@ import { isDesktop } from './app/citybaseApi.js';
 import { projectRepoTreeToCityModel } from './app/cityModel.js';
 import { projectSnapshotToActivity } from './app/activity.js';
 import { useAgentDetect } from './app/useAgentDetect.js';
+import { useApprovalRequests } from './app/useApprovalRequests.js';
+import { citybaseApi } from './app/citybaseApi.js';
 
 const TWEAK_DEFAULTS = { role: 'admin', connected: false, agentProvider: 'auto' };
 
@@ -74,6 +76,8 @@ function CodebaseCity() {
   const connected = tweaks.connected === true;
   const agentProvider = tweaks.agentProvider || 'auto';
   const agentDetect = useAgentDetect();
+  const approval = useApprovalRequests();
+  const dispatchCounterRef = React.useRef(0);
 
   const workspace = useWorkspace();
   const liveBranch = workspace.snapshot?.branch || null;
@@ -164,6 +168,33 @@ function CodebaseCity() {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+
+  const dispatchAgent = async () => {
+    const adv = selectedAdv?.adv;
+    if (!cityConnected || !workspace.workspace) {
+      pushToast({ text: 'Open a workspace first', color: 'amber', icon: '⚠' });
+      return;
+    }
+    if (!adv) {
+      pushToast({ text: 'Pick an adventurer first', color: 'amber', icon: '⚠' });
+      return;
+    }
+    const dispatchId = ++dispatchCounterRef.current;
+    try {
+      const run = await citybaseApi.agents.startRun({
+        provider: agentProvider,
+        questId: `dispatch-${dispatchId}`,
+        adventurerId: adv.id,
+        skill: 'refactor',
+        repoUrl: workspace.workspace.rootPath,
+        branch: workspace.snapshot?.branch || 'main',
+        promptContext: 'investigate the workspace and propose a small refactor',
+      });
+      pushToast({ text: `Run dispatched · ${run.runId.slice(0, 8)}`, color: 'green', icon: '★' });
+    } catch (err) {
+      pushToast({ text: err?.message || 'dispatch failed', color: 'red', icon: '✕' });
+    }
   };
 
   const pushToast = (t) => {
@@ -393,7 +424,10 @@ function CodebaseCity() {
             <ActionBar
               tab={actionTab}
               onTabChange={setActionTab}
-              onFire={(act) => pushToast({ text: `${act.label} dispatched`, color: act.color, icon: act.icon })}
+              onFire={(act) => {
+                if (act.id === 'dispatch-agent') { dispatchAgent(); return; }
+                pushToast({ text: `${act.label} dispatched`, color: act.color, icon: act.icon });
+              }}
             />
           </div>
 
@@ -426,6 +460,11 @@ function CodebaseCity() {
         />
       )}
       <LootToast toasts={toasts} />
+      <ApprovalModal
+        pending={approval.pending}
+        onApprove={() => approval.pending && approval.approve(approval.pending.runId)}
+        onReject={() => approval.pending && approval.reject(approval.pending.runId)}
+      />
 
       {/* TWEAKS */}
       <TweaksPanel title="Tweaks">
