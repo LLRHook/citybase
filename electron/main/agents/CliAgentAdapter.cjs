@@ -14,13 +14,44 @@
 //     completion or timeout.
 //   - streamEvents synthesizes a trail from the buffered exit state.
 //     Real token-by-token streaming waits on a processService change
-//     that surfaces stdout chunks.
+//     that surfaces stdout chunks. (ClaudeAdapter overrides this with
+//     real-output parsing — synthesizeTrail is only the fallback now.)
+//   - openPR shells out to `gh pr create` and assumes the head branch
+//     has been pushed already. Auto-push is deferred to v1.1 per the
+//     ROADMAP "Out of v1 scope" list — a push side-effect inside
+//     openPR would surprise the user.
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const { AgentAdapter, validateStartTaskParams } = require('./AgentAdapter.cjs');
 const { detectAgentBinaries } = require('./detect.cjs');
 const { parseUnifiedDiff } = require('./parseUnifiedDiff.cjs');
 const { runWorkspaceChecks } = require('../services/workspaceChecks.cjs');
+
+// `gh pr create` prints a few lines of progress and ends with the new
+// PR URL on its own line, e.g.
+//   Creating pull request for feature/x into main in owner/repo
+//   https://github.com/owner/repo/pull/123
+// The URL line is what the caller actually wants. We accept any line
+// that looks like a GitHub PR URL — defensive against future format
+// drift like the "Visit ..." prefix some `gh` versions add.
+function parseGhPrCreateUrl(stdout) {
+  if (typeof stdout !== 'string') return null;
+  // Walk whitespace-separated tokens and return the first one that
+  // contains `/pull/<digits>`. Grabbing the whole token preserves any
+  // query string or fragment, which a stricter regex would chop off.
+  for (const token of stdout.split(/\s+/)) {
+    if (/^https?:\/\/\S*\/pull\/\d+/.test(token)) return token;
+  }
+  return null;
+}
+
+function parsePrNumberFromUrl(url) {
+  if (typeof url !== 'string') return null;
+  const match = url.match(/\/pull\/(\d+)(?:[/?#]|$)/);
+  if (!match) return null;
+  const n = Number.parseInt(match[1], 10);
+  return Number.isFinite(n) ? n : null;
+}
 
 function defaultBuildArgv({ params }) {
   return [
@@ -165,9 +196,52 @@ class CliAgentAdapter extends AgentAdapter {
     });
   }
 
-  async openPR(runId, _params) {
-    this._requireRun(runId);
-    throw new Error(`openPR not yet supported by ${this._binaryName}Adapter; pending Phase 5 PR-creation surface`);
+  async openPR(runId, params) {
+    const entry = this._requireRun(runId);
+    if (!params || typeof params !== 'object') {
+      throw new TypeError('openPR: params is required');
+    }
+    const { title, body = '', sourceBranch, targetBranch } = params;
+    if (typeof title !== 'string' || title.length === 0) {
+      throw new TypeError('openPR: title must be a non-empty string');
+    }
+    if (typeof sourceBranch !== 'string' || sourceBranch.length === 0) {
+      throw new TypeError('openPR: sourceBranch must be a non-empty string');
+    }
+    if (typeof targetBranch !== 'string' || targetBranch.length === 0) {
+      throw new TypeError('openPR: targetBranch must be a non-empty string');
+    }
+
+    // The branch MUST be pushed before this call; gh pr create will
+    // refuse if the head branch has no upstream. We don't auto-push
+    // here — push is deferred to v1.1 per ROADMAP, and a side-effect
+    // mid-openPR would surprise the user.
+    const result = await this._processService.run(
+      'gh',
+      ['pr', 'create',
+        '--title', title,
+        '--body', body,
+        '--base', targetBranch,
+        '--head', sourceBranch],
+      { cwd: entry.cwd },
+    );
+    if (!result.ok) {
+      const stderr = (result.stderr || '').trim();
+      const message = stderr || `gh pr create exited with code ${result.code}`;
+      const err = new Error(`gh pr create failed: ${message}`);
+      err.code = result.code;
+      err.stderr = stderr;
+      throw err;
+    }
+    const url = parseGhPrCreateUrl(result.stdout || '');
+    if (!url) {
+      throw new Error(`gh pr create succeeded but emitted no PR URL: ${(result.stdout || '').trim()}`);
+    }
+    const prNumber = parsePrNumberFromUrl(url);
+    if (prNumber == null) {
+      throw new Error(`gh pr create returned an unparseable URL: ${url}`);
+    }
+    return { prNumber, url };
   }
 
   async cancel(runId) {
@@ -184,4 +258,9 @@ class CliAgentAdapter extends AgentAdapter {
   }
 }
 
-module.exports = { CliAgentAdapter, defaultBuildArgv };
+module.exports = {
+  CliAgentAdapter,
+  defaultBuildArgv,
+  parseGhPrCreateUrl,
+  parsePrNumberFromUrl,
+};
