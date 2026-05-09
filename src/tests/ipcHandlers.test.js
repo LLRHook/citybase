@@ -16,6 +16,10 @@ function makeStubs(overrides = {}) {
   };
   const gitService = {
     getSnapshot: vi.fn(async (ws) => ({ workspaceId: ws.id, branch: 'main' })),
+    getBranches: vi.fn(async () => [
+      { name: 'main', isCurrent: true, upstream: 'origin/main' },
+      { name: 'feature/x', isCurrent: false, upstream: null },
+    ]),
     ...(overrides.gitService || {}),
   };
   const agentManager = {
@@ -96,6 +100,7 @@ describe('createIpcHandlers — channel set', () => {
       'citybase:app.getPlatform',
       'citybase:app.getVersion',
       'citybase:git.getSnapshot',
+      'citybase:git.listBranches',
       'citybase:git.refresh',
       'citybase:workspace.forget',
       'citybase:workspace.getCurrent',
@@ -154,6 +159,32 @@ describe('createIpcHandlers — app + workspace + git (regression)', () => {
   it('git.refresh shares the handler reference with git.getSnapshot', () => {
     const { handlers } = build(makeStubs());
     expect(handlers['citybase:git.refresh']).toBe(handlers['citybase:git.getSnapshot']);
+  });
+
+  it('git.listBranches looks up the workspace then asks gitService.getBranches', async () => {
+    const stubs = makeStubs();
+    const { handlers } = build(stubs);
+    const out = await handlers['citybase:git.listBranches'](null, 'ws-1');
+    expect(stubs.workspaceService.getWorkspaceById).toHaveBeenCalledWith('ws-1');
+    expect(stubs.gitService.getBranches).toHaveBeenCalledWith({ id: 'ws-1', rootPath: '/repo' });
+    expect(out).toEqual([
+      { name: 'main', isCurrent: true, upstream: 'origin/main' },
+      { name: 'feature/x', isCurrent: false, upstream: null },
+    ]);
+  });
+
+  it('git.listBranches throws on unknown workspace id', async () => {
+    const stubs = makeStubs();
+    const { handlers } = build(stubs);
+    await expect(handlers['citybase:git.listBranches'](null, 'nope'))
+      .rejects.toThrow(/unknown workspace id: nope/);
+  });
+
+  it('git.listBranches returns [] when gitService is missing the helper (older builds)', async () => {
+    const stubs = makeStubs();
+    delete stubs.gitService.getBranches;
+    const { handlers } = build(stubs);
+    expect(await handlers['citybase:git.listBranches'](null, 'ws-1')).toEqual([]);
   });
 });
 
