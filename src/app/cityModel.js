@@ -152,6 +152,9 @@ export function projectRepoTreeToCityModel(tracked, dirty = []) {
       buildings.push({
         d: districtId,
         name,
+        // Full repo-relative path — exact-match lookup for dirty-file
+        // overlays in map.jsx (basenames collide across folders).
+        path: f,
         type: isTowerFile(name) ? 'tower' : 'house',
       });
     }
