@@ -4,8 +4,7 @@ import { NEON, C, alpha } from './palette.js';
 import {
   NeonBar, Pill, Mono, Title,
 } from './theme.jsx';
-import { SKILL_DEFS, GUILDS } from './data.js';
-import { SAGAS } from './sagas.js';
+import { SKILL_DEFS } from './data.js';
 import { QuestSourceBadge } from './panels.jsx';
 
 const LANES = [
@@ -16,13 +15,13 @@ const LANES = [
   { id: 'done',        label: 'DONE',         color: 'green' },
 ];
 
-function KanbanCard({ quest, onClick, onOpenAnalysis }) {
+function KanbanCard({ quest, guilds, sagas, onClick, onOpenAnalysis }) {
   const sk = SKILL_DEFS[quest.skill];
   const a = C(sk.color);
-  const saga = SAGAS.find(s => s.id === quest.saga);
+  const saga = sagas.find(s => s.id === quest.saga);
   const adv = quest.adventurer;
   const advObj = adv
-    ? GUILDS.flatMap(g => g.adventurers.map(av => ({ ...av, guild: g }))).find(x => x.id === adv)
+    ? guilds.flatMap(g => g.adventurers.map(av => ({ ...av, guild: g }))).find(x => x.id === adv)
     : null;
 
   return (
@@ -100,7 +99,7 @@ function KanbanCard({ quest, onClick, onOpenAnalysis }) {
   );
 }
 
-function KanbanLane({ lane, quests, onCardClick, onOpenAnalysis }) {
+function KanbanLane({ lane, quests, guilds, sagas, onCardClick, onOpenAnalysis }) {
   const a = C(lane.color);
   return (
     <div style={{
@@ -118,7 +117,7 @@ function KanbanLane({ lane, quests, onCardClick, onOpenAnalysis }) {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflow: 'auto', flex: 1, minHeight: 0 }}>
         {quests.map(q => (
-          <KanbanCard key={q.id} quest={q} onClick={onCardClick} onOpenAnalysis={onOpenAnalysis} />
+          <KanbanCard key={q.id} quest={q} guilds={guilds} sagas={sagas} onClick={onCardClick} onOpenAnalysis={onOpenAnalysis} />
         ))}
         {quests.length === 0 && (
           <div style={{ padding: '20px 0', textAlign: 'center', opacity: 0.5 }}>
@@ -130,7 +129,7 @@ function KanbanLane({ lane, quests, onCardClick, onOpenAnalysis }) {
   );
 }
 
-export function KanbanView({ quests, onCardClick, onOpenAnalysis, groupBy, onGroupChange }) {
+export function KanbanView({ quests, guilds, sagas, onCardClick, onOpenAnalysis, groupBy, onGroupChange }) {
   const orphans = quests.filter(q => !q.saga);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -169,7 +168,7 @@ export function KanbanView({ quests, onCardClick, onOpenAnalysis, groupBy, onGro
             ))}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {SAGAS.map(s => (
+            {sagas.map(s => (
               <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 8 }}>
                 <div style={{
                   padding: 10,
@@ -195,7 +194,7 @@ export function KanbanView({ quests, onCardClick, onOpenAnalysis, groupBy, onGro
                     return (
                       <div key={l.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: `2px solid ${C(l.color)}`, paddingTop: 6 }}>
                         {sagaQuests.map(q => (
-                          <KanbanCard key={q.id} quest={q} onClick={onCardClick} onOpenAnalysis={onOpenAnalysis} />
+                          <KanbanCard key={q.id} quest={q} guilds={guilds} sagas={sagas} onClick={onCardClick} onOpenAnalysis={onOpenAnalysis} />
                         ))}
                       </div>
                     );
@@ -216,7 +215,7 @@ export function KanbanView({ quests, onCardClick, onOpenAnalysis, groupBy, onGro
                   {LANES.map(l => (
                     <div key={l.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: `2px solid ${C(l.color)}`, paddingTop: 6 }}>
                       {orphans.filter(q => q.lane === l.id).map(q => (
-                        <KanbanCard key={q.id} quest={q} onClick={onCardClick} onOpenAnalysis={onOpenAnalysis} />
+                        <KanbanCard key={q.id} quest={q} guilds={guilds} sagas={sagas} onClick={onCardClick} onOpenAnalysis={onOpenAnalysis} />
                       ))}
                     </div>
                   ))}
@@ -231,6 +230,7 @@ export function KanbanView({ quests, onCardClick, onOpenAnalysis, groupBy, onGro
             <KanbanLane
               key={l.id} lane={l}
               quests={quests.filter(q => q.lane === l.id)}
+              guilds={guilds} sagas={sagas}
               onCardClick={onCardClick} onOpenAnalysis={onOpenAnalysis}
             />
           ))}

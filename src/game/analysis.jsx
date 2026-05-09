@@ -5,8 +5,6 @@ import { hexPath } from './hex.js';
 import {
   Panel, Pill, Mono, Title, NButton,
 } from './theme.jsx';
-import { GUILDS } from './data.js';
-import { ADV_REPORTS } from './sagas.js';
 
 function CheckRow({ check }) {
   const map = { pass: 'green', fail: 'red', warn: 'amber', running: 'cyan' };
@@ -136,11 +134,11 @@ function RiskMeter({ risk }) {
   );
 }
 
-export function AdventurerAnalysis({ advId, onPickAdv }) {
-  const report = ADV_REPORTS[advId];
-  const adv = GUILDS.flatMap(g => g.adventurers.map(a => ({ ...a, guild: g }))).find(x => x.id === advId);
-  const allWithReports = Object.keys(ADV_REPORTS)
-    .map(id => GUILDS.flatMap(g => g.adventurers.map(a => ({ ...a, guild: g }))).find(x => x.id === id))
+export function AdventurerAnalysis({ advId, guilds, advReports, onPickAdv }) {
+  const report = advReports[advId];
+  const adv = guilds.flatMap(g => g.adventurers.map(a => ({ ...a, guild: g }))).find(x => x.id === advId);
+  const allWithReports = Object.keys(advReports)
+    .map(id => guilds.flatMap(g => g.adventurers.map(a => ({ ...a, guild: g }))).find(x => x.id === id))
     .filter(Boolean);
 
   if (!report || !adv) {
