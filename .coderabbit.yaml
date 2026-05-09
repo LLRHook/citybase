@@ -15,6 +15,18 @@ reviews:
   review_status: false             # skip the "Review in progress" status comment
   collapse_walkthrough: true       # keep the file-by-file walkthrough collapsed by default
 
+  # Pre-merge checks: disable rules that conflict with project policy.
+  # The project rule is "default to writing no comments" (AGENTS.md), so the
+  # built-in docstring-coverage check is off. The "Generate docstrings" finishing
+  # touch in the Reviews UI should also stay un-clicked on PRs.
+  pre_merge_checks:
+    docstrings:
+      mode: OFF
+    title:
+      mode: WARNING
+    description:
+      mode: WARNING
+
   auto_review:
     enabled: true
     drafts: false
