@@ -1,5 +1,9 @@
 name: CI
 
+# Least-privilege token: this workflow only reads code; no PR/issue writes.
+permissions:
+  contents: read
+
 on:
   push:
     branches: ['**']
@@ -9,8 +13,12 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # actions are pinned to commit SHAs (not @v4 tags) for supply-chain safety.
+      # Resolve current v4 SHAs via:
+      #   gh api repos/actions/checkout/commits/v4 --jq .sha
+      #   gh api repos/actions/setup-node/commits/v4 --jq .sha
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: '20'
           cache: 'npm'
