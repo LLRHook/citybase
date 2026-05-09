@@ -52,8 +52,10 @@ function run(command, args, { cwd, timeoutMs, maxBuffer, env } = {}) {
 
 // Apps launched from Finder on macOS inherit a thin PATH that omits
 // /opt/homebrew/bin and /usr/local/bin. Augment for git/codex/claude lookups.
+// On Windows and Linux these paths don't apply, so skip the augmentation.
 function augmentedEnv() {
   const env = { ...process.env };
+  if (process.platform !== 'darwin') return env;
   const extras = ['/opt/homebrew/bin', '/usr/local/bin'];
   const cur = (env.PATH || '').split(':').filter(Boolean);
   for (const p of extras) {

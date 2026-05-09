@@ -67,7 +67,7 @@ function buildMenu({ getMainWindow }) {
       submenu: [
         {
           label: 'About Citybase',
-          click: () => shell.openExternal('https://github.com/'),
+          click: () => shell.openExternal('https://github.com/LLRHook/citybase'),
         },
       ],
     },
