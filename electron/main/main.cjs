@@ -5,19 +5,20 @@ const { app, BrowserWindow } = require('electron');
 const path = require('node:path');
 const { buildMenu } = require('./menu.cjs');
 const { registerIpc } = require('./ipc.cjs');
+const { resolveLaunchTarget, WINDOW_BOUNDS } = require('./windowConfig.cjs');
 const { getCurrentWorkspace } = require('./services/workspaceService.cjs');
-
-const isDev = process.env.CITYBASE_DEV === '1' || process.argv.includes('--dev');
-const DEV_URL = process.env.CITYBASE_DEV_URL || 'http://localhost:5173';
 
 let mainWindow = null;
 
 function createWindow() {
+  const target = resolveLaunchTarget({
+    argv: process.argv,
+    env: process.env,
+    distIndexPath: path.join(__dirname, '..', '..', 'dist', 'index.html'),
+  });
+
   mainWindow = new BrowserWindow({
-    width: 1480,
-    height: 960,
-    minWidth: 1100,
-    minHeight: 720,
+    ...WINDOW_BOUNDS,
     backgroundColor: '#070914',
     title: 'Citybase',
     webPreferences: {
@@ -28,11 +29,13 @@ function createWindow() {
     },
   });
 
-  if (isDev) {
-    mainWindow.loadURL(DEV_URL);
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  if (target.kind === 'dev') {
+    mainWindow.loadURL(target.url);
+    if (target.openDevTools) {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
   } else {
-    mainWindow.loadFile(path.join(__dirname, '..', '..', 'dist', 'index.html'));
+    mainWindow.loadFile(target.file);
   }
 
   mainWindow.on('closed', () => { mainWindow = null; });
