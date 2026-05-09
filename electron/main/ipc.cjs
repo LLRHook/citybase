@@ -20,16 +20,13 @@ function registerIpc({ getMainWindow }) {
   ipcMain.handle('citybase:workspace.listRecent', () => workspaceService.listRecentWorkspaces());
   ipcMain.handle('citybase:workspace.forget', (_evt, id) => workspaceService.forgetWorkspace(id));
 
-  ipcMain.handle('citybase:git.getSnapshot', async (_evt, workspaceId) => {
+  const handleGitSnapshot = async (_evt, workspaceId) => {
     const ws = await workspaceService.getWorkspaceById(workspaceId);
     if (!ws) throw new Error(`unknown workspace id: ${workspaceId}`);
     return gitService.getSnapshot(ws);
-  });
-  ipcMain.handle('citybase:git.refresh', async (_evt, workspaceId) => {
-    const ws = await workspaceService.getWorkspaceById(workspaceId);
-    if (!ws) throw new Error(`unknown workspace id: ${workspaceId}`);
-    return gitService.getSnapshot(ws);
-  });
+  };
+  ipcMain.handle('citybase:git.getSnapshot', handleGitSnapshot);
+  ipcMain.handle('citybase:git.refresh', handleGitSnapshot);
 }
 
 module.exports = { registerIpc };

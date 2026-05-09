@@ -50,7 +50,7 @@ Tauri remains a good later option if bundle size and native hardening matter mor
 
 ## Architecture Sketch
 
-```
+```text
 Citybase Desktop App
 
 React/Vite renderer
