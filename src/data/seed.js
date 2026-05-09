@@ -1,19 +1,8 @@
-// src/data/seed.js — single mock data source for the Citybase prototype.
-// The backend (Phase 1+) will replace this file with live projections from
-// the linked repo, issue tracker, and contributor history.
+// Single mock data source. The backend (Phase 1+) replaces this file with
+// live projections; add new mock data here, not in component files.
 //
-// This file consolidates what used to be scattered:
-//   - src/game/data.js   (REPO, DISTRICTS, BUILDINGS, GUILDS, SKILL_DEFS, ACTIVITY, hpFromContext, fmtTokens)
-//   - src/game/sagas.js  (SAGAS, QUESTS_V2, ADV_REPORTS)
-//   - src/game/command.jsx inline arrays (OBJECTIVES, ALERTS)
-//
-// src/game/data.js and src/game/sagas.js are now thin re-export shims so
-// existing component imports keep working. Add new mock data here, not in
-// component files.
-//
-// Models the my-website repo as a city. Folders = districts, files = buildings.
-// Authors = guilds. Coding agents under each author = adventurers.
-// Tasks from Jira / issues from Bitbucket = quests.
+// Domain mapping: folders → districts, files → buildings, contributors →
+// guilds, coding agents → adventurers, tickets → quests.
 
 // =================== REPO ===================
 
