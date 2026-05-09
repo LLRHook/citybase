@@ -1,0 +1,71 @@
+# CodeRabbit AI review config for citybase.
+# Schema: https://docs.coderabbit.ai/reference/yaml-template
+#
+# Operating rule (see AGENTS.md): AI proposes, deterministic CI gates merge.
+# CodeRabbit is advisory — its comments do not block merge. CI (lint + build +
+# test) is the merge gate.
+
+language: en-US
+
+reviews:
+  profile: chill                   # less verbose than 'assertive'; one summary + targeted comments
+  request_changes_workflow: false  # don't gate the PR via "Request Changes" — CI is the gate
+  high_level_summary: true
+  poem: false                      # opt out of the haiku gimmick
+  review_status: false             # skip the "Review in progress" status comment
+  collapse_walkthrough: true       # keep the file-by-file walkthrough collapsed by default
+
+  # Pre-merge checks: disable rules that conflict with project policy.
+  # The project rule is "default to writing no comments" (AGENTS.md), so the
+  # built-in docstring-coverage check is off. The "Generate docstrings" finishing
+  # touch in the Reviews UI should also stay un-clicked on PRs.
+  pre_merge_checks:
+    docstrings:
+      mode: OFF
+    title:
+      mode: WARNING
+    description:
+      mode: WARNING
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+    ignore_title_keywords:
+      - WIP
+      - DRAFT
+      - 'chore(deps)'              # Dependabot's default title prefix
+      - 'bump '                    # generic dep-bump titles
+
+  path_filters:
+    - '!dist/**'
+    - '!node_modules/**'
+    - '!package-lock.json'
+    - '!**/*.lock'
+
+  # Per-path review intensity. The data seed file is mostly mock literals;
+  # don't waste review budget there.
+  path_instructions:
+    - path: 'src/data/seed.js'
+      instructions: |
+        This is the canonical mock data source. The backend will replace it
+        wholesale in Phase 1+. Skip stylistic comments on the literal data
+        (names, IDs, color choices). Flag only structural issues, type
+        inconsistencies between entities, or contradictions with the domain
+        model in docs/domain-model.md.
+    - path: 'src/game/**'
+      instructions: |
+        Prototype UI. Inline styles and co-located helpers are intentional
+        for now (see ROADMAP.md Phase 0). Don't suggest a styling-system
+        rewrite or Storybook setup — those are deferred. Do flag real React
+        bugs (ref-during-render, missing keys, stale closures), accessibility
+        regressions, and any new runtime dependency.
+    - path: 'docs/**'
+      instructions: |
+        Provider-neutral documentation. Don't recommend Claude-specific
+        wording in docs/agent-runtime.md — the AgentProvider interface is
+        intentionally vendor-agnostic.
+
+chat:
+  auto_reply: true

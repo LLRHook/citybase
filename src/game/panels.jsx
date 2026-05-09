@@ -1,7 +1,7 @@
 // panels.jsx — quest board, guild roster, character sheet, activity feed.
-import React from 'react';
+import { NEON, C, alpha } from './palette.js';
+import { hexPath } from './hex.js';
 import {
-  NEON, C, alpha, hexPath,
   Panel, NeonBar, Pill, Mono, Title, NButton, Crest,
 } from './theme.jsx';
 import { SKILL_DEFS, hpFromContext, fmtTokens } from './data.js';
