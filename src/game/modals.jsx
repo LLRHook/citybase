@@ -196,7 +196,11 @@ export function PostQuestModal({ onClose, onSubmit }) {
             <div style={{ marginTop: 6 }}>
               <QuestCard
                 quest={{
-                  id: form.source === 'agent' ? 'RUN-???' : 'TASK-???',
+                  // Mirrors the source-to-prefix convention seen in src/data/seed.js
+                  // (and what the backend will assign). Real IDs come from the main process.
+                  id: form.source === 'agent' ? 'RUN-???'
+                    : form.source === 'git' ? 'GIT-???'
+                    : 'TASK-???',
                   source: form.source, title: form.title || '(untitled)',
                   skill: form.skill, reward: form.reward,
                   target: form.target, file: form.file,
