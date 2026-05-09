@@ -25,6 +25,8 @@ function browserStub() {
       getSnapshot: async () => null,
       refresh: async () => null,
       listBranches: async () => [],
+      checkout: async () => ({ ok: false, error: { message: 'git not available in browser preview' } }),
+      commit: async () => ({ ok: false, error: { message: 'git not available in browser preview' } }),
     },
     checks: {
       run: async () => [],

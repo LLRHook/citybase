@@ -20,6 +20,7 @@ export function BranchSelector({
   fileCount = 0,
   selectedBranch,
   onSelect,
+  onCheckout,
   api,
 }) {
   const [open, setOpen] = React.useState(false);
@@ -94,7 +95,29 @@ export function BranchSelector({
         <span>{label}</span>
         {linked && <span style={{ color: NEON.ink3, fontSize: 9 }}>{open ? '▴' : '▾'}</span>}
       </button>
-      {pendingDifferent && (
+      {pendingDifferent && !dirty && typeof onCheckout === 'function' && (
+        <button
+          type="button"
+          onClick={() => onCheckout(selectedBranch)}
+          aria-label={`Checkout ${selectedBranch}`}
+          style={{
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 9, fontWeight: 700,
+            letterSpacing: 1, padding: '4px 8px',
+            border: `1px solid ${alpha(NEON.green, 0.7)}`,
+            background: alpha(NEON.green, 0.15),
+            color: NEON.green, cursor: 'pointer', borderRadius: 2,
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+          }}
+        >
+          ↳ CHECKOUT {selectedBranch}
+        </button>
+      )}
+      {pendingDifferent && dirty && (
+        <Pill color="amber">
+          → {selectedBranch} (commit first)
+        </Pill>
+      )}
+      {pendingDifferent && !dirty && typeof onCheckout !== 'function' && (
         <Pill color="amber">
           → {selectedBranch}
         </Pill>

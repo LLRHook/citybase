@@ -214,6 +214,57 @@ function CodebaseCity() {
     }
   };
 
+  const checkoutBranch = async (branchName) => {
+    if (!workspace.workspace) {
+      pushToast({ text: 'Open a workspace first', color: 'amber', icon: '⚠' });
+      return;
+    }
+    if (!branchName) return;
+    try {
+      const result = await citybaseApi.git.checkout(workspace.workspace.id, branchName);
+      if (!result?.ok) {
+        const msg = result?.error?.message || 'checkout failed';
+        pushToast({ text: msg, color: 'red', icon: '✕' });
+        return;
+      }
+      setTweak('selectedBranch', null);
+      pushToast({ text: `Checked out ${branchName}`, color: 'green', icon: '✓' });
+      await workspace.refresh();
+    } catch (err) {
+      pushToast({ text: err?.message || 'checkout failed', color: 'red', icon: '✕' });
+    }
+  };
+
+  const commitWorkspace = async (message) => {
+    if (!workspace.workspace) {
+      pushToast({ text: 'Open a workspace first', color: 'amber', icon: '⚠' });
+      return { ok: false };
+    }
+    const trimmed = (message || '').trim();
+    if (!trimmed) {
+      pushToast({ text: 'Commit message required', color: 'amber', icon: '⚠' });
+      return { ok: false };
+    }
+    try {
+      const result = await citybaseApi.git.commit(workspace.workspace.id, {
+        message: trimmed,
+        addAll: true,
+      });
+      if (!result?.ok) {
+        const msg = result?.error?.message || 'commit failed';
+        pushToast({ text: msg, color: 'red', icon: '✕' });
+        return { ok: false };
+      }
+      const short = result.commitHash ? result.commitHash.slice(0, 8) : '(no hash)';
+      pushToast({ text: `Commit landed · ${short}`, color: 'green', icon: '✓' });
+      await workspace.refresh();
+      return result;
+    } catch (err) {
+      pushToast({ text: err?.message || 'commit failed', color: 'red', icon: '✕' });
+      return { ok: false };
+    }
+  };
+
   const runChecks = async () => {
     if (!cityConnected || !workspace.workspace) {
       pushToast({ text: 'Open a workspace first', color: 'amber', icon: '⚠' });
@@ -345,6 +396,7 @@ function CodebaseCity() {
             fileCount={workspace.snapshot?.files?.length || 0}
             selectedBranch={tweaks.selectedBranch}
             onSelect={(name) => setTweak('selectedBranch', name)}
+            onCheckout={checkoutBranch}
             api={citybaseApi}
           />
           <Transport
@@ -381,6 +433,8 @@ function CodebaseCity() {
           advReports={advReports}
           districts={districts}
           onPickAdv={setAnalysisAdv}
+          workspaceDirty={workspace.snapshot?.files?.length || 0}
+          onCommit={commitWorkspace}
         />
       )}
 
