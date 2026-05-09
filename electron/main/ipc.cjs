@@ -14,6 +14,7 @@ const { createAgentManager } = require('./agents/agentManager.cjs');
 const { detectAgentBinaries } = require('./agents/detect.cjs');
 const { CodexAdapter } = require('./agents/CodexAdapter.cjs');
 const { ClaudeAdapter } = require('./agents/ClaudeAdapter.cjs');
+const { runWorkspaceChecks } = require('./services/workspaceChecks.cjs');
 
 function buildAgentManager() {
   const codex = new CodexAdapter({ processService });
@@ -33,6 +34,11 @@ function registerIpc({ getMainWindow }) {
     win.webContents.send(AGENT_EVENT_CHANNEL, payload);
   };
 
+  // Pre-bind processService so the IPC handler doesn't need to know
+  // about it; tests inject their own runner instead.
+  const boundChecksRunner = ({ workspace }) =>
+    runWorkspaceChecks({ workspace, processService });
+
   const { handlers } = createIpcHandlers({
     app,
     workspaceService,
@@ -41,6 +47,7 @@ function registerIpc({ getMainWindow }) {
     detectAgentBinaries,
     sendAgentEvent,
     getMainWindow,
+    runWorkspaceChecks: boundChecksRunner,
   });
   for (const [channel, handler] of Object.entries(handlers)) {
     ipcMain.handle(channel, handler);
