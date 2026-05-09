@@ -1,10 +1,11 @@
 import { render, screen, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../App.jsx';
 
 // Phase 0 contract: no provider yet, so the app must not pretend any work is happening.
 // No quests, no team, no toasts, no LIVE pulse, no fake metrics — only "unlinked" until
-// a real provider is wired in Phase 1+.
+// a real provider is wired in Phase 1+. This applies to every view, not just the city.
 describe('App idle defaults (no fake activity)', () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -38,5 +39,23 @@ describe('App idle defaults (no fake activity)', () => {
       vi.advanceTimersByTime(20000);
     });
     expect(screen.queryByText(/\+240 XP/)).not.toBeInTheDocument();
+  });
+
+  it('Kanban view shows zero quests and no seed sagas when toggled', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: /KANBAN/ }));
+    expect(screen.getByText(/0 quests/)).toBeInTheDocument();
+    const sagaIds = screen.queryAllByText(/^SAGA-\d+$/);
+    expect(sagaIds).toHaveLength(0);
+  });
+
+  it('Analysis view shows the empty prompt with no selectable adventurers', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: /ANALYSIS/ }));
+    expect(screen.getByText(/no analysis available/i)).toBeInTheDocument();
+    expect(screen.queryByText('Alpha-7')).not.toBeInTheDocument();
+    expect(screen.queryByText('Delta-3')).not.toBeInTheDocument();
   });
 });
