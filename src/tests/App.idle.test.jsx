@@ -81,4 +81,21 @@ describe('App idle defaults (no fake activity)', () => {
     expect(codex.getAttribute('aria-checked')).toBe('false');
     expect(claude.getAttribute('aria-checked')).toBe('false');
   });
+
+  it('renders a DISPATCH agent tile in the city ActionBar', () => {
+    render(<App />);
+    expect(screen.getByRole('button', { name: /DISPATCH/ })).toBeInTheDocument();
+  });
+
+  it('clicking DISPATCH without a workspace surfaces an "Open a workspace first" toast', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: /DISPATCH/ }));
+    expect(await screen.findByText(/Open a workspace first/i)).toBeInTheDocument();
+  });
+
+  it('does not render the approval modal in idle state (no pending requests)', () => {
+    render(<App />);
+    expect(screen.queryByText(/AGENT REQUESTS APPROVAL/i)).not.toBeInTheDocument();
+  });
 });
