@@ -47,6 +47,18 @@ Children receive state via props. Don't add new top-level `useState` outside `Ap
 
 Do **not** push directly to `main`. Open a PR from a feature branch. Lint, build, and tests must be green before the PR can be merged. CI is in [.github/workflows/ci.yml](./.github/workflows/ci.yml).
 
+## Commit messages
+
+This project uses **conventional commits**, enforced by a `commit-msg` hook in [hooks/commit-msg](./hooks/commit-msg). Activated via `core.hooksPath` (set by `npm install` postinstall).
+
+Subject format: `<type>(<scope>)?<!>?: <imperative description>`
+
+Allowed types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `ci`, `style`, `perf`, `build`, `revert`.
+
+The hook will reject any commit whose subject doesn't match. A second layer — [.claude/hooks/validate-commit-msg.sh](./.claude/hooks/validate-commit-msg.sh), wired in [.claude/settings.json](./.claude/settings.json) — intercepts `git commit -m "..."` calls inside Claude Code sessions before they execute, so the failure surfaces immediately rather than after the bash call.
+
+**A note on the global `/commit` skill.** The user's global Claude skill `commit` writes commit subjects as the literal branch name or a ticket ID, not as conventional commits. **Don't use `/commit` on this repo** — its output will be rejected by the hook. Use `git commit -m "<type>: ..."` directly, or invoke the project-specific orchestration skill once it exists.
+
 ## PR review
 
 Every PR receives an automated review from [CodeRabbit](https://coderabbit.ai). Its comments are **advisory** — they do not block merge. CI is the merge gate. CodeRabbit's behavior is configured in [.coderabbit.yaml](./.coderabbit.yaml); adjust path instructions there rather than dismissing reviews case-by-case.

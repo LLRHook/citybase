@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest"
+    "test": "vitest",
+    "postinstall": "git config core.hooksPath hooks 2>/dev/null || true"
   },
   "dependencies": {
     "react": "^19.2.5",
