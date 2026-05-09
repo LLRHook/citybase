@@ -180,6 +180,63 @@ function NextActionCard({ action }) {
   );
 }
 
+function CommitResultCard({ dirtyCount, onCommit }) {
+  const [message, setMessage] = React.useState('');
+  const [submitting, setSubmitting] = React.useState(false);
+  const trimmed = message.trim();
+  const disabled = submitting || trimmed.length === 0 || dirtyCount === 0;
+
+  const submit = async () => {
+    if (disabled) return;
+    setSubmitting(true);
+    try {
+      const result = await onCommit(trimmed);
+      if (result && result.ok) setMessage('');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const a = C('green');
+  return (
+    <div style={{
+      padding: 10,
+      border: `1px solid ${alpha(a, 0.5)}`,
+      borderLeft: `3px solid ${a}`,
+      background: alpha(a, 0.06),
+      display: 'flex', flexDirection: 'column', gap: 8,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <Mono size={8} color="ink3" style={{ letterSpacing: 1.4 }}>COMMIT RESULT</Mono>
+        <Mono size={9} color="green">{dirtyCount} dirty file{dirtyCount === 1 ? '' : 's'}</Mono>
+      </div>
+      <textarea
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder="commit message (one line ideal; multiline OK)"
+        aria-label="Commit message"
+        rows={3}
+        style={{
+          width: '100%', resize: 'vertical', boxSizing: 'border-box',
+          background: NEON.bg0, color: NEON.ink,
+          border: `1px solid ${NEON.line}`, borderRadius: 2,
+          padding: '6px 8px', fontFamily: 'JetBrains Mono, monospace', fontSize: 11,
+          outline: 'none', minHeight: 56,
+        }}
+      />
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <NButton
+          accent={disabled ? 'ink3' : 'green'}
+          onClick={submit}
+          disabled={disabled}
+        >
+          {submitting ? '⏳ Committing…' : '✓ Commit'}
+        </NButton>
+      </div>
+    </div>
+  );
+}
+
 function ChangedDistricts({ changedDistricts, files }) {
   if (!changedDistricts || changedDistricts.length === 0) {
     return <Mono color="ink3">no files changed</Mono>;
@@ -245,7 +302,15 @@ function buildRunReviewInputs({ pr, adv, districts }) {
   return { run, diff, checks, districts: districts || [], intent };
 }
 
-export function AdventurerAnalysis({ advId, guilds, advReports, districts, onPickAdv }) {
+export function AdventurerAnalysis({
+  advId,
+  guilds,
+  advReports,
+  districts,
+  onPickAdv,
+  workspaceDirty = 0,
+  onCommit,
+}) {
   const report = advReports[advId];
   const adv = guilds.flatMap(g => g.adventurers.map(a => ({ ...a, guild: g }))).find(x => x.id === advId);
   const allWithReports = Object.keys(advReports)
@@ -353,6 +418,9 @@ export function AdventurerAnalysis({ advId, guilds, advReports, districts, onPic
           <Panel title="Risk Assessment" accent={RISK_COLOR[review.riskLevel] || 'amber'}>
             <RiskMeter level={review.riskLevel} score={review.riskScore} factors={review.riskFactors} />
           </Panel>
+          {workspaceDirty > 0 && typeof onCommit === 'function' && (
+            <CommitResultCard dirtyCount={workspaceDirty} onCommit={onCommit} />
+          )}
           {(pr.reviewers && pr.reviewers.length > 0) && (
             <Panel title="Reviewers" accent="amber">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
