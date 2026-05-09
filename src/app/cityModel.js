@@ -31,7 +31,7 @@ const RING_POSITIONS = [
 // 'red' and 'white' are reserved (alerts and core).
 const DISTRICT_COLOR_CYCLE = ['cyan', 'magenta', 'amber', 'green'];
 
-const TOWER_NAME_PATTERN = /^(index|main|app|page|layout|server|client|root|server)\b/i;
+const TOWER_NAME_PATTERN = /^(index|main|app|page|layout|server|client|root)\b/i;
 const TOWER_FILENAMES = new Set([
   'package.json', 'tsconfig.json', 'vite.config.js', 'vite.config.ts',
   'eslint.config.js', '.eslintrc.cjs', 'webpack.config.js', 'rollup.config.js',

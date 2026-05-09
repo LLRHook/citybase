@@ -105,15 +105,18 @@ function CodebaseCity() {
 
   // Project the workspace's real Git tree into the city's district + building
   // shape. Idle (no workspace) keeps the empty defaults so map.jsx still falls
-  // back to the 'NO WORKSPACE LINK' overlay path.
-  const repoTree = workspace.snapshot?.repoTree;
-  const dirtyPaths = workspace.snapshot?.files?.map(f => f.path);
+  // back to the 'NO WORKSPACE LINK' overlay path. Keyed on the snapshot
+  // reference because snapshots are produced atomically by useWorkspace —
+  // deriving repoTree / dirtyPaths inside avoids a fresh `[]` on each render.
+  const snapshot = workspace.snapshot;
   const cityModel = React.useMemo(() => {
+    const repoTree = snapshot?.repoTree;
     if (!repoTree || repoTree.length === 0) {
       return { districts: EMPTY_DISTRICTS, buildings: EMPTY_BUILDINGS };
     }
+    const dirtyPaths = snapshot?.files?.map(f => f.path) ?? [];
     return projectRepoTreeToCityModel(repoTree, dirtyPaths);
-  }, [repoTree, dirtyPaths]);
+  }, [snapshot]);
   const districts = cityModel.districts;
   const buildings = cityModel.buildings;
   const vitalsRepo = repo ?? (isDesktop && workspace.workspace ? {
