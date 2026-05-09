@@ -296,6 +296,23 @@ describe('CodexAdapter — runChecks', () => {
     const checks = await adapter.runChecks(run.runId);
     expect(checks[0]).toEqual({ name: 'lint · npm run lint', state: 'fail', meta: 'timed out after 15000ms' });
   });
+
+  it('passes "-- --run" only for the test script so Vitest does not enter watch mode', async () => {
+    const ps = makeProcessService();
+    const pkg = JSON.stringify({ scripts: { lint: 'eslint .', test: 'vitest', typecheck: 'tsc --noEmit' } });
+    const adapter = makeAdapter({ processService: ps, readFileSync: () => pkg });
+    const run = await adapter.startTask(VALID_PARAMS);
+    await adapter.runChecks(run.runId);
+    const npmCalls = ps.run.mock.calls
+      .filter(([cmd]) => cmd === 'npm')
+      .map(([, argv]) => argv);
+    const lint = npmCalls.find(a => a[1] === 'lint');
+    const test = npmCalls.find(a => a[1] === 'test');
+    const typecheck = npmCalls.find(a => a[1] === 'typecheck');
+    expect(lint).toEqual(['run', 'lint', '--silent']);
+    expect(test).toEqual(['run', 'test', '--silent', '--', '--run']);
+    expect(typecheck).toEqual(['run', 'typecheck', '--silent']);
+  });
 });
 
 describe('CodexAdapter — openPR + cancel', () => {
