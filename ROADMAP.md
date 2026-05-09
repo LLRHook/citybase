@@ -238,19 +238,26 @@ Work items:
 Citybase v1 ships when every item is true:
 
 - Installed desktop app launches without a dev server.
+- **App auto-boots on launch:** the most recent workspace is restored when one exists, agent detection runs, and the user lands in a usable state without intermediate clicks. First-run users see the unlinked shell and a single 'Open Workspace' affordance.
 - User can open one local Git repository.
 - City view is generated from the real repository.
 - Git status, branch, and recent changes are real.
-- Codex CLI and Claude Code adapters are available when installed.
-- A read-only agent request and a write-capable approved request both work.
+- **Claude Code adapter** is available when the `claude` CLI is installed and is the default first-run provider. The Codex adapter ships in v1 as well but is not a hard ship requirement — `claude` not installed surfaces a clear settings prompt; v1 does not block on either being present.
+- A read-only agent request and a write-capable approved request both work end to end against Claude Code.
 - The default review surface does not show raw code.
 - App handles missing Git, missing agents, auth failures, and cancelled runs cleanly.
 - Build, lint, typecheck, and smoke tests are green.
 - README includes setup, app architecture, safety model, and troubleshooting.
 
+### Out of v1 scope (deferred to v1.1+)
+
+- Codex CLI as a hard ship requirement (the adapter ships, but Codex is not part of the must-pass demo).
+- Multi-workspace switching from inside a running app session (close + relaunch is fine for v1).
+- Push-to-remote action (commit lands locally; the user finishes in their normal Git tool).
+
 ## Open Questions
 
 - Do we want macOS-only for the first downloadable build, or macOS + Windows from the start?
-- Should Codex or Claude Code be the default first-run provider when both are installed?
+- ~~Should Codex or Claude Code be the default first-run provider when both are installed?~~ **Decided: Claude Code is the v1 default.**
 - Should Citybase ever include a hidden code editor panel, or should raw code stay outside the main product permanently?
-- Should commit/push be v1, or should v1 stop at local changed files and let users finish in their normal Git tool?
+- ~~Should commit/push be v1, or should v1 stop at local changed files and let users finish in their normal Git tool?~~ **Decided: commit only; push deferred to v1.1.**
