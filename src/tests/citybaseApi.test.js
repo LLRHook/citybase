@@ -58,6 +58,12 @@ describe('citybaseApi — browser stub (no window.citybase)', () => {
       await expect(citybaseApi.agents.runChecks('r')).resolves.toEqual([]);
     });
 
+    it('approve / reject / listPendingApprovals are no-op stubs in browser mode', async () => {
+      await expect(citybaseApi.agents.approve('r')).resolves.toBeUndefined();
+      await expect(citybaseApi.agents.reject('r')).resolves.toBeUndefined();
+      await expect(citybaseApi.agents.listPendingApprovals()).resolves.toEqual([]);
+    });
+
     it('onEvent returns an unsubscribe function (no-op in browser)', () => {
       const off = citybaseApi.agents.onEvent(() => {});
       expect(typeof off).toBe('function');

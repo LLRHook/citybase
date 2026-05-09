@@ -103,6 +103,12 @@ function createIpcHandlers({
     'citybase:agent.produceDiff': (_evt, runId) => agentManager.produceDiff(runId),
     'citybase:agent.runChecks': (_evt, runId) => agentManager.runChecks(runId),
     'citybase:agent.openPR': (_evt, runId, prParams) => agentManager.openPR(runId, prParams),
+
+    // Approval flow: the adapter pauses on agentManager.requestApproval and
+    // resolves only when the renderer calls approve or reject.
+    'citybase:agent.approve': (_evt, runId) => agentManager.approveRun(runId),
+    'citybase:agent.reject': (_evt, runId) => agentManager.rejectRun(runId),
+    'citybase:agent.listPendingApprovals': () => agentManager.listPendingApprovals(),
   };
 
   return { handlers, pumpAgentEvents };

@@ -185,3 +185,121 @@ describe('createAgentManager — delegation by runId', () => {
     expect(mgr.getRun(run.runId)).toEqual(run);
   });
 });
+
+describe('createAgentManager — provider auto-resolution', () => {
+  it("resolves 'auto' to codex when both are installed (preference order)", async () => {
+    const codex = makeAdapter();
+    const claude = makeAdapter();
+    const detect = vi.fn(async () => ({
+      codex: { found: true, path: '/usr/local/bin/codex' },
+      claude: { found: true, path: '/usr/local/bin/claude' },
+    }));
+    const mgr = createAgentManager({ adapters: { codex, claude }, detect });
+    await mgr.startRun({ ...startParams, provider: 'auto' });
+    expect(codex.startTask).toHaveBeenCalledTimes(1);
+    expect(claude.startTask).not.toHaveBeenCalled();
+  });
+
+  it("resolves 'auto' to claude when codex is not installed", async () => {
+    const codex = makeAdapter();
+    const claude = makeAdapter();
+    const detect = vi.fn(async () => ({
+      codex: { found: false }, claude: { found: true, path: '/c/claude' },
+    }));
+    const mgr = createAgentManager({ adapters: { codex, claude }, detect });
+    await mgr.startRun({ ...startParams, provider: 'auto' });
+    expect(claude.startTask).toHaveBeenCalledTimes(1);
+    expect(codex.startTask).not.toHaveBeenCalled();
+  });
+
+  it("rejects 'auto' when nothing is installed", async () => {
+    const detect = vi.fn(async () => ({ codex: { found: false }, claude: { found: false } }));
+    const mgr = createAgentManager({
+      adapters: { codex: makeAdapter(), claude: makeAdapter() },
+      detect,
+    });
+    await expect(mgr.startRun({ ...startParams, provider: 'auto' }))
+      .rejects.toThrow(/no installed agent CLI found/);
+  });
+
+  it("rejects 'auto' when no detect function was provided to the manager", async () => {
+    const mgr = createAgentManager({ adapters: { codex: makeAdapter() } });
+    await expect(mgr.startRun({ ...startParams, provider: 'auto' }))
+      .rejects.toThrow(/requires a detect function/);
+  });
+
+  it('explicit provider names skip the detect helper entirely', async () => {
+    const codex = makeAdapter();
+    const detect = vi.fn(async () => { throw new Error('detect should not run'); });
+    const mgr = createAgentManager({ adapters: { codex }, detect });
+    await mgr.startRun({ ...startParams, provider: 'codex' });
+    expect(detect).not.toHaveBeenCalled();
+  });
+});
+
+describe('createAgentManager — approval flow', () => {
+  async function runWith(adapter, opts = {}) {
+    let counter = 0;
+    const mgr = createAgentManager({
+      adapters: { fake: adapter },
+      generateRunId: () => `gen-${++counter}`,
+      ...opts,
+    });
+    const run = await mgr.startRun(startParams);
+    return { mgr, run };
+  }
+
+  it('listPendingApprovals starts empty', async () => {
+    const { mgr } = await runWith(makeAdapter());
+    expect(mgr.listPendingApprovals()).toEqual([]);
+  });
+
+  it("requestApproval pauses until approveRun resolves with 'approved'", async () => {
+    const { mgr, run } = await runWith(makeAdapter());
+    const pending = mgr.requestApproval(run.runId, { files: 2 });
+    expect(mgr.listPendingApprovals()).toEqual([{ runId: run.runId, summary: { files: 2 } }]);
+    mgr.approveRun(run.runId);
+    await expect(pending).resolves.toBe('approved');
+    expect(mgr.listPendingApprovals()).toEqual([]);
+  });
+
+  it("rejectRun resolves a pending approval with 'rejected'", async () => {
+    const { mgr, run } = await runWith(makeAdapter());
+    const pending = mgr.requestApproval(run.runId);
+    mgr.rejectRun(run.runId);
+    await expect(pending).resolves.toBe('rejected');
+    expect(mgr.listPendingApprovals()).toEqual([]);
+  });
+
+  it('requestApproval throws on unknown runId', async () => {
+    const { mgr } = await runWith(makeAdapter());
+    expect(() => mgr.requestApproval('nope')).toThrow(/unknown runId: nope/);
+  });
+
+  it('requestApproval throws if a request is already pending for the same run', async () => {
+    const { mgr, run } = await runWith(makeAdapter());
+    mgr.requestApproval(run.runId);
+    expect(() => mgr.requestApproval(run.runId)).toThrow(/already has a pending approval/);
+  });
+
+  it('approveRun / rejectRun throw when no approval is pending for the runId', async () => {
+    const { mgr, run } = await runWith(makeAdapter());
+    expect(() => mgr.approveRun(run.runId)).toThrow(/no pending approval/);
+    expect(() => mgr.rejectRun(run.runId)).toThrow(/no pending approval/);
+  });
+
+  it("cancel auto-rejects a pending approval (so the adapter doesn't await forever)", async () => {
+    const { mgr, run } = await runWith(makeAdapter());
+    const pending = mgr.requestApproval(run.runId);
+    await mgr.cancel(run.runId);
+    await expect(pending).resolves.toBe('rejected');
+    expect(mgr.listPendingApprovals()).toEqual([]);
+  });
+
+  it('clearInFlight also forgets pending approvals', async () => {
+    const { mgr, run } = await runWith(makeAdapter());
+    mgr.requestApproval(run.runId);
+    mgr.clearInFlight();
+    expect(mgr.listPendingApprovals()).toEqual([]);
+  });
+});
