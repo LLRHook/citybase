@@ -11,8 +11,9 @@ function questIcon(skill) {
 }
 
 export function QuestSourceBadge({ source }) {
-  if (source === 'jira') return <Pill color="cyan">JIRA</Pill>;
-  if (source === 'bitbucket') return <Pill color="amber">BITBUCKET</Pill>;
+  if (source === 'local') return <Pill color="cyan">LOCAL</Pill>;
+  if (source === 'git') return <Pill color="green">GIT</Pill>;
+  if (source === 'agent') return <Pill color="amber">AGENT</Pill>;
   return <Pill>{source}</Pill>;
 }
 
@@ -66,7 +67,7 @@ export function QuestBoard({ quests, onSelect, role, onPostQuest, filter, onFilt
   const visible = quests.filter(q => q.status === filter);
   return (
     <Panel
-      title="Quest Board · Bitbucket + Jira"
+      title="Task Board · Local Git"
       accent="cyan"
       headerRight={
         <div style={{ display: 'flex', gap: 4 }}>
@@ -275,14 +276,14 @@ export function VitalsBar({ stats, repo, connected }) {
       borderRadius: 4,
     }}>
       <div>
-        <Mono size={8} color="ink3">REPO · BITBUCKET</Mono>
+        <Mono size={8} color="ink3">REPO · LOCAL GIT</Mono>
         <Title size={14} weight={700} color={linked ? 'ink' : 'ink3'}>
           {linked ? repo.name : '— unlinked —'}
         </Title>
         <Mono size={8} color="ink3">
           {linked
             ? `${repo.remote} · ${repo.branch} · ${repo.commit}`
-            : 'connect a Bitbucket workspace to summon vitals'}
+            : 'open a local Git workspace to summon vitals'}
         </Mono>
       </div>
       {showStats && <div style={{ width: 1, height: 36, background: NEON.line }} />}

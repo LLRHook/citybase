@@ -122,7 +122,7 @@ export function QuestDetailModal({ quest, onClose, onAccept, currentGuild }) {
 
 export function PostQuestModal({ onClose, onSubmit }) {
   const [form, setForm] = React.useState({
-    source: 'jira', title: '', desc: '', skill: 'bugfix',
+    source: 'local', title: '', desc: '', skill: 'bugfix',
     target: 'lib', file: 'github.ts', reward: 100,
   });
   const upd = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -146,9 +146,9 @@ export function PostQuestModal({ onClose, onSubmit }) {
 
           <Field label="SOURCE">
             <div style={{ display: 'flex', gap: 4 }}>
-              {['jira', 'bitbucket'].map(s => (
+              {['local', 'agent'].map(s => (
                 <Choice key={s} active={form.source === s} onClick={() => upd('source', s)}
-                  color={s === 'jira' ? 'cyan' : 'amber'}>{s.toUpperCase()}</Choice>
+                  color={s === 'local' ? 'cyan' : 'amber'}>{s.toUpperCase()}</Choice>
               ))}
             </div>
           </Field>
@@ -196,7 +196,7 @@ export function PostQuestModal({ onClose, onSubmit }) {
             <div style={{ marginTop: 6 }}>
               <QuestCard
                 quest={{
-                  id: form.source === 'jira' ? 'JIRA-???' : 'BB-???',
+                  id: form.source === 'agent' ? 'RUN-???' : 'TASK-???',
                   source: form.source, title: form.title || '(untitled)',
                   skill: form.skill, reward: form.reward,
                   target: form.target, file: form.file,
