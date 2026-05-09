@@ -186,6 +186,90 @@ describe('createAgentManager — delegation by runId', () => {
   });
 });
 
+describe('createAgentManager — listRuns (Run History)', () => {
+  function freshMgr({ now } = {}) {
+    let counter = 0;
+    return createAgentManager({
+      adapters: { fake: makeAdapter() },
+      generateRunId: () => `gen-${++counter}`,
+      now,
+    });
+  }
+
+  it('returns [] before any run has started', () => {
+    expect(freshMgr().listRuns()).toEqual([]);
+  });
+
+  it('returns flat history entries with provider + startedAt', async () => {
+    let t = 1_700_000_000_000;
+    const mgr = freshMgr({ now: () => ++t });
+    const r1 = await mgr.startRun(startParams);
+    const r2 = await mgr.startRun({ ...startParams, questId: 'TASK-2' });
+    const out = mgr.listRuns();
+    // newest-first ordering
+    expect(out.map((e) => e.runId)).toEqual([r2.runId, r1.runId]);
+    expect(out[0]).toMatchObject({
+      runId: r2.runId,
+      questId: 'TASK-2',
+      adventurerId: 'alpha-7',
+      status: 'running',
+      branch: undefined,
+      contextUsed: 0,
+      maxContext: 200_000,
+      provider: 'fake',
+    });
+    expect(typeof out[0].startedAt).toBe('number');
+    expect(out[0].startedAt).toBeGreaterThan(out[1].startedAt);
+  });
+
+  it('history survives cancel; the cancelled run remains visible with status=cancelled', async () => {
+    const mgr = freshMgr();
+    const run = await mgr.startRun(startParams);
+    await mgr.cancel(run.runId);
+    // in-flight registry forgot it, but history did not
+    expect(mgr.getRun(run.runId)).toBeNull();
+    const out = mgr.listRuns();
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ runId: run.runId, status: 'cancelled' });
+  });
+
+  it('respects { limit } and trims to the most recent N', async () => {
+    const mgr = freshMgr();
+    const ids = [];
+    for (let i = 0; i < 5; i += 1) {
+      const r = await mgr.startRun({ ...startParams, questId: `TASK-${i}` });
+      ids.push(r.runId);
+    }
+    const out = mgr.listRuns({ limit: 3 });
+    expect(out).toHaveLength(3);
+    // newest-first: last three runs in reverse
+    expect(out.map((e) => e.runId)).toEqual([ids[4], ids[3], ids[2]]);
+  });
+
+  it('historyLimit caps total entries (oldest pruned FIFO)', async () => {
+    const mgr = createAgentManager({
+      adapters: { fake: makeAdapter() },
+      generateRunId: (() => { let c = 0; return () => `gen-${++c}`; })(),
+      historyLimit: 3,
+    });
+    const ids = [];
+    for (let i = 0; i < 5; i += 1) {
+      const r = await mgr.startRun({ ...startParams, questId: `TASK-${i}` });
+      ids.push(r.runId);
+    }
+    const out = mgr.listRuns();
+    // oldest 2 dropped; newest 3 retained, newest-first
+    expect(out.map((e) => e.runId)).toEqual([ids[4], ids[3], ids[2]]);
+  });
+
+  it('clearInFlight wipes history too', async () => {
+    const mgr = freshMgr();
+    await mgr.startRun(startParams);
+    mgr.clearInFlight();
+    expect(mgr.listRuns()).toEqual([]);
+  });
+});
+
 describe('createAgentManager — provider auto-resolution', () => {
   it("resolves 'auto' to codex when both are installed (preference order)", async () => {
     const codex = makeAdapter();
