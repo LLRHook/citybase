@@ -92,17 +92,31 @@ These are the assumed answers to the spec questions. Each is overridable; this i
 
 Each phase has a **goal**, a **definition of done**, and **work items** that map to issues. Phases are sequential — don't start Phase 2 until Phase 1's DoD is green.
 
-### Phase 0 · Foundation (where we are now → ready for backend)
-**Goal.** Lock the prototype into a maintainable shape so backend work can start without churn.
+### Phase 0A · Stabilization (✅ complete)
+**Goal.** Carve a small, low-risk slice out of Phase 0 so the prototype has a documented, tested, CI-backed shell before any real-data work begins.
+
+**Landed.** Foundation merged across [PR #1](https://github.com/LLRHook/citybase/pull/1), [#6](https://github.com/LLRHook/citybase/pull/6), [#7](https://github.com/LLRHook/citybase/pull/7), [#8](https://github.com/LLRHook/citybase/pull/8); commits squash-merged into `main`.
+
+- [x] Repo spine: [README](./README.md), [AGENTS.md](./AGENTS.md), [CONTRIBUTING.md](./CONTRIBUTING.md), [CLAUDE.md](./CLAUDE.md), `.github/pull_request_template.md`, `.github/dependabot.yml`.
+- [x] CI: [.github/workflows/ci.yml](./.github/workflows/ci.yml) runs `install → lint → build → test`, least-privilege token, SHA-pinned actions, `pull_request` trigger only (no double runs).
+- [x] Mock data centralized in [src/data/seed.js](./src/data/seed.js); `src/game/data.js` and `sagas.js` are thin re-export shims so component imports kept working.
+- [x] Component split for Fast Refresh: [palette.js](./src/game/palette.js) (NEON tokens + alpha), [hex.js](./src/game/hex.js) (hex math), [useTweaks.js](./src/game/useTweaks.js) (hook); [theme.jsx](./src/game/theme.jsx) is now components-only.
+- [x] Tests: Vitest + React Testing Library + jsdom wired; smoke tests against `<App />` cover render and seed-data flow.
+- [x] Lint zero-error: `react-refresh/only-export-components` at error severity, no `react-hooks/refs` violations, no unused `React` imports.
+- [x] Domain model + agent-runtime contract: [docs/domain-model.md](./docs/domain-model.md) (7 entities), [docs/agent-runtime.md](./docs/agent-runtime.md) (provider-neutral `AgentProvider` interface).
+- [x] Commit discipline: [hooks/commit-msg](./hooks/commit-msg) canonical validator + [.claude/hooks/validate-commit-msg.sh](./.claude/hooks/validate-commit-msg.sh) PreToolUse wrapper; activated via `npm install` postinstall.
+- [x] AI review wired: [.coderabbit.yaml](./.coderabbit.yaml) in advisory mode (chill profile, docstring pre-merge check disabled, ignores Dependabot bump titles).
+- [x] Claude Code project setup: [.claude/settings.json](./.claude/settings.json) with permissions allowlist + PreToolUse hook.
+
+### Phase 0 · Foundation (broader scope — items deferred from 0A)
+**Goal.** Complete the full foundation envisioned for the prototype-to-product transition.
 
 **DoD.** TypeScript + lint + CI green; mocked data sourced from a single seed file the backend will eventually replace; Storybook (or equivalent) renders every city/kanban/analysis component in isolation.
 
-- [ ] Convert `src/game/*.jsx → *.tsx` and `*.js → *.ts`; add `tsconfig.json` with strict mode.
-- [ ] Add ESLint + Prettier config (already partially present), wire `npm run lint` + `npm run typecheck` into CI.
-- [ ] Add GitHub Actions: `ci.yml` runs install → typecheck → lint → build on every push.
+- [ ] Convert `src/game/*.jsx → *.tsx` and `*.js → *.ts`; add `tsconfig.json` with strict mode. *(Phase 0A explicitly deferred this to keep the diff bounded.)*
+- [ ] Add Prettier config + wire `npm run typecheck` into CI. *(ESLint already wired in 0A; Prettier and typecheck still pending.)*
 - [ ] Extract all state into a single `useGameStore` (Zustand) so future server data has one home.
 - [ ] Replace inline `style={{}}` blocks with CSS-in-JS or CSS modules where they exceed ~30 lines, for diffability.
-- [ ] Add `vitest` + React Testing Library; smoke test that the three views render.
 - [ ] Add a simple keyboard-shortcut layer (`L`/`T`/`R`/`P`/`D`/`O` action hotkeys, `1`/`2`/`3` view switch) — currently buttons only.
 - [ ] Storybook (or Ladle) for: `Panel`, `NeonBar`, `IsoBuilding`, `QuestCard`, `KanbanCard`, `WorkerAgentCell`, `SelectedUnitCard`, `RiskMeter`.
 
