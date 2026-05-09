@@ -264,7 +264,9 @@ export function ActivityFeed({ items }) {
   );
 }
 
-export function VitalsBar({ stats, repo }) {
+export function VitalsBar({ stats, repo, connected }) {
+  const linked = connected && repo;
+  const showStats = linked && stats.length > 0;
   return (
     <div style={{
       display: 'flex', gap: 12, alignItems: 'center', padding: '8px 14px',
@@ -274,11 +276,17 @@ export function VitalsBar({ stats, repo }) {
     }}>
       <div>
         <Mono size={8} color="ink3">REPO · BITBUCKET</Mono>
-        <Title size={14} weight={700} color="ink">{repo.name}</Title>
-        <Mono size={8} color="ink3">{repo.remote} · {repo.branch} · {repo.commit}</Mono>
+        <Title size={14} weight={700} color={linked ? 'ink' : 'ink3'}>
+          {linked ? repo.name : '— unlinked —'}
+        </Title>
+        <Mono size={8} color="ink3">
+          {linked
+            ? `${repo.remote} · ${repo.branch} · ${repo.commit}`
+            : 'connect a Bitbucket workspace to summon vitals'}
+        </Mono>
       </div>
-      <div style={{ width: 1, height: 36, background: NEON.line }} />
-      {stats.map((s, i) => (
+      {showStats && <div style={{ width: 1, height: 36, background: NEON.line }} />}
+      {showStats && stats.map((s, i) => (
         <div key={i} style={{ minWidth: 90 }}>
           <Mono size={8} color="ink3" style={{ letterSpacing: 1 }}>{s.label}</Mono>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
@@ -287,13 +295,15 @@ export function VitalsBar({ stats, repo }) {
           </div>
         </div>
       ))}
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{
-          width: 8, height: 8, borderRadius: '50%', background: NEON.green,
-          boxShadow: `0 0 8px ${NEON.green}`, animation: 'pulse 2s infinite',
-        }} />
-        <Mono size={9} color="green" weight={600}>LIVE · 24:17</Mono>
-      </div>
+      {linked && (
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%', background: NEON.green,
+            boxShadow: `0 0 8px ${NEON.green}`, animation: 'pulse 2s infinite',
+          }} />
+          <Mono size={9} color="green" weight={600}>LIVE</Mono>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,11 +4,7 @@ import { hexPath, hexToPx } from './game/hex.js';
 import {
   Mono, Title, Pill, NButton, NeonBar,
 } from './game/theme.jsx';
-import {
-  REPO, DISTRICTS, GUILDS, SKILL_DEFS, ACTIVITY,
-} from './game/data.js';
-import { QUESTS_V2 } from './game/sagas.js';
-import { OBJECTIVES, ALERTS } from './data/seed.js';
+import { SKILL_DEFS } from './game/data.js';
 import { CityMap } from './game/map.jsx';
 import {
   QuestBoard, GuildRoster, ActivityFeed, VitalsBar,
@@ -29,7 +25,12 @@ import {
   TweaksPanel, TweakSection, TweakToggle, TweakRadio,
 } from './game/tweaks.jsx';
 
-const TWEAK_DEFAULTS = { role: 'admin', connected: true };
+const TWEAK_DEFAULTS = { role: 'admin', connected: false };
+
+// Phase 0: no provider yet — every projection of the world starts empty.
+// Phase 1+ replaces these with provider-fed values (RepoProvider, GuildProvider, etc).
+const EMPTY_GUILDS = Object.freeze([]);
+const EMPTY_DISTRICTS = Object.freeze([]);
 
 class ErrBoundary extends React.Component {
   constructor(props) {
@@ -62,38 +63,43 @@ export default function App() {
 function CodebaseCity() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const role = tweaks.role || 'admin';
-  const connected = tweaks.connected !== false;
+  const connected = tweaks.connected === true;
 
   const [view, setView] = React.useState('city');
-  const [analysisAdv, setAnalysisAdv] = React.useState('alpha-7');
+  const [analysisAdv, setAnalysisAdv] = React.useState(null);
   const [kanbanGroup, setKanbanGroup] = React.useState('saga');
   const [questFilter, setQuestFilter] = React.useState('open');
   const [selectedQuest, setSelectedQuest] = React.useState(null);
   const [showPost, setShowPost] = React.useState(false);
   const [focusedDistrict, setFocusedDistrict] = React.useState(null);
-  const [expandedGuilds, setExpandedGuilds] = React.useState(new Set(['victor']));
-  const [selectedAdv, setSelectedAdv] = React.useState({ adv: GUILDS[0].adventurers[0], guild: GUILDS[0] });
-  const [quests, setQuests] = React.useState(QUESTS_V2);
-  const [activity, setActivity] = React.useState(ACTIVITY);
+  const [expandedGuilds, setExpandedGuilds] = React.useState(new Set());
+  const [selectedAdv, setSelectedAdv] = React.useState(null);
+  const [quests, setQuests] = React.useState([]);
+  const [activity, setActivity] = React.useState([]);
   const [toasts, setToasts] = React.useState([]);
   const [tick, setTick] = React.useState(0);
   const [playing, setPlaying] = React.useState(true);
   const [speed, setSpeed] = React.useState(1);
   const [actionTab, setActionTab] = React.useState('actions');
 
-  const currentGuild = GUILDS[0];
+  const guilds = EMPTY_GUILDS;
+  const districts = EMPTY_DISTRICTS;
+  const repo = null;
+  const currentGuild = guilds[0] ?? null;
 
+  const hasActiveQuests = quests.some(q => q.status === 'active');
   React.useEffect(() => {
+    if (!hasActiveQuests) return undefined;
     const id = setInterval(() => setTick(t => t + 1), 80);
     return () => clearInterval(id);
-  }, []);
+  }, [hasActiveQuests]);
 
   const pawns = React.useMemo(() => {
     return quests.filter(q => q.status === 'active').map(q => {
-      const guild = GUILDS.find(g => g.id === q.guild);
+      const guild = guilds.find(g => g.id === q.guild);
       const adv = guild?.adventurers.find(a => a.id === q.adventurer);
-      const fromD = DISTRICTS.find(d => d.id === 'core');
-      const toD = DISTRICTS.find(d => d.id === q.target);
+      const fromD = districts.find(d => d.id === 'core');
+      const toD = districts.find(d => d.id === q.target);
       if (!fromD || !toD || !adv) return null;
       const from = hexToPx(fromD.q, fromD.r);
       const to = hexToPx(toD.q, toD.r);
@@ -101,7 +107,7 @@ function CodebaseCity() {
       const progress = phase < 1 ? phase : 1;
       return { from, to, progress, color: guild.color, label: adv.name.replace('-', '') };
     }).filter(Boolean);
-  }, [quests, tick]);
+  }, [quests, tick, guilds, districts]);
 
   const toggleGuild = (id) => {
     setExpandedGuilds(prev => {
@@ -118,6 +124,7 @@ function CodebaseCity() {
   };
 
   const acceptQuest = (quest, advId) => {
+    if (!currentGuild) return;
     setQuests(prev => prev.map(q => q.id === quest.id ? {
       ...q, status: 'active', lane: 'in-progress',
       adventurer: advId, guild: currentGuild.id,
@@ -137,21 +144,12 @@ function CodebaseCity() {
     setShowPost(false);
   };
 
-  React.useEffect(() => {
-    const id = setInterval(() => {
-      pushToast({ text: `+240 XP · Alpha-7`, color: 'amber', icon: '★' });
-    }, 14000);
-    return () => clearInterval(id);
-  }, []);
-
-  const stats = [
-    { label: 'BUILD HEALTH', value: '92', unit: '%', color: 'green' },
-    { label: 'COVERAGE',     value: '81', unit: '%', color: 'cyan' },
-    { label: 'CONTEXT',      value: '78', unit: '%', color: 'magenta' },
-    { label: 'VELOCITY',     value: '1.42', unit: '/hr', color: 'amber' },
-    { label: 'OPEN QUESTS',  value: String(quests.filter(q => q.status === 'open').length), color: 'amber' },
-    { label: 'ACTIVE',       value: String(quests.filter(q => q.status === 'active').length), color: 'green' },
-  ];
+  const stats = quests.length > 0
+    ? [
+        { label: 'OPEN QUESTS', value: String(quests.filter(q => q.status === 'open').length), color: 'amber' },
+        { label: 'ACTIVE',      value: String(quests.filter(q => q.status === 'active').length), color: 'green' },
+      ]
+    : [];
 
   return (
     <div style={{ minHeight: '100vh', padding: 16, display: 'flex', flexDirection: 'column', gap: 12, position: 'relative', maxWidth: 1700, margin: '0 auto' }}>
@@ -207,9 +205,9 @@ function CodebaseCity() {
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
           <Mono size={9} color="ink3">BRANCH</Mono>
-          <Mono size={10} color="cyan" weight={700}>{REPO.branch}</Mono>
-          <Mono size={9} color="ink3" style={{ marginLeft: 8 }}>TIME</Mono>
-          <Mono size={10} color="ink" weight={700}>24:17</Mono>
+          <Mono size={10} color={connected && repo ? 'cyan' : 'ink3'} weight={700}>
+            {connected && repo ? repo.branch : '—'}
+          </Mono>
           <Transport
             playing={playing}
             onToggle={() => setPlaying(p => !p)}
@@ -221,7 +219,7 @@ function CodebaseCity() {
       </div>
 
       {/* VITALS */}
-      <VitalsBar stats={stats} repo={REPO} />
+      <VitalsBar stats={stats} repo={repo} connected={connected} />
 
       {/* === KANBAN VIEW === */}
       {view === 'kanban' && (
@@ -245,8 +243,8 @@ function CodebaseCity() {
           <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr 280px', gap: 12, alignItems: 'stretch' }}>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <ObjectivesPanel items={OBJECTIVES} />
-              <AlertsPanel items={ALERTS} />
+              <ObjectivesPanel items={[]} />
+              <AlertsPanel items={[]} />
               <div style={{ flex: 1, minHeight: 200 }}>
                 <QuestBoard
                   quests={quests}
@@ -267,7 +265,8 @@ function CodebaseCity() {
                 connected={connected}
               />
               {focusedDistrict && (() => {
-                const d = DISTRICTS.find(x => x.id === focusedDistrict);
+                const d = districts.find(x => x.id === focusedDistrict);
+                if (!d) return null;
                 const dQuests = quests.filter(q => q.target === d.id);
                 return (
                   <div style={{
@@ -296,7 +295,7 @@ function CodebaseCity() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <CodebaseOverview />
+              {connected && <CodebaseOverview />}
               <ActivityFeed items={activity.slice(0, 6)} />
             </div>
           </div>
@@ -304,13 +303,13 @@ function CodebaseCity() {
           {/* COMMAND ROW */}
           <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr 320px 440px', gap: 12, alignItems: 'stretch' }}>
             <Minimap
-              districts={DISTRICTS}
+              districts={districts}
               focusedId={focusedDistrict}
               onSelect={(d) => setFocusedDistrict(d.id === focusedDistrict ? null : d.id)}
               pawnCount={pawns?.length || 0}
             />
             <WorkerAgentsRow
-              guilds={GUILDS}
+              guilds={guilds}
               selectedAdvId={selectedAdv?.adv?.id}
               onSelect={(adv, guild) => setSelectedAdv({ adv, guild })}
             />
@@ -329,7 +328,7 @@ function CodebaseCity() {
           {/* GUILD ROSTER */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
             <GuildRoster
-              guilds={GUILDS}
+              guilds={guilds}
               expandedGuilds={expandedGuilds}
               onToggleGuild={toggleGuild}
               selectedAdv={selectedAdv?.adv}

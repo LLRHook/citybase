@@ -168,7 +168,7 @@ export function CityMap({ focusedDistrictId, onSelectDistrict, pawns, connected 
             })}
           </g>
 
-          {DISTRICTS.filter(d => d.id !== 'core').map(d => {
+          {connected && DISTRICTS.filter(d => d.id !== 'core').map(d => {
             const pos = hexToPx(d.q, d.r);
             const col = C(d.color);
             return (
@@ -184,7 +184,7 @@ export function CityMap({ focusedDistrictId, onSelectDistrict, pawns, connected 
             );
           })}
 
-          {DISTRICTS.map(d => (
+          {connected && DISTRICTS.map(d => (
             <DistrictTiles
               key={d.id}
               district={d}
@@ -193,7 +193,7 @@ export function CityMap({ focusedDistrictId, onSelectDistrict, pawns, connected 
             />
           ))}
 
-          {pawns && pawns.map((p, i) => <HexPawn key={i} {...p} />)}
+          {connected && pawns && pawns.map((p, i) => <HexPawn key={i} {...p} />)}
         </g>
       </svg>
 
@@ -215,18 +215,22 @@ export function CityMap({ focusedDistrictId, onSelectDistrict, pawns, connected 
         </div>
       )}
 
-      <div style={{ position: 'absolute', top: 10, right: 10 }}>
-        <Pill color="cyan">⌘ HEX GRID · ZOOM 1.0×</Pill>
-      </div>
+      {connected && (
+        <div style={{ position: 'absolute', top: 10, right: 10 }}>
+          <Pill color="cyan">⌘ HEX GRID · ZOOM 1.0×</Pill>
+        </div>
+      )}
 
-      <div style={{ position: 'absolute', bottom: 10, left: 10, display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: 480 }}>
-        {DISTRICTS.map(d => (
-          <Pill key={d.id} color={d.color}>
-            <span style={{ display: 'inline-block', width: 6, height: 6, background: C(d.color), borderRadius: '50%', boxShadow: `0 0 4px ${C(d.color)}` }} />
-            {d.name}
-          </Pill>
-        ))}
-      </div>
+      {connected && (
+        <div style={{ position: 'absolute', bottom: 10, left: 10, display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: 480 }}>
+          {DISTRICTS.map(d => (
+            <Pill key={d.id} color={d.color}>
+              <span style={{ display: 'inline-block', width: 6, height: 6, background: C(d.color), borderRadius: '50%', boxShadow: `0 0 4px ${C(d.color)}` }} />
+              {d.name}
+            </Pill>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
