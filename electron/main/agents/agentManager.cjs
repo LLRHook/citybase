@@ -5,6 +5,8 @@
 //   - dispatches startRun({ provider, ...startTaskParams }) to the right one
 //     (provider='auto' picks the first installed adapter)
 //   - tracks in-flight runs by runId so cancel() can find them
+//   - keeps a parallel history Map so the renderer can render a "Run
+//     History" panel even after cancel() prunes the in-flight entry
 //   - delegates streamEvents / reportUsage / produceDiff / runChecks / openPR
 //     to the adapter that owns the runId
 //   - holds pending approval requests so adapters can pause file-changing
@@ -17,6 +19,8 @@ const { resolveProvider } = require('./resolveProvider.cjs');
 function defaultGenerateRunId() {
   return crypto.randomUUID();
 }
+
+function defaultNow() { return Date.now(); }
 
 function isAdapterShape(adapter) {
   if (!adapter || typeof adapter !== 'object') return false;
@@ -38,10 +42,16 @@ function createAgentManager({
   adapters = {},
   generateRunId = defaultGenerateRunId,
   detect,
+  now = defaultNow,
+  historyLimit = 100,
 } = {}) {
   const registry = new Map();
   // runId -> { provider, adapter, run }
   const inFlight = new Map();
+  // runId -> { run, provider, startedAt }; survives cancel() so the
+  // renderer's Run History panel can render every run from this session
+  // regardless of how it ended.
+  const history = new Map();
   // runId -> { resolve, summary }; resolve('approved' | 'rejected')
   const pendingApprovals = new Map();
 
@@ -103,6 +113,15 @@ function createAgentManager({
       throw new Error(`agentManager.startRun: runId collision: ${run.runId}`);
     }
     inFlight.set(run.runId, { provider, adapter, run });
+    // Capture a snapshot in history so a later cancel() doesn't erase
+    // the record. Trim to historyLimit (FIFO) to keep memory bounded
+    // on long-lived sessions.
+    history.set(run.runId, { run: { ...run }, provider, startedAt: now() });
+    while (history.size > historyLimit) {
+      const oldest = history.keys().next().value;
+      if (oldest === undefined) break;
+      history.delete(oldest);
+    }
     return run;
   }
 
@@ -194,11 +213,39 @@ function createAgentManager({
     }
     await adapter.cancel(runId);
     inFlight.delete(runId);
+    // History keeps the record but reflects the final state.
+    const histEntry = history.get(runId);
+    if (histEntry) {
+      histEntry.run = { ...histEntry.run, status: 'cancelled' };
+    }
   }
 
-  /** Test-only / internal: forget all in-flight runs and pending approvals. */
+  /**
+   * Recent runs for the Run History panel. Newest-first. Each entry is
+   * a flat shape suitable for IPC — no adapter / closure references.
+   */
+  function listRuns({ limit = 50 } = {}) {
+    const entries = [...history.values()];
+    // history Map insertion order is oldest-first; reverse to render
+    // most recent runs at the top of the panel.
+    entries.reverse();
+    return entries.slice(0, limit).map((entry) => ({
+      runId: entry.run.runId,
+      questId: entry.run.questId,
+      adventurerId: entry.run.adventurerId,
+      status: entry.run.status,
+      branch: entry.run.branch,
+      contextUsed: entry.run.contextUsed,
+      maxContext: entry.run.maxContext,
+      provider: entry.provider,
+      startedAt: entry.startedAt,
+    }));
+  }
+
+  /** Test-only / internal: forget all in-flight runs, history, and pending approvals. */
   function clearInFlight() {
     inFlight.clear();
+    history.clear();
     pendingApprovals.clear();
   }
 
@@ -208,6 +255,7 @@ function createAgentManager({
     getProvider,
     startRun,
     getRun,
+    listRuns,
     streamEvents,
     reportUsage,
     produceDiff,

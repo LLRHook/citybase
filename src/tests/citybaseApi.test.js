@@ -44,6 +44,10 @@ describe('citybaseApi — browser stub (no window.citybase)', () => {
     expect(citybaseApi.app.getBoot()).toBeNull();
   });
 
+  it('agents.listRuns returns [] in the browser stub', async () => {
+    await expect(citybaseApi.agents.listRuns()).resolves.toEqual([]);
+  });
+
   it('git.listBranches returns [] in the browser stub', async () => {
     await expect(citybaseApi.git.listBranches('any-id')).resolves.toEqual([]);
   });

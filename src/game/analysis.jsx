@@ -237,6 +237,66 @@ function CommitResultCard({ dirtyCount, onCommit }) {
   );
 }
 
+// Real-data Run History panel. `runs` is the result of agentManager.listRuns()
+// surfaced through citybase:agent.listRuns; entries are flat objects, not
+// adapter handles. When the user has not dispatched anything yet (or the
+// browser stub is in play) we render the empty-state Mono line — never a
+// seed-data fallback.
+const STATUS_COLOR = {
+  running: 'cyan',
+  done: 'green',
+  failed: 'red',
+  cancelled: 'amber',
+};
+
+function formatStartedAt(ms) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms)) return '';
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+export function RunHistoryPanel({ runs }) {
+  if (!Array.isArray(runs) || runs.length === 0) {
+    return (
+      <Mono size={10} color="ink3">
+        no runs yet · dispatch an agent to see real activity here
+      </Mono>
+    );
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {runs.map((r) => {
+        const color = STATUS_COLOR[r.status] || 'ink2';
+        const startedLabel = formatStartedAt(r.startedAt);
+        return (
+          <div
+            key={r.runId}
+            data-testid="run-history-row"
+            style={{
+              padding: 8,
+              border: `1px solid ${NEON.line}`,
+              background: alpha(NEON.bg1, 0.5),
+              display: 'flex', flexDirection: 'column', gap: 4,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Pill color={color}>{r.status}</Pill>
+              <Mono size={9} color="ink2">{r.provider}</Mono>
+              {r.branch && <Mono size={9} color="ink3">· {r.branch}</Mono>}
+              {startedLabel && (
+                <Mono size={9} color="ink3" style={{ marginLeft: 'auto' }}>{startedLabel}</Mono>
+              )}
+            </div>
+            <Mono size={9} color="ink3">
+              {r.questId || '(no quest)'} · {r.runId.slice(0, 8)}
+            </Mono>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ChangedDistricts({ changedDistricts, files }) {
   if (!changedDistricts || changedDistricts.length === 0) {
     return <Mono color="ink3">no files changed</Mono>;
@@ -310,6 +370,7 @@ export function AdventurerAnalysis({
   onPickAdv,
   workspaceDirty = 0,
   onCommit,
+  runs = [],
 }) {
   const report = advReports[advId];
   const adv = guilds.flatMap(g => g.adventurers.map(a => ({ ...a, guild: g }))).find(x => x.id === advId);
@@ -321,12 +382,19 @@ export function AdventurerAnalysis({
 
   if (!report || !adv) {
     return (
-      <div style={{ padding: 40, textAlign: 'center' }}>
-        <Mono color="ink3">no analysis available · select an adventurer with an open run</Mono>
-        <div style={{ marginTop: 12, display: 'flex', gap: 6, justifyContent: 'center' }}>
-          {allWithReports.map(a => (
-            <NButton key={a.id} accent={a.guild.color} onClick={() => onPickAdv(a.id)}>{a.name}</NButton>
-          ))}
+      <div style={{ padding: 40 }}>
+        <div style={{ textAlign: 'center' }}>
+          <Mono color="ink3">no analysis available · select an adventurer with an open run</Mono>
+          <div style={{ marginTop: 12, display: 'flex', gap: 6, justifyContent: 'center' }}>
+            {allWithReports.map(a => (
+              <NButton key={a.id} accent={a.guild.color} onClick={() => onPickAdv(a.id)}>{a.name}</NButton>
+            ))}
+          </div>
+        </div>
+        <div style={{ maxWidth: 520, margin: '24px auto 0' }}>
+          <Panel title="Run History" accent="cyan">
+            <RunHistoryPanel runs={runs} />
+          </Panel>
         </div>
       </div>
     );
@@ -421,6 +489,9 @@ export function AdventurerAnalysis({
           {workspaceDirty > 0 && typeof onCommit === 'function' && (
             <CommitResultCard dirtyCount={workspaceDirty} onCommit={onCommit} />
           )}
+          <Panel title="Run History" accent="cyan">
+            <RunHistoryPanel runs={runs} />
+          </Panel>
           {(pr.reviewers && pr.reviewers.length > 0) && (
             <Panel title="Reviewers" accent="amber">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

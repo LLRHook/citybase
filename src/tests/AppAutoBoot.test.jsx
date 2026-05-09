@@ -48,6 +48,7 @@ const desktopBridge = {
     startRun: vi.fn(),
     cancel: vi.fn(),
     getRun: vi.fn(),
+    listRuns: vi.fn(async () => []),
     reportUsage: vi.fn(),
     produceDiff: vi.fn(async () => ({ files: [] })),
     runChecks: vi.fn(async () => []),

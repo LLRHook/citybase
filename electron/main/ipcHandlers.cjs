@@ -133,6 +133,7 @@ function createIpcHandlers({
     },
     'citybase:agent.cancel': (_evt, runId) => agentManager.cancel(runId),
     'citybase:agent.getRun': (_evt, runId) => agentManager.getRun(runId),
+    'citybase:agent.listRuns': (_evt, opts) => agentManager.listRuns(opts || {}),
     'citybase:agent.reportUsage': (_evt, runId) => agentManager.reportUsage(runId),
     'citybase:agent.produceDiff': (_evt, runId) => agentManager.produceDiff(runId),
     'citybase:agent.runChecks': (_evt, runId) => agentManager.runChecks(runId),
