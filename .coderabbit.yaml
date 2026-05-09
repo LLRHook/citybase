@@ -21,11 +21,11 @@ reviews:
   # touch in the Reviews UI should also stay un-clicked on PRs.
   pre_merge_checks:
     docstrings:
-      mode: OFF
+      mode: 'off'
     title:
-      mode: WARNING
+      mode: 'warning'
     description:
-      mode: WARNING
+      mode: 'warning'
 
   auto_review:
     enabled: true
