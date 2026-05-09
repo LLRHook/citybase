@@ -4,7 +4,7 @@ This document tells AI coding agents (Claude Code, Codex, Gemini, Aider, local m
 
 ## What is Citybase?
 
-Citybase is an isometric IDE that visualizes a repository as a hex-tile city. Tickets become quests, contributors become guilds, coding agents are the adventurers dispatched to fulfill quests. The current state is a **design prototype** — all data is mocked. See [ROADMAP.md](./ROADMAP.md) for the full plan.
+Citybase is an isometric IDE that visualizes a repository as a hex-tile city. Tickets become quests, contributors become guilds, coding agents are the adventurers dispatched to fulfill quests. Phase 5 is complete — the renderer reads real Git state, dispatches real Claude Code runs, and renders real run history. See [ROADMAP.md](./ROADMAP.md) for the phased plan and remaining v1.1 work.
 
 ## Running the app
 
@@ -16,16 +16,13 @@ npm run lint         # ESLint
 npm test -- --run    # Vitest, single pass
 ```
 
-## Where mock data lives
+## Where seed / fixture data lives
 
-**One canonical source:** `src/data/seed.js`. The backend (Phase 1+) will replace this file and nothing else.
+**One canonical source:** `src/data/seed.js`. Production paths in the renderer no longer import it — the city is projected from real Git state, run history is read from `agentManager.listRuns()`, and the modals receive `districts` as a prop. seed.js stays as **test fixtures**: `AdventurerAnalysis.test.jsx` is the only consumer.
 
-For backwards compatibility, two re-export shims still exist so existing imports keep working:
+`src/game/data.js` is a slim shim that re-exports `SKILL_DEFS`, `hpFromContext`, and `fmtTokens` from seed — those are constant enums / pure formatters, not user data.
 
-- `src/game/data.js` → re-exports from `src/data/seed.js`
-- `src/game/sagas.js` → re-exports from `src/data/seed.js`
-
-If you add new mock data, put it in `src/data/seed.js`. Do **not** add new inline `const` arrays inside component files.
+If you need new test fixtures, put them in `src/data/seed.js`. **Do not import seed.js from production renderer code.**
 
 ## Where state lives
 
@@ -76,8 +73,8 @@ See [docs/domain-model.md](./docs/domain-model.md) for plain-language definition
 
 ## Agent runtime contract
 
-When the agent runner ships in Phase 4, it must implement the provider-neutral `AgentProvider` interface in [docs/agent-runtime.md](./docs/agent-runtime.md). Claude Agent SDK is the **default adapter**, not the only runtime — Codex, Gemini, and local models can each be drop-in adapters.
+The agent runner implements the provider-neutral `AgentProvider` interface in [docs/agent-runtime.md](./docs/agent-runtime.md). `ClaudeAdapter` is the v1 default and shells out to the real `claude --print --output-format json …` CLI. `CodexAdapter` is wired through the same shape. `CliAgentAdapter.openPR` shells out to `gh pr create` for the PR-creation surface — the head branch must be pushed first (auto-push is deferred to v1.1).
 
 ## Roadmap
 
-Long-term plan and phase definitions live in [ROADMAP.md](./ROADMAP.md). Phase 0A (this work) carves stabilization out of Phase 0.
+Long-term plan and phase definitions live in [ROADMAP.md](./ROADMAP.md). Phase 0A through Phase 5 are complete; v1.1 cleanup and deferred items are tracked under "Status (post Phase 5)" and "Out of v1 scope".
