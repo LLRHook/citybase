@@ -10,7 +10,7 @@ Phase 0A stabilized the prototype with CI, tests, docs, and a centralized mock-d
 
 ## Quick start
 
-Prerequisites: Node 20+ and npm.
+Prerequisites: Node 20+, npm, and Git ≥ 1.8.5 (released November 2013 — required for the `git -C <path>` flag the workspace service uses).
 
 ```bash
 npm install
