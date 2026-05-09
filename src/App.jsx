@@ -33,6 +33,8 @@ const TWEAK_DEFAULTS = { role: 'admin', connected: false };
 // Phase 1+ replaces these with provider-fed values (RepoProvider, GuildProvider, etc).
 const EMPTY_GUILDS = Object.freeze([]);
 const EMPTY_DISTRICTS = Object.freeze([]);
+const EMPTY_SAGAS = Object.freeze([]);
+const EMPTY_ADV_REPORTS = Object.freeze({});
 
 class ErrBoundary extends React.Component {
   constructor(props) {
@@ -96,6 +98,8 @@ function CodebaseCity() {
 
   const guilds = EMPTY_GUILDS;
   const districts = EMPTY_DISTRICTS;
+  const sagas = EMPTY_SAGAS;
+  const advReports = EMPTY_ADV_REPORTS;
   const repo = null;
   const vitalsRepo = repo ?? (isDesktop && workspace.workspace ? {
     name: workspace.workspace.name,
@@ -256,6 +260,8 @@ function CodebaseCity() {
       {view === 'kanban' && (
         <KanbanView
           quests={quests}
+          guilds={guilds}
+          sagas={sagas}
           onCardClick={setSelectedQuest}
           onOpenAnalysis={(advId) => { setAnalysisAdv(advId); setView('analysis'); }}
           groupBy={kanbanGroup}
@@ -265,7 +271,12 @@ function CodebaseCity() {
 
       {/* === ANALYSIS VIEW === */}
       {view === 'analysis' && (
-        <AdventurerAnalysis advId={analysisAdv} onPickAdv={setAnalysisAdv} />
+        <AdventurerAnalysis
+          advId={analysisAdv}
+          guilds={guilds}
+          advReports={advReports}
+          onPickAdv={setAnalysisAdv}
+        />
       )}
 
       {/* === CITY VIEW === */}
