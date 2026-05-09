@@ -47,6 +47,10 @@ Children receive state via props. Don't add new top-level `useState` outside `Ap
 
 Do **not** push directly to `main`. Open a PR from a feature branch. Lint, build, and tests must be green before the PR can be merged. CI is in [.github/workflows/ci.yml](./.github/workflows/ci.yml).
 
+## PR review
+
+Every PR receives an automated review from [CodeRabbit](https://coderabbit.ai). Its comments are **advisory** — they do not block merge. CI is the merge gate. CodeRabbit's behavior is configured in [.coderabbit.yaml](./.coderabbit.yaml); adjust path instructions there rather than dismissing reviews case-by-case.
+
 ## Constraints (keep these in mind)
 
 - **No new runtime dependencies** without justification in the PR. Dev deps for testing/tooling are fine.
