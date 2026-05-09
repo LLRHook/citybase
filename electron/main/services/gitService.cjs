@@ -108,13 +108,30 @@ function parseBranchHeader(stdout) {
   return out;
 }
 
+function statusForXyDigit(ch) {
+  // '.' means clean for that side of XY in porcelain v2; everything else
+  // collapses through PORCELAIN_STATUS_MAP. Unknown characters fall
+  // through to 'modified' so we never lose a file.
+  if (!ch) return 'unmodified';
+  if (ch === '.') return 'unmodified';
+  return PORCELAIN_STATUS_MAP[ch] || 'modified';
+}
+
 function parseFiles(stdout) {
   const files = [];
   for (const line of stdout.split('\n')) {
     if (!line) continue;
     if (line.startsWith('# ')) continue;
     if (line.startsWith('? ')) {
-      files.push({ path: line.slice(2), status: 'untracked' });
+      // Untracked: not in the index, present in the worktree.
+      files.push({
+        path: line.slice(2),
+        status: 'untracked',
+        staged: false,
+        unstaged: true,
+        indexStatus: 'unmodified',
+        workTreeStatus: 'untracked',
+      });
       continue;
     }
     if (line.startsWith('1 ')) {
@@ -122,7 +139,7 @@ function parseFiles(stdout) {
       const parts = line.split(' ');
       const xy = parts[1] || '..';
       const path = parts.slice(8).join(' ');
-      files.push({ path, status: statusFromXy(xy) });
+      files.push(buildFileEntry(path, xy, statusFromXy(xy)));
       continue;
     }
     if (line.startsWith('2 ')) {
@@ -132,17 +149,38 @@ function parseFiles(stdout) {
       const tail = parts.slice(9).join(' ');
       const tabIdx = tail.indexOf('\t');
       const path = tabIdx >= 0 ? tail.slice(0, tabIdx) : tail;
-      files.push({ path, status: statusFromXy(xy) || 'renamed' });
+      files.push(buildFileEntry(path, xy, statusFromXy(xy) || 'renamed'));
       continue;
     }
     if (line.startsWith('u ')) {
       const parts = line.split(' ');
       const path = parts.slice(10).join(' ');
-      files.push({ path, status: 'conflicted' });
+      // Unmerged entries are conflicted on both sides of XY by definition.
+      files.push({
+        path,
+        status: 'conflicted',
+        staged: true,
+        unstaged: true,
+        indexStatus: 'conflicted',
+        workTreeStatus: 'conflicted',
+      });
       continue;
     }
   }
   return files;
+}
+
+function buildFileEntry(path, xy, status) {
+  const x = xy[0] || '.';
+  const y = xy[1] || '.';
+  return {
+    path,
+    status,
+    staged: x !== '.',
+    unstaged: y !== '.',
+    indexStatus: statusForXyDigit(x),
+    workTreeStatus: statusForXyDigit(y),
+  };
 }
 
 function statusFromXy(xy) {
@@ -206,4 +244,4 @@ async function getBranches(workspace) {
   return parseBranchList(result.stdout || '');
 }
 
-module.exports = { getSnapshot, getBranches, parseBranchList };
+module.exports = { getSnapshot, getBranches, parseBranchList, parseFiles };
