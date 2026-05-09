@@ -14,7 +14,29 @@
     "dev:desktop": "concurrently -k -n vite,electron -c blue,magenta \"npm run dev\" \"wait-on http://localhost:5173 && electron . --dev\"",
     "build:desktop": "vite build",
     "start:desktop": "electron .",
+    "package:dir": "npm run build:desktop && electron-builder --dir",
+    "package:mac": "npm run build:desktop && electron-builder --mac --config.mac.identity=null",
     "postinstall": "git config core.hooksPath hooks || exit 0"
+  },
+  "build": {
+    "appId": "com.llrhook.citybase",
+    "productName": "Citybase",
+    "asar": true,
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "package.json",
+      "electron/**/*",
+      "dist/**/*"
+    ],
+    "mac": {
+      "target": [
+        { "target": "dir", "arch": ["arm64", "x64"] }
+      ],
+      "category": "public.app-category.developer-tools",
+      "identity": null
+    }
   },
   "dependencies": {
     "react": "^19.2.6",
@@ -30,6 +52,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "concurrently": "^9.2.1",
     "electron": "^41.5.0",
+    "electron-builder": "^26.9.1",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
