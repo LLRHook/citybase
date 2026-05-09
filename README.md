@@ -4,101 +4,138 @@
 
 ## What is this?
 
-Citybase is currently a **design prototype** wrapped in the first Electron desktop shell. The React/Vite renderer still uses mocked data, but the app direction is local-first: open one Git repository from disk, visualize it as a city, and delegate AI work to an existing harness such as Codex CLI or Claude Code.
+Citybase is a local-first desktop app: open one Git repository from disk, see it as a city, dispatch a Claude Code run from the UI, and review the result without staring at raw diffs.
 
-Phase 0A stabilized the prototype with CI, tests, docs, and a centralized mock-data module. This desktop refresh keeps that architecture while adding the initial main/preload process, workspace IPC, and renderer hooks for a local Git workspace.
+The v1 path runs Claude Code inside the IDE end-to-end. Codex CLI is wired through the same provider contract as a fallback adapter.
+
+## Prerequisites
+
+- **Node 20+** and **npm** for the renderer / Electron build.
+- **Git ≥ 1.8.5** — the workspace service uses the `git -C <path>` flag (released November 2013).
+- **Claude Code CLI** on `PATH`, authenticated. Citybase shells out to `claude --print --output-format json …` for non-interactive runs. Install per [docs.claude.com](https://docs.claude.com/en/docs/claude-code/overview) and confirm `claude --version` works in a terminal.
+- **GitHub CLI (`gh`)** on `PATH`, authenticated, if you intend to use the PR-creation surface. `gh auth status` must show a logged-in account.
+- **Codex CLI** is optional in v1. If installed, it's available as an alternative adapter; if not, Citybase falls back to Claude.
 
 ## Quick start
 
-Prerequisites: Node 20+, npm, and Git ≥ 1.8.5 (released November 2013 — required for the `git -C <path>` flag the workspace service uses).
-
 ```bash
 npm install
-npm run dev
+npm run dev:desktop    # boot the Electron shell against the dev server
 ```
 
-Open http://localhost:5173 for the browser prototype.
-
-To run the Electron shell during development:
+For a renderer-only browser preview (no Electron, no real Git, no agents — useful for UI work):
 
 ```bash
-npm run dev:desktop
+npm run dev            # http://localhost:5173
 ```
+
+## What v1 does
+
+A normal session looks like this — every step is real activity, not seeded data:
+
+1. **Launch.** The main process restores the most recent workspace and runs `detectAgentBinaries()`. Both results are pushed to the renderer over the `BOOT_PAYLOAD_CHANNEL` before App.jsx mounts, so the UI lands populated with no extra clicks.
+2. **Open a workspace** if one isn't already restored: `File → Open Workspace…`. The Git service reads branch, status, file tree, and recent commits via `git status --porcelain=v2` / `git log` / `git ls-files`.
+3. **Pick a branch** in the top-bar selector. CHECKOUT runs when the workspace is clean; if it's dirty the selector shows a "commit first" pill instead.
+4. **Dispatch an agent.** The IPC handler resolves the right `AgentProvider` adapter (`auto` prefers Claude when installed) and starts a real `claude` process inside the workspace cwd. `streamEvents` yields the parsed JSON envelope as a real `AgentEvent`.
+5. **Review on the Analysis screen.** The right column shows real CI checks, a real diff (parsed from `git diff --unified=3`), and a Run History panel listing every agent run started in the current session. The empty state says "no runs yet · dispatch an agent" — no seeded reports.
+6. **Commit.** With dirty files, the COMMIT RESULT card opens. Type a message; the action runs `git add -A && git commit -m`, then `git rev-parse HEAD` for the new hash.
+7. **Open a PR** by pushing the branch yourself, then calling `agents.openPR` from the UI. The adapter shells out to `gh pr create --title --body --base --head` from the run cwd and parses the URL out of stdout.
 
 ## Available scripts
 
 | Script | What it does |
 |---|---|
-| `npm run dev` | Start the Vite dev server with HMR |
-| `npm run dev:desktop` | Start Vite and launch Electron against the dev server |
+| `npm run dev` | Vite dev server (renderer-only browser preview) |
+| `npm run dev:desktop` | Vite + Electron against the dev server |
 | `npm run build` | Production renderer build to `dist/` |
-| `npm run build:desktop` | Build the renderer for Electron loading from `dist/index.html` |
-| `npm run start:desktop` | Launch Electron against the built renderer |
-| `npm run package:dir` | Build the renderer + package an unpacked dev build under `dist-electron/` (no installer, no codesign) |
-| `npm run package:mac` | Build a macOS `.app` directory under `dist-electron/`, ad-hoc / unsigned for local dev |
+| `npm run build:desktop` | Renderer build configured for Electron loading from `dist/index.html` |
+| `npm run start:desktop` | Electron against the built renderer |
+| `npm run package:dir` | Unpacked dev build under `dist-electron/` (no installer, no codesign) |
+| `npm run package:mac` | macOS `.app`, ad-hoc / unsigned for local dev |
 | `npm run lint` | ESLint over the project |
-| `npm test` | Run Vitest in watch mode; use `npm test -- --run` for a single pass |
-| `npm run preview` | Preview the production renderer build locally |
+| `npm test` | Vitest in watch mode (`npm test -- --run` for one pass) |
+| `npm run preview` | Preview the production renderer build |
 
-### Packaging notes
+`package:dir` and `package:mac` are dev-only — no DMG, no notarization, no signing. `electron-builder` config lives in the `build` field of `package.json`; output goes to gitignored `dist-electron/`.
 
-`package:dir` and `package:mac` are intentionally **dev-only**: no DMG, no notarization, no codesigning identity. They produce a runnable app directory you can hand to a teammate or launch locally. Production-distribution scripts (DMG, signed/notarized macOS, Windows MSI, Linux AppImage) are deferred to a later phase.
-
-`electron-builder` reads its config from the `build` field in `package.json`. Output goes to `dist-electron/` which is gitignored.
-
-**Windows dev note:** running `package:*` from Windows requires either Windows Developer Mode enabled (Settings → Privacy & Security → For Developers) or an admin shell — electron-builder's first run extracts a 7z cache that contains symbolic links, which Windows refuses to create otherwise. macOS and Linux runners (including the CI image) have no such constraint.
+**Windows dev note.** Running `package:*` from Windows requires Developer Mode (Settings → Privacy & Security → For Developers) or an admin shell — `electron-builder`'s first run extracts a 7z cache containing symlinks, which Windows refuses to create otherwise.
 
 ## Project structure
 
 ```text
 electron/
   main/
-    main.cjs                    - BrowserWindow lifecycle and app startup
-    ipc.cjs                     - allow-listed IPC handlers
-    menu.cjs                    - desktop menu commands
-    services/                   - workspace, Git, and process helpers
+    main.cjs                       BrowserWindow lifecycle + did-finish-load boot push
+    ipc.cjs / ipcHandlers.cjs      typed IPC handlers (workspace, git, agents, checks)
+    bootPayload.cjs                pure factory for the BOOT_PAYLOAD_CHANNEL message
+    menu.cjs / menuTemplate.cjs    desktop menu + commands
+    windowConfig.cjs               BrowserWindow defaults
+    services/
+      processService.cjs           guarded execFile runner (argv arrays only, cwd pinned)
+      workspaceService.cjs         workspace pick / restore / persist
+      gitService.cjs               getSnapshot / getBranches / checkout / commit
+      workspaceChecks.cjs          runs declared npm scripts as CheckResult[]
+    agents/
+      AgentAdapter.cjs             the AgentProvider contract base class
+      CliAgentAdapter.cjs          shared CLI-wrapping implementation
+      ClaudeAdapter.cjs            real claude flags + JSON-result streamEvents
+      CodexAdapter.cjs             same shape, codex CLI
+      agentManager.cjs             registry + dispatcher + run history
+      detect.cjs                   PATH probe for claude / codex / gh
+      parseUnifiedDiff.cjs         git diff parser
+      constants.cjs                AGENT_EVENT_CHANNEL + BOOT_PAYLOAD_CHANNEL
   preload/
-    preload.cjs                 - isolated window.citybase bridge
+    preload.cjs                    isolated window.citybase bridge
 
 src/
-  App.jsx                       - top-level shell (view switching + state)
-  main.jsx                      - Vite entry point
+  App.jsx                          top-level shell + view switching
   app/
-    citybaseApi.js              - renderer facade for Electron/browser API
-    useWorkspace.js             - selected workspace + Git snapshot state
+    citybaseApi.js                 renderer facade (desktop bridge or browser stub)
+    useWorkspace.js                workspace + Git snapshot state
+    useAgentDetect.js              hook reading the boot payload, IPC fallback
+    useApprovalRequests.js         pending-approval channel for write-capable runs
+    useRunHistory.js               Run History data via agents.listRuns
   data/
-    seed.js                     - single mock data source; backend projections replace this
+    seed.js                        test fixtures only — not imported by production paths
   game/
-    palette.js                  - neon color tokens + alpha helper
-    hex.js                      - pointy-top hex grid math
-    theme.jsx                   - UI primitives
-    useTweaks.js                - runtime-toggles hook
+    palette.js / hex.js            non-component primitives (Fast Refresh-safe)
+    theme.jsx                      UI primitives
+    useTweaks.js                   runtime-toggles hook
     map.jsx, kanban.jsx,
-    analysis.jsx, panels.jsx,
-    modals.jsx, command.jsx,
-    tweaks.jsx                  - view + panel components
-    data.js, sagas.js           - re-export shims sourcing from src/data/seed.js
+    analysis.jsx (RunHistoryPanel,
+      CommitResultCard),
+    panels.jsx, modals.jsx,
+    command.jsx, branchSelector.jsx,
+    tweaks.jsx                     view + panel components
+    data.js                        slim re-export (SKILL_DEFS / hpFromContext / fmtTokens)
   tests/
-    setup.js                    - Vitest setup
-    *.smoke.test.jsx            - RTL smoke tests against <App />
-
-docs/
-  domain-model.md               - plain-language core entities
-  agent-runtime.md              - provider-neutral AgentProvider contract
+    setup.js                       Vitest setup
+    *.test.{js,jsx}                unit + smoke tests under jsdom
 ```
 
-## Architecture notes
+## Safety model
 
-- The renderer never gets Node.js integration. Electron uses `contextIsolation: true`, `nodeIntegration: false`, and a small preload API.
-- `src/data/seed.js` is the only canonical mock-data source. Add new fixtures there, not inside components.
-- `src/game/data.js` and `src/game/sagas.js` remain compatibility re-export shims.
-- `palette.js`, `hex.js`, and `useTweaks.js` remain non-component modules so Fast Refresh can keep `theme.jsx` and `tweaks.jsx` component-focused.
-- `vite.config.js` keeps Vitest on jsdom and uses `base: './'` so the built renderer works when Electron loads `dist/index.html` from disk.
+- **No shell access from the renderer.** `webPreferences` sets `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. The renderer talks to the main process only through the typed `window.citybase` object exposed by `preload.cjs`.
+- **Allow-listed IPC channels.** Every channel in `ipcHandlers.cjs` validates inputs (workspace ids must be known, paths must resolve under workspace root) and returns plain serializable objects. The renderer can never pass arbitrary command strings.
+- **`processService.run` is the single execFile site.** Argv arrays only — no shell strings, no string concatenation. cwd is required and pinned to a workspace path. Timeouts and max-buffer caps are enforced.
+- **Mutating Git surfaces validate before they touch the world.** `gitService.checkout` refuses unknown branches (no `-b` auto-create); `gitService.commit` rejects empty messages; both return `{ ok: false, error }` instead of throwing into the main process.
+- **`--permission-mode bypassPermissions` is used only for non-interactive Claude runs** so the CLI doesn't hang waiting for an approval surface that doesn't exist yet. When the renderer's approval routing lands, this flips to `auto` or `default` and prompts pump through `useApprovalRequests`.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| "claude CLI not found on PATH" | `claude` isn't installed, or Citybase was launched from Finder on macOS without the right `PATH`. | Install per Anthropic's docs, then relaunch Citybase from a terminal so it inherits the right `PATH`. The processService augments `PATH` with `/opt/homebrew/bin` and `/usr/local/bin` on macOS but won't find a binary that lives somewhere else. |
+| Claude run fails immediately with "not authenticated" | The CLI hasn't logged in yet. | Run `claude login` once in a terminal, confirm `claude --print --output-format json -p "hi"` works, then retry inside Citybase. |
+| `openPR` throws "no upstream" or "branch not pushed" | The head branch hasn't been pushed to the remote. v1 deliberately doesn't auto-push — that side effect is deferred to v1.1. | `git push -u origin <branch>` from a terminal, then call openPR again. |
+| `openPR` throws "GraphQL: must have admin rights" or similar | `gh` is authenticated as the wrong account, or doesn't have permission on the remote. | `gh auth status` to inspect; `gh auth login` to re-auth. |
+| Browser preview at `http://localhost:5173` won't start | Port already in use. Common culprit on this dev box: the Docker backend. | Stop Docker (or whatever holds 5173) before `npm run dev`. `vite.config.js` sets `strictPort: true` on purpose — it won't silently move to 5174. |
+| Commit hook rejects "subject does not match the project convention" | Non-conventional subject. | See [CONTRIBUTING.md](./CONTRIBUTING.md). Format is `<type>(<scope>)?<!>?: <description>`, ≤72 chars, lowercase after the colon. |
 
 ## Roadmap
 
-The full vision and phased plan live in [ROADMAP.md](./ROADMAP.md). Phase 0A is the stabilization baseline; the desktop shell is the next local-first slice.
+The full vision and phased plan live in [ROADMAP.md](./ROADMAP.md). Phase 5 is complete and the v1 ship-gate items are addressed across PRs #36 / #37 / #38 / #40 / #41. Remaining v1.1 work and deferred items are listed there.
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) and [AGENTS.md](./AGENTS.md). The short version: AI agents propose changes via PRs; CI gates the merge.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) and [AGENTS.md](./AGENTS.md). Short version: AI agents propose changes via PRs; CI gates the merge.
