@@ -27,6 +27,7 @@ import {
 import { useWorkspace } from './app/useWorkspace.js';
 import { isDesktop } from './app/citybaseApi.js';
 import { projectRepoTreeToCityModel } from './app/cityModel.js';
+import { projectSnapshotToActivity } from './app/activity.js';
 
 const TWEAK_DEFAULTS = { role: 'admin', connected: false };
 
@@ -119,6 +120,11 @@ function CodebaseCity() {
   }, [snapshot]);
   const districts = cityModel.districts;
   const buildings = cityModel.buildings;
+
+  // Activity feed lit by the same snapshot — working-tree changes first,
+  // then commit history newest-first. Idle (no snapshot) leaves activity
+  // empty so the panel renders blank.
+  const liveActivity = React.useMemo(() => projectSnapshotToActivity(snapshot), [snapshot]);
   const vitalsRepo = repo ?? (isDesktop && workspace.workspace ? {
     name: workspace.workspace.name,
     remote: workspace.workspace.rootPath,
@@ -358,7 +364,7 @@ function CodebaseCity() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {cityConnected && repo && <CodebaseOverview />}
-              <ActivityFeed items={activity.slice(0, 6)} />
+              <ActivityFeed items={liveActivity.length > 0 ? liveActivity : activity.slice(0, 6)} />
             </div>
           </div>
 
