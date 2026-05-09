@@ -22,10 +22,13 @@ const PORCELAIN_STATUS_MAP = {
 
 async function getSnapshot(workspace) {
   const cwd = workspace.rootPath;
-  const [topResult, statusResult, logResult] = await Promise.all([
+  const [topResult, statusResult, logResult, treeResult] = await Promise.all([
     run('git', ['rev-parse', '--show-toplevel'], { cwd }),
     run('git', ['status', '--porcelain=v2', '--branch'], { cwd }),
     run('git', ['log', '--oneline', '--decorate', '-n', '30'], { cwd }),
+    // ls-files lists tracked files only — fast, no untracked noise, gives the
+    // city projector a stable folder/file tree even when the working copy is dirty.
+    run('git', ['ls-files', '-z'], { cwd, maxBuffer: 16 * 1024 * 1024 }),
   ]);
 
   if (!topResult.ok) {
@@ -35,6 +38,7 @@ async function getSnapshot(workspace) {
   const branchInfo = parseBranchHeader(statusResult.stdout);
   const files = parseFiles(statusResult.stdout);
   const recentCommits = parseLog(logResult.ok ? logResult.stdout : '');
+  const repoTree = parseLsFilesZ(treeResult.ok ? treeResult.stdout : '');
 
   return {
     workspaceId: workspace.id,
@@ -45,8 +49,16 @@ async function getSnapshot(workspace) {
     isDirty: files.length > 0,
     files,
     recentCommits,
+    repoTree,
     error: null,
   };
+}
+
+// `git ls-files -z` separates entries with NUL, which is stable for paths
+// that contain spaces, quotes, or other shell-hostile characters.
+function parseLsFilesZ(stdout) {
+  if (!stdout) return [];
+  return stdout.split('\0').filter(Boolean);
 }
 
 function notARepoSnapshot(workspace, topResult) {
@@ -63,6 +75,7 @@ function notARepoSnapshot(workspace, topResult) {
     isDirty: false,
     files: [],
     recentCommits: [],
+    repoTree: [],
     error: { kind: 'no-git', message },
   };
 }
