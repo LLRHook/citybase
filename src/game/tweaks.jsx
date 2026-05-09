@@ -63,6 +63,8 @@ const TWEAKS_STYLE = `
 
 const PAD = 16;
 
+const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
+
 export function TweaksPanel({ title = 'Tweaks', children }) {
   const [open, setOpen] = React.useState(true);
   const [pos, setPos] = React.useState({ x: PAD, y: PAD });
@@ -71,13 +73,13 @@ export function TweaksPanel({ title = 'Tweaks', children }) {
   const clampToViewport = React.useCallback(() => {
     const panel = dragRef.current;
     if (!panel) return;
-    const w = panel.offsetWidth, h = panel.offsetHeight;
-    const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
-    const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
-    setPos(prev => ({
-      x: Math.min(maxRight, Math.max(PAD, prev.x)),
-      y: Math.min(maxBottom, Math.max(PAD, prev.y)),
-    }));
+    const maxRight = Math.max(PAD, window.innerWidth - panel.offsetWidth - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - panel.offsetHeight - PAD);
+    setPos(prev => {
+      const x = clamp(prev.x, PAD, maxRight);
+      const y = clamp(prev.y, PAD, maxBottom);
+      return (x === prev.x && y === prev.y) ? prev : { x, y };
+    });
   }, []);
 
   React.useEffect(() => {
@@ -94,20 +96,14 @@ export function TweaksPanel({ title = 'Tweaks', children }) {
     const sx = e.clientX, sy = e.clientY;
     const startRight = window.innerWidth - r.right;
     const startBottom = window.innerHeight - r.bottom;
+    const maxRight = Math.max(PAD, window.innerWidth - panel.offsetWidth - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - panel.offsetHeight - PAD);
     let lastX = startRight, lastY = startBottom;
-    const clampX = (x) => {
-      const max = Math.max(PAD, window.innerWidth - panel.offsetWidth - PAD);
-      return Math.min(max, Math.max(PAD, x));
-    };
-    const clampY = (y) => {
-      const max = Math.max(PAD, window.innerHeight - panel.offsetHeight - PAD);
-      return Math.min(max, Math.max(PAD, y));
-    };
     const move = (ev) => {
-      lastX = clampX(startRight - (ev.clientX - sx));
-      lastY = clampY(startBottom - (ev.clientY - sy));
-      panel.style.right = lastX + 'px';
-      panel.style.bottom = lastY + 'px';
+      const nx = clamp(startRight - (ev.clientX - sx), PAD, maxRight);
+      const ny = clamp(startBottom - (ev.clientY - sy), PAD, maxBottom);
+      if (nx !== lastX) { panel.style.right = nx + 'px'; lastX = nx; }
+      if (ny !== lastY) { panel.style.bottom = ny + 'px'; lastY = ny; }
     };
     const up = () => {
       window.removeEventListener('mousemove', move);

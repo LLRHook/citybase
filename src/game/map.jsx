@@ -15,15 +15,6 @@ function tilesForDistrict(d) {
   return offsets.map(([dq, dr]) => ({ q: d.q + dq, r: d.r + dr }));
 }
 
-function buildingsPlaced(districtId) {
-  const d = DISTRICTS.find(x => x.id === districtId);
-  const tiles = tilesForDistrict(d);
-  return BUILDINGS.filter(b => b.d === districtId).map((b, i) => {
-    const t = tiles[(i + 1) % tiles.length];
-    return { ...b, q: t.q, r: t.r };
-  });
-}
-
 export function HexPawn({ from, to, progress, color, label }) {
   const a = C(color);
   const x = from.x + (to.x - from.x) * progress;
@@ -41,10 +32,14 @@ export function HexPawn({ from, to, progress, color, label }) {
   );
 }
 
-function DistrictTiles({ district, buildings, focused, onClick }) {
+function DistrictTiles({ district, focused, onClick }) {
   const a = C(district.color);
   const tiles = tilesForDistrict(district);
   const center = hexToPx(district.q, district.r);
+  const buildings = BUILDINGS.filter(b => b.d === district.id).map((b, i) => {
+    const t = tiles[(i + 1) % tiles.length];
+    return { ...b, q: t.q, r: t.r };
+  });
 
   return (
     <g
@@ -193,7 +188,6 @@ export function CityMap({ focusedDistrictId, onSelectDistrict, pawns, connected 
             <DistrictTiles
               key={d.id}
               district={d}
-              buildings={buildingsPlaced(d.id)}
               focused={focusedDistrictId === d.id}
               onClick={onSelectDistrict}
             />

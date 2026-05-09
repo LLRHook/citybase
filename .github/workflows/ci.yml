@@ -6,17 +6,15 @@ permissions:
 
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
 
 jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      # actions are pinned to commit SHAs (not @v4 tags) for supply-chain safety.
-      # Resolve current v4 SHAs via:
-      #   gh api repos/actions/checkout/commits/v4 --jq .sha
-      #   gh api repos/actions/setup-node/commits/v4 --jq .sha
+      # actions are pinned to commit SHAs (not version tags) for supply-chain safety.
+      # Dependabot bumps the SHAs; the # comment after each SHA tracks the version.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
         with:
