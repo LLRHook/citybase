@@ -53,6 +53,9 @@ function parsePrNumberFromUrl(url) {
   return Number.isFinite(n) ? n : null;
 }
 
+const DEFAULT_TASK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const DEFAULT_TASK_MAX_BUFFER = 16 * 1024 * 1024; // 16 MB
+
 function defaultBuildArgv({ params }) {
   return [
     '--quiet',
@@ -90,6 +93,8 @@ class CliAgentAdapter extends AgentAdapter {
     fsExists,
     readFileSync,
     binaryPath,
+    taskTimeoutMs,
+    taskMaxBuffer,
     now,
   } = {}) {
     super();
@@ -105,6 +110,11 @@ class CliAgentAdapter extends AgentAdapter {
     this._fsExists = fsExists || ((p) => { try { return fs.existsSync(p); } catch { return false; } });
     this._readFileSync = readFileSync || ((p, enc) => fs.readFileSync(p, enc));
     this._binaryPathOverride = typeof binaryPath === 'string' && binaryPath.length > 0 ? binaryPath : null;
+    // Real agent runs take minutes, not the 15s processService default.
+    // Bump task timeout / output buffer so a long Claude / Codex run
+    // doesn't get killed mid-flight or truncated by the 4MB default.
+    this._taskTimeoutMs = Number.isFinite(taskTimeoutMs) ? taskTimeoutMs : DEFAULT_TASK_TIMEOUT_MS;
+    this._taskMaxBuffer = Number.isFinite(taskMaxBuffer) ? taskMaxBuffer : DEFAULT_TASK_MAX_BUFFER;
     this._now = typeof now === 'function' ? now : () => Date.now();
     // runId -> { run, cwd, skill, stdout, stderr, exitState, cancelled }
     this._runs = new Map();
@@ -126,14 +136,24 @@ class CliAgentAdapter extends AgentAdapter {
     validateStartTaskParams(params);
     const binary = this._resolveBinary();
     const skill = params.skill;
-    const args = this._buildArgv({ params, skill });
+    // buildArgv may return either a flat argv array (the simple case)
+    // or `{ args, stdin }` for adapters that pipe the prompt over
+    // stdin instead of a flag (e.g. CodexAdapter uses `codex exec ... -`).
+    const invocation = this._buildArgv({ params, skill });
+    const args = Array.isArray(invocation) ? invocation : invocation?.args;
+    const stdin = Array.isArray(invocation) ? undefined : invocation?.stdin;
     if (!Array.isArray(args)) {
-      throw new TypeError(`${this._binaryName}Adapter: buildArgv must return a string array`);
+      throw new TypeError(`${this._binaryName}Adapter: buildArgv must return a string array or { args, stdin }`);
     }
 
     const runId = crypto.randomUUID();
     const cwd = params.repoUrl;
-    const result = await this._processService.run(binary, args, { cwd });
+    const result = await this._processService.run(binary, args, {
+      cwd,
+      timeoutMs: this._taskTimeoutMs,
+      maxBuffer: this._taskMaxBuffer,
+      stdin,
+    });
     let exitState = 'pass';
     if (result.timedOut) exitState = 'timeout';
     else if (!result.ok) exitState = 'fail';
