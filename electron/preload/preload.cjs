@@ -1,8 +1,18 @@
 // Preload runs in an isolated world with access to a small Node API surface.
 // We expose ONLY a typed `window.citybase` object via contextBridge — never
 // raw ipcRenderer, fs, or shell. The renderer treats this object as its API.
+//
+// IMPORTANT: this script runs under `sandbox: true` (see windowConfig.cjs).
+// The Electron sandbox forbids `require()` of arbitrary user-land paths;
+// only `require('electron')` and a small set of built-ins are allowed. So
+// the channel name strings are duplicated as literals here, NOT imported
+// from electron/main/agents/constants.cjs. The two sides MUST stay in
+// sync — there's a runtime test (preload.channels.test.js) that diffs
+// the literals here against the constants module to prevent drift.
 const { contextBridge, ipcRenderer } = require('electron');
-const { AGENT_EVENT_CHANNEL, BOOT_PAYLOAD_CHANNEL } = require('../main/agents/constants.cjs');
+
+const AGENT_EVENT_CHANNEL = 'citybase:agent.event';
+const BOOT_PAYLOAD_CHANNEL = 'citybase:boot.payload';
 
 const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
 
