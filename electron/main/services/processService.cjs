@@ -23,6 +23,15 @@ function run(command, args, { cwd, timeoutMs, maxBuffer, env } = {}) {
     throw new TypeError('processService.run: cwd is required');
   }
 
+  // Diagnostic trace, env-gated so production stdout stays quiet. Set
+  // CITYBASE_PROCESS_TRACE=1 to dump every spawn (no env: secrets stay
+  // out of logs). The error-path log below is unconditional — a spawn
+  // that fails with EINVAL/ENOENT/etc is rare enough that always
+  // recording the syscall + code is the right tradeoff.
+  if (process.env.CITYBASE_PROCESS_TRACE === '1') {
+    console.log('[processService.run]', JSON.stringify({ command, args, cwd, timeoutMs }));
+  }
+
   return new Promise((resolve) => {
     const start = Date.now();
     const child = execFile(command, args, {
@@ -36,6 +45,11 @@ function run(command, args, { cwd, timeoutMs, maxBuffer, env } = {}) {
       const code = err && typeof err.code === 'number' ? err.code
         : err && err.code === 'ETIMEDOUT' ? null
         : 0;
+      if (err) {
+        console.log('[processService.run] error', JSON.stringify({
+          command, code: err.code, errno: err.errno, syscall: err.syscall, message: err.message,
+        }));
+      }
       resolve({
         ok: !err,
         code,
