@@ -146,3 +146,85 @@ describe('detectAgentBinaries — default fsExists hits the real filesystem', ()
     expect(out).toEqual({ codex: { found: false }, claude: { found: false } });
   });
 });
+
+// Electron's main process often inherits a trimmed PATH (taskbar
+// launches on Windows, Finder on macOS, no-shell launches on Linux).
+// Probing the common per-user install roots catches binaries that
+// `which claude` from a terminal would find but a fresh-launched
+// Electron wouldn't.
+describe('detectAgentBinaries — extra PATH dirs catch binaries outside env.PATH', () => {
+  it('Windows: probes %USERPROFILE%\\.local\\bin even if not on PATH', () => {
+    const out = detectAgentBinaries({
+      env: { PATH: 'C:\\Windows', USERPROFILE: 'C:\\Users\\v' },
+      platform: 'win32',
+      fsExists: existing(['C:\\Users\\v\\.local\\bin\\claude.exe']),
+    });
+    expect(out.claude.path).toBe('C:\\Users\\v\\.local\\bin\\claude.exe');
+  });
+
+  it('Windows: probes %APPDATA%\\npm', () => {
+    const out = detectAgentBinaries({
+      env: { PATH: 'C:\\Windows', APPDATA: 'C:\\Users\\v\\AppData\\Roaming' },
+      platform: 'win32',
+      fsExists: existing(['C:\\Users\\v\\AppData\\Roaming\\npm\\codex.cmd']),
+    });
+    expect(out.codex.path).toBe('C:\\Users\\v\\AppData\\Roaming\\npm\\codex.cmd');
+  });
+
+  it('Windows: probes WinGet Links dir', () => {
+    const out = detectAgentBinaries({
+      env: { PATH: 'C:\\Windows', LOCALAPPDATA: 'C:\\Users\\v\\AppData\\Local' },
+      platform: 'win32',
+      fsExists: existing(['C:\\Users\\v\\AppData\\Local\\Microsoft\\WinGet\\Links\\codex.exe']),
+    });
+    expect(out.codex.path).toBe('C:\\Users\\v\\AppData\\Local\\Microsoft\\WinGet\\Links\\codex.exe');
+  });
+
+  it('macOS: probes ~/.local/bin + Homebrew + /usr/local/bin', () => {
+    const out = detectAgentBinaries({
+      env: { PATH: '/usr/bin', HOME: '/Users/v' },
+      platform: 'darwin',
+      fsExists: existing(['/opt/homebrew/bin/claude']),
+    });
+    expect(out.claude.path).toBe('/opt/homebrew/bin/claude');
+  });
+
+  it('linux: probes ~/.local/bin', () => {
+    const out = detectAgentBinaries({
+      env: { PATH: '/usr/bin', HOME: '/home/v' },
+      platform: 'linux',
+      fsExists: existing(['/home/v/.local/bin/claude']),
+    });
+    expect(out.claude.path).toBe('/home/v/.local/bin/claude');
+  });
+});
+
+describe('detectAgentBinaries — Windows codex preference', () => {
+  it('prefers a stable %APPDATA%\\npm install over a per-checkout .local\\bin shim', () => {
+    const out = detectAgentBinaries({
+      env: {
+        PATH: 'C:\\Users\\v\\.local\\bin',
+        USERPROFILE: 'C:\\Users\\v',
+        APPDATA: 'C:\\Users\\v\\AppData\\Roaming',
+      },
+      platform: 'win32',
+      fsExists: existing([
+        'C:\\Users\\v\\.local\\bin\\codex.cmd',
+        'C:\\Users\\v\\AppData\\Roaming\\npm\\codex.cmd',
+      ]),
+    });
+    expect(out.codex.path).toBe('C:\\Users\\v\\AppData\\Roaming\\npm\\codex.cmd');
+  });
+
+  it('falls back to the .local\\bin shim when no stable install exists', () => {
+    const out = detectAgentBinaries({
+      env: {
+        PATH: 'C:\\Users\\v\\.local\\bin',
+        USERPROFILE: 'C:\\Users\\v',
+      },
+      platform: 'win32',
+      fsExists: existing(['C:\\Users\\v\\.local\\bin\\codex.cmd']),
+    });
+    expect(out.codex.path).toBe('C:\\Users\\v\\.local\\bin\\codex.cmd');
+  });
+});

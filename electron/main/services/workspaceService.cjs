@@ -16,7 +16,7 @@ function statePath() {
 async function readState() {
   try {
     const raw = await fs.readFile(statePath(), 'utf8');
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(stripBom(raw));
     if (!parsed || typeof parsed !== 'object') return emptyState();
     return {
       currentId: typeof parsed.currentId === 'string' ? parsed.currentId : null,
@@ -27,6 +27,13 @@ async function readState() {
     console.warn('citybase: failed to read workspace state, starting empty', err);
     return emptyState();
   }
+}
+
+// Some tools that touch the workspaces.json on disk add a UTF-8 BOM
+// (PowerShell's default Out-File, certain editors). JSON.parse rejects
+// it; strip if present.
+function stripBom(raw) {
+  return raw && raw.charCodeAt(0) === 0xFEFF ? raw.slice(1) : raw;
 }
 
 function emptyState() {
