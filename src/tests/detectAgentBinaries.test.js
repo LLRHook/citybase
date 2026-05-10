@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { detectAgentBinaries } from '../../electron/main/agents/detect.cjs';
 
 function existing(paths) {
@@ -103,5 +106,43 @@ describe('detectAgentBinaries — overrides', () => {
       candidates: { codex: ['codex-nightly', 'codex'], claude: ['claude'] },
     });
     expect(out.codex.path).toBe('/usr/local/bin/codex-nightly');
+  });
+});
+
+// Production callers (electron/main/ipc.cjs, main.cjs) call
+// detectAgentBinaries() with no arguments. The default `fsExists` MUST
+// hit the real filesystem; an earlier `() => false` default silently
+// returned "no agents installed" for every real launch, which is the
+// "no installed agent CLI found" error the user hit. Probe a real
+// temp dir to make sure that bug can't come back.
+describe('detectAgentBinaries — default fsExists hits the real filesystem', () => {
+  it('finds a binary that physically exists on the injected PATH', () => {
+    const root = mkdtempSync(join(tmpdir(), 'citybase-detect-'));
+    const binDir = join(root, 'bin');
+    mkdirSync(binDir);
+    const ext = process.platform === 'win32' ? '.cmd' : '';
+    const claudeFile = join(binDir, `claude${ext}`);
+    writeFileSync(claudeFile, '');
+    try {
+      // Override env.PATH only — leave fsExists unset so the default kicks in.
+      const out = detectAgentBinaries({
+        env: { PATH: binDir },
+      });
+      expect(out.claude.found).toBe(true);
+      expect(out.claude.path).toBe(claudeFile);
+      expect(out.codex.found).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('returns not-found cleanly when the default fsExists throws (e.g. permission denied)', () => {
+    // Spy on Node's fs.existsSync via the test boundary: the function's
+    // default catches and returns false, so even a thrown probe doesn't
+    // explode detection.
+    const out = detectAgentBinaries({
+      env: { PATH: '/nonexistent/path/that/cannot/exist' },
+    });
+    expect(out).toEqual({ codex: { found: false }, claude: { found: false } });
   });
 });

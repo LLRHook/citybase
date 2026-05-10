@@ -11,7 +11,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // module identity returned by the mock factory; resetting them between
 // tests keeps assertions independent.
 const desktopBridge = {
-  isDesktop: true,
   app: {
     getVersion: vi.fn(async () => '1.0.0'),
     getPlatform: vi.fn(async () => 'darwin'),
@@ -63,7 +62,6 @@ const desktopBridge = {
 
 vi.mock('../app/citybaseApi.js', () => ({
   citybaseApi: desktopBridge,
-  isDesktop: true,
 }));
 
 // Now safe to import — the mock is hoisted by vitest.

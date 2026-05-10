@@ -17,7 +17,6 @@ function Probe({ api, initial }) {
 
 function makeApi(impl) {
   return {
-    isDesktop: false,
     agents: { detect: impl },
   };
 }

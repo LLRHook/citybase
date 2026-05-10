@@ -3,9 +3,18 @@
 // slice; tools like `codex --version` need the processService and its
 // macOS PATH augmentation).
 //
-// Pure function — every input is injected. Tests stub fsExists with a Set
-// of paths and assert the right combinations.
+// Tests inject a `fsExists` function that returns true for a fixture
+// Set of paths. Production callers leave it unset and we fall back to
+// `fs.existsSync`. Earlier the default was `() => false` and every
+// production caller silently got "no agents installed" — the bug
+// surfaced when a user clicked Run with provider='auto' and the
+// resolver said no installed agent CLI was found.
 const path = require('node:path');
+const fs = require('node:fs');
+
+function defaultFsExists(p) {
+  try { return fs.existsSync(p); } catch { return false; }
+}
 
 const DEFAULT_CANDIDATES = Object.freeze({
   codex: Object.freeze(['codex']),
@@ -64,7 +73,7 @@ function findBinary({ candidates, pathDirs, extensions, join, fsExists }) {
 function detectAgentBinaries({
   env = process.env,
   platform = process.platform,
-  fsExists = () => false,
+  fsExists = defaultFsExists,
   candidates = DEFAULT_CANDIDATES,
 } = {}) {
   // Windows surfaces both PATH and Path depending on shell; fall back to
