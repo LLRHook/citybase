@@ -82,18 +82,23 @@ describe('CodexAdapter — startTask', () => {
       .rejects.toThrow(/skill must be one of/);
   });
 
-  it('builds an argv with --quiet, mode, and --prompt; threads model through', async () => {
+  it('builds an argv that runs `codex exec` with the prompt piped via stdin', async () => {
     const ps = makeProcessService();
     const adapter = makeAdapter({ processService: ps });
     await adapter.startTask({ ...VALID_PARAMS, model: 'gpt-5-codex' });
-    const [, args] = ps.run.mock.calls[0];
-    expect(args[0]).toBe('--quiet');
-    expect(args).toContain('--mode');
-    expect(args).toContain('edit');
-    expect(args).toContain('--prompt');
-    expect(args).toContain('do the thing');
+    const [, args, options] = ps.run.mock.calls[0];
+    expect(args[0]).toBe('exec');
+    expect(args).toContain('--cd');
+    expect(args).toContain('/abs/repo');
+    expect(args).toContain('--sandbox');
+    expect(args).toContain('workspace-write');
     expect(args).toContain('--model');
     expect(args).toContain('gpt-5-codex');
+    // Trailing `-` makes codex exec read the prompt from stdin.
+    expect(args.at(-1)).toBe('-');
+    // The prompt body (with the skill prefix) lands on stdin.
+    expect(typeof options.stdin).toBe('string');
+    expect(options.stdin).toContain('do the thing');
   });
 
   it('marks the run as done and returns AgentRun shape on a clean exit', async () => {
