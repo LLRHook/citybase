@@ -39,7 +39,21 @@ function createWindow() {
     }
   } else {
     mainWindow.loadFile(target.file);
+    if (process.env.CITYBASE_DEVTOOLS === '1') {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
   }
+  // Renderer-process console + crash diagnostics are always wired so a
+  // headless launch (e.g. CI, an automated probe) can see what the
+  // renderer printed without opening DevTools. Lives here because we
+  // genuinely shipped a renderer that silently failed to attach the
+  // preload bridge once, and silence is the worst possible failure mode.
+  mainWindow.webContents.on('console-message', (_e, level, message, line, source) => {
+    console.log(`[renderer L${level}] ${source}:${line} ${message}`);
+  });
+  mainWindow.webContents.on('render-process-gone', (_e, details) => {
+    console.error('[renderer crash]', details);
+  });
 
   // Push the boot payload (detected agents + auto-restored workspace) to
   // the renderer the moment the window is ready. Without this, App.jsx
@@ -70,6 +84,15 @@ function getMainWindow() {
 }
 
 app.setName('Citybase');
+// On Windows, an unpackaged Electron app whose name is a single
+// non-reverse-DNS token can produce a "Windows cannot find '\Citybase\'"
+// shell error when the OS tries to resolve the AppUserModelID against
+// installed apps (Start menu / taskbar lookups). Pin the AUMID to the
+// reverse-DNS form we already use for packaged builds (see
+// `build.appId` in package.json) so the OS has a valid token to match.
+if (process.platform === 'win32' && typeof app.setAppUserModelId === 'function') {
+  app.setAppUserModelId('com.llrhook.citybase');
+}
 
 app.whenReady().then(async () => {
   registerIpc({ getMainWindow });
