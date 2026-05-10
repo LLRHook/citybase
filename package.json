@@ -6,12 +6,10 @@
   "type": "module",
   "main": "electron/main/main.cjs",
   "scripts": {
-    "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
     "test": "vitest",
-    "dev:desktop": "concurrently -k -n vite,electron -c blue,magenta \"npm run dev\" \"wait-on http://localhost:5173 && electron . --dev\"",
+    "dev:desktop": "concurrently -k -n vite,electron -c blue,magenta \"vite\" \"wait-on http://localhost:5173 && electron . --dev\"",
     "build:desktop": "vite build",
     "start:desktop": "electron .",
     "package:dir": "npm run build:desktop && electron-builder --dir",
