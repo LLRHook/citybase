@@ -84,6 +84,15 @@ function getMainWindow() {
 }
 
 app.setName('Citybase');
+// On Windows, an unpackaged Electron app whose name is a single
+// non-reverse-DNS token can produce a "Windows cannot find '\Citybase\'"
+// shell error when the OS tries to resolve the AppUserModelID against
+// installed apps (Start menu / taskbar lookups). Pin the AUMID to the
+// reverse-DNS form we already use for packaged builds (see
+// `build.appId` in package.json) so the OS has a valid token to match.
+if (process.platform === 'win32' && typeof app.setAppUserModelId === 'function') {
+  app.setAppUserModelId('com.llrhook.citybase');
+}
 
 app.whenReady().then(async () => {
   registerIpc({ getMainWindow });
