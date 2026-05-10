@@ -16,7 +16,6 @@ function Probe({ api }) {
 
 function makeApi({ initial = [], onEvent } = {}) {
   return {
-    isDesktop: true,
     agents: {
       listRuns: vi.fn(async () => initial),
       onEvent: onEvent || vi.fn(() => () => {}),
@@ -44,7 +43,6 @@ describe('useRunHistory', () => {
 
   it('treats a non-array result defensively', async () => {
     const api = {
-      isDesktop: true,
       agents: { listRuns: vi.fn(async () => null), onEvent: vi.fn(() => () => {}) },
     };
     render(<Probe api={api} />);
@@ -55,7 +53,6 @@ describe('useRunHistory', () => {
 
   it('falls back to [] when listRuns rejects', async () => {
     const api = {
-      isDesktop: true,
       agents: { listRuns: vi.fn(async () => { throw new Error('boom'); }), onEvent: vi.fn(() => () => {}) },
     };
     render(<Probe api={api} />);
@@ -98,10 +95,9 @@ describe('useRunHistory', () => {
     expect(off).toHaveBeenCalled();
   });
 
-  it('still works when the bridge has no onEvent (browser stub fallback)', async () => {
+  it('still works when the bridge has no onEvent (defensive fallback)', async () => {
     const api = {
-      isDesktop: false,
-      agents: { listRuns: vi.fn(async () => [{ runId: 'r1', status: 'done', provider: 'browser' }]) },
+      agents: { listRuns: vi.fn(async () => [{ runId: 'r1', status: 'done', provider: 'claude' }]) },
     };
     render(<Probe api={api} />);
     await waitFor(() => {

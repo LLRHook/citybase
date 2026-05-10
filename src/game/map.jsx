@@ -3,7 +3,7 @@ import { NEON, C, alpha } from './palette.js';
 import { HEX_SIZE, hexToPx, hexPath } from './hex.js';
 import {
   IsoBuilding,
-  Title, Mono, Pill,
+  Title, Mono, Pill, NButton,
 } from './theme.jsx';
 
 function tilesForDistrict(d) {
@@ -148,7 +148,7 @@ function DistrictTiles({ district, allBuildings, dirtyByPath, focused, onClick }
   );
 }
 
-export function CityMap({ districts, buildings, dirtyByPath, focusedDistrictId, onSelectDistrict, pawns, connected }) {
+export function CityMap({ districts, buildings, dirtyByPath, focusedDistrictId, onSelectDistrict, pawns, connected, onPickWorkspace }) {
   const W = 820, H = 520;
   const cx = W / 2, cy = H / 2 + 20;
   const safeDistricts = Array.isArray(districts) ? districts : [];
@@ -241,6 +241,11 @@ export function CityMap({ districts, buildings, dirtyByPath, focusedDistrictId, 
             <Mono color="ink2" size={11} style={{ display: 'block', marginTop: 8 }}>
               Open a local Git workspace to summon this city.
             </Mono>
+            {typeof onPickWorkspace === 'function' && (
+              <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}>
+                <NButton accent="amber" onClick={onPickWorkspace}>＋ OPEN WORKSPACE</NButton>
+              </div>
+            )}
           </div>
         </div>
       )}

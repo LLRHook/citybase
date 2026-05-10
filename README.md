@@ -20,14 +20,16 @@ The v1 path runs Claude Code inside the IDE end-to-end. Codex CLI is wired throu
 
 ```bash
 npm install
-npm run dev:desktop    # boot the Electron shell against the dev server
+npm run dev:desktop    # Electron shell with HMR against the Vite dev server
 ```
 
-For a renderer-only browser preview (no Electron, no real Git, no agents — useful for UI work):
+For a one-shot launch against the production build:
 
 ```bash
-npm run dev            # http://localhost:5173
+npm run build:desktop && npm run start:desktop
 ```
+
+**There is no standalone-browser path.** The renderer always runs inside Electron — `citybaseApi.js` throws on import when `window.citybase` is missing instead of silently degrading to a stub. The browser-only `dev` and `preview` scripts were removed on 2026-05-10.
 
 ## What v1 does
 
@@ -45,16 +47,13 @@ A normal session looks like this — every step is real activity, not seeded dat
 
 | Script | What it does |
 |---|---|
-| `npm run dev` | Vite dev server (renderer-only browser preview) |
-| `npm run dev:desktop` | Vite + Electron against the dev server |
-| `npm run build` | Production renderer build to `dist/` |
-| `npm run build:desktop` | Renderer build configured for Electron loading from `dist/index.html` |
-| `npm run start:desktop` | Electron against the built renderer |
+| `npm run dev:desktop` | Electron shell with HMR against the Vite dev server |
+| `npm run start:desktop` | Electron against the built renderer in `dist/` |
+| `npm run build` / `build:desktop` | Production renderer build to `dist/` (alias of each other) |
 | `npm run package:dir` | Unpacked dev build under `dist-electron/` (no installer, no codesign) |
 | `npm run package:mac` | macOS `.app`, ad-hoc / unsigned for local dev |
 | `npm run lint` | ESLint over the project |
 | `npm test` | Vitest in watch mode (`npm test -- --run` for one pass) |
-| `npm run preview` | Preview the production renderer build |
 
 `package:dir` and `package:mac` are dev-only — no DMG, no notarization, no signing. `electron-builder` config lives in the `build` field of `package.json`; output goes to gitignored `dist-electron/`.
 
@@ -90,7 +89,7 @@ electron/
 src/
   App.jsx                          top-level shell + view switching
   app/
-    citybaseApi.js                 renderer facade (desktop bridge or browser stub)
+    citybaseApi.js                 renderer facade — desktop bridge re-export (throws if missing)
     useWorkspace.js                workspace + Git snapshot state
     useAgentDetect.js              hook reading the boot payload, IPC fallback
     useApprovalRequests.js         pending-approval channel for write-capable runs
@@ -129,7 +128,7 @@ src/
 | Claude run fails immediately with "not authenticated" | The CLI hasn't logged in yet. | Run `claude login` once in a terminal, confirm `claude --print --output-format json -p "hi"` works, then retry inside Citybase. |
 | `openPR` throws "no upstream" or "branch not pushed" | The head branch hasn't been pushed to the remote. v1 deliberately doesn't auto-push — that side effect is deferred to v1.1. | `git push -u origin <branch>` from a terminal, then call openPR again. |
 | `openPR` throws "GraphQL: must have admin rights" or similar | `gh` is authenticated as the wrong account, or doesn't have permission on the remote. | `gh auth status` to inspect; `gh auth login` to re-auth. |
-| Browser preview at `http://localhost:5173` won't start | Port already in use. Common culprit on this dev box: the Docker backend. | Stop Docker (or whatever holds 5173) before `npm run dev`. `vite.config.js` sets `strictPort: true` on purpose — it won't silently move to 5174. |
+| `dev:desktop` hangs at "waiting for http://localhost:5173" | Vite couldn't bind 5173 — usually Docker. | Stop the conflicting process or change `server.port` in `vite.config.js` (and `dev:desktop`'s `wait-on` URL). `strictPort: true` is on purpose so a port collision fails loud. |
 | Commit hook rejects "subject does not match the project convention" | Non-conventional subject. | See [CONTRIBUTING.md](./CONTRIBUTING.md). Format is `<type>(<scope>)?<!>?: <description>`, ≤72 chars, lowercase after the colon. |
 
 ## Roadmap

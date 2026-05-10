@@ -6,10 +6,10 @@
 //   ready     → workspace selected, snapshot loaded (snapshot.error may set)
 //   error     → workspace operation itself failed (e.g. pick rejected)
 //
-// In browser mode (no Electron) this hook resolves to idle with no
-// workspace, leaving the existing fixture-based UI as the visible state.
+// The renderer only runs inside Electron; citybaseApi throws on import
+// if the bridge is missing, so this hook can call it unconditionally.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { citybaseApi, isDesktop } from './citybaseApi.js';
+import { citybaseApi } from './citybaseApi.js';
 
 export function useWorkspace() {
   const [state, setState] = useState({
@@ -35,7 +35,6 @@ export function useWorkspace() {
   }, []);
 
   const pick = useCallback(async () => {
-    if (!isDesktop) return;
     const myLoad = ++loadIdRef.current;
     setState(s => ({ ...s, status: 'loading', error: null }));
     try {
@@ -55,7 +54,6 @@ export function useWorkspace() {
   }, [loadSnapshot]);
 
   const refresh = useCallback(async () => {
-    if (!isDesktop) return;
     const myLoad = ++loadIdRef.current;
     setState(s => {
       if (!s.workspace) return s;
@@ -77,7 +75,6 @@ export function useWorkspace() {
   }, [loadSnapshot]);
 
   const close = useCallback(async () => {
-    if (!isDesktop) return;
     // Invalidate any in-flight hydrate/refresh/pick so its terminal setState is dropped.
     loadIdRef.current += 1;
     const ws = await citybaseApi.workspace.getCurrent();
@@ -87,7 +84,6 @@ export function useWorkspace() {
 
   // Initial load: hydrate from any remembered workspace.
   useEffect(() => {
-    if (!isDesktop) return undefined;
     const myLoad = ++loadIdRef.current;
     (async () => {
       const ws = await citybaseApi.workspace.getCurrent();
@@ -108,7 +104,6 @@ export function useWorkspace() {
 
   // Wire menu commands (File → Open / Close Workspace).
   useEffect(() => {
-    if (!isDesktop) return;
     const off = citybaseApi.menu.onCommand((payload) => {
       if (payload?.action === 'openWorkspace') pick();
       if (payload?.action === 'closeWorkspace') close();

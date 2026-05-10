@@ -11,9 +11,9 @@ describe('App idle defaults (no fake activity)', () => {
     vi.useRealTimers();
   });
 
-  it('shows the unlinked status pill on first load', () => {
+  it('shows the no-workspace status pill on first load', () => {
     render(<App />);
-    expect(screen.getByText('unlinked')).toBeInTheDocument();
+    expect(screen.getByText(/NO WORKSPACE · open one/)).toBeInTheDocument();
   });
 
   it('renders no quest IDs (no JIRA-* or BB-* tickets)', () => {

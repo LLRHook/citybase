@@ -22,11 +22,10 @@ import { KanbanView } from './game/kanban.jsx';
 import { AdventurerAnalysis } from './game/analysis.jsx';
 import { useTweaks } from './game/useTweaks.js';
 import {
-  TweaksPanel, TweakSection, TweakToggle, TweakRadio, TweakStatus,
+  TweaksPanel, TweakSection, TweakRadio, TweakStatus,
 } from './game/tweaks.jsx';
 import { BranchSelector } from './game/branchSelector.jsx';
 import { useWorkspace } from './app/useWorkspace.js';
-import { isDesktop } from './app/citybaseApi.js';
 import { projectRepoTreeToCityModel } from './app/cityModel.js';
 import { projectSnapshotToActivity } from './app/activity.js';
 import { useAgentDetect } from './app/useAgentDetect.js';
@@ -35,7 +34,7 @@ import { useRunHistory } from './app/useRunHistory.js';
 import { citybaseApi } from './app/citybaseApi.js';
 
 const TWEAK_DEFAULTS = {
-  role: 'admin', connected: false, agentProvider: 'auto', selectedBranch: null,
+  role: 'admin', agentProvider: 'auto', selectedBranch: null,
 };
 
 // Stable empty references for shapes the renderer still expects but
@@ -81,7 +80,6 @@ export default function App() {
 function CodebaseCity() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const role = tweaks.role || 'admin';
-  const connected = tweaks.connected === true;
   const agentProvider = tweaks.agentProvider || 'auto';
 
   // The main process pushes a one-shot boot payload on did-finish-load
@@ -107,11 +105,11 @@ function CodebaseCity() {
   const liveBranch = workspace.snapshot?.branch || null;
   const liveDirty = !!workspace.snapshot?.isDirty;
   const branchLabel = liveBranch || '—';
-  const wsLinked = isDesktop ? !!workspace.workspace : connected;
-  const cityConnected = isDesktop ? wsLinked : connected;
-  const wsLinkedLabel = isDesktop
-    ? (workspace.workspace ? `WORKSPACE · ${workspace.workspace.name}` : 'NO WORKSPACE · open one')
-    : (connected ? 'LOCAL GIT + AGENT · linked' : 'unlinked');
+  const wsLinked = !!workspace.workspace;
+  const cityConnected = wsLinked;
+  const wsLinkedLabel = workspace.workspace
+    ? `WORKSPACE · ${workspace.workspace.name}`
+    : 'NO WORKSPACE · open one';
 
   const [view, setView] = React.useState('city');
   const [analysisAdv, setAnalysisAdv] = React.useState(null);
@@ -170,7 +168,7 @@ function CodebaseCity() {
     }
     return m;
   }, [snapshot]);
-  const vitalsRepo = repo ?? (isDesktop && workspace.workspace ? {
+  const vitalsRepo = repo ?? (workspace.workspace ? {
     name: workspace.workspace.name,
     remote: workspace.workspace.rootPath,
     branch: liveBranch || '—',
@@ -367,15 +365,13 @@ function CodebaseCity() {
           {wsLinkedLabel}
         </Pill>
 
-        {isDesktop && (
-          <NButton
-            accent={workspace.workspace ? 'cyan' : 'amber'}
-            ghost={!!workspace.workspace}
-            onClick={workspace.workspace ? workspace.refresh : workspace.pick}
-          >
-            {workspace.workspace ? '↻ REFRESH' : '＋ OPEN WORKSPACE'}
-          </NButton>
-        )}
+        <NButton
+          accent={workspace.workspace ? 'cyan' : 'amber'}
+          ghost={!!workspace.workspace}
+          onClick={workspace.workspace ? workspace.refresh : workspace.pick}
+        >
+          {workspace.workspace ? '↻ REFRESH' : '＋ OPEN WORKSPACE'}
+        </NButton>
 
         <Pill color={role === 'admin' ? 'amber' : role === 'member' ? 'cyan' : 'ink3'}>
           ROLE · {role}
@@ -489,6 +485,7 @@ function CodebaseCity() {
                 onSelectDistrict={(d) => setFocusedDistrict(d.id === focusedDistrict ? null : d.id)}
                 pawns={cityConnected ? pawns : []}
                 connected={cityConnected}
+                onPickWorkspace={workspace.pick}
               />
               {focusedDistrict && (() => {
                 const d = districts.find(x => x.id === focusedDistrict);
@@ -594,13 +591,6 @@ function CodebaseCity() {
 
       {/* TWEAKS */}
       <TweaksPanel title="Tweaks">
-        <TweakSection title="Connection">
-          <TweakToggle
-            label="Local Git + agent linked"
-            value={connected}
-            onChange={(v) => setTweak('connected', v)}
-          />
-        </TweakSection>
         <TweakSection title="Role">
           <TweakRadio
             label="Permission"
