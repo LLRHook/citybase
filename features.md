@@ -41,7 +41,7 @@ Priority guide: crit / high / med / low.
 ## Open
 
 ### [FEAT-001] Desktop-mode E2E smoke test that opens the app window
-- [ ] **Priority:** high
+- [x] **Priority:** high
 - **Area:** tests
 - **File(s):** `e2e/desktop.smoke.spec.js` (new), `package.json`, `.github/workflows/ci.yml`
 - **Why:** ROADMAP Phase 1 work item "Add a 'desktop mode' smoke test that opens
@@ -78,10 +78,18 @@ Priority guide: crit / high / med / low.
 - **Out of scope:** E2E against the packaged app bundle (the CI packaging step only
   proves `electron-builder --dir` succeeds), multi-window flows, agent-run E2E
   against real CLIs, visual regression.
-- **Status:** open
+- **Implementation:** `e2e/desktop.smoke.spec.js` (Playwright 1.60 `_electron`,
+  serial worker, CI-only `--no-sandbox`) asserting title, live bridge,
+  `getVersion()` over real IPC, sandboxed renderer, rendered `#root`, and detect
+  shape; `playwright.config.js`; `test:e2e` script with a clear dist-missing
+  error; Vitest `exclude: e2e/**`; `desktop-smoke` CI job (xvfb + pinned SHAs +
+  `electron-builder --dir`); VERIFICATION.md Stage 2.4 placeholder replaced;
+  `index.html` title aligned to "Citybase". Captured the pre-wave bridge failure
+  live before any fix existed.
+- **Status:** shipped-pending-migration
 
 ### [FEAT-002] README safety model and troubleshooting sections
-- [ ] **Priority:** med
+- [x] **Priority:** med
 - **Area:** docs
 - **File(s):** `README.md`
 - **Why:** the v1 ship gate (ROADMAP) requires "README includes setup, app
@@ -100,7 +108,13 @@ Priority guide: crit / high / med / low.
   - No duplication drift: safety section links to docs/agent-runtime.md rather than restating the contract.
 - **Test plan:** n/a (docs); VERIFICATION.md Stage 1 doc-drift check covers it.
 - **Out of scope:** restructuring the rest of README; marketing copy.
-- **Status:** open
+- **Implementation:** shipped upstream in the v1 operator-guide rewrite
+  (a6a31bd) — README gained "Safety model" (isolation flags, allow-listed IPC,
+  single spawn site, git-mutation validation, the bypassPermissions caveat) and
+  a symptom/cause/fix "Troubleshooting" table. Verified present at merge time;
+  the agent-runtime.md cross-link this ticket wanted is folded into BUG-019's
+  doc pass.
+- **Status:** shipped-pending-migration
 
 ### [FEAT-003] Production packaging and distribution
 - [ ] **Priority:** low
