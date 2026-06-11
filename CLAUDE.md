@@ -20,6 +20,7 @@ npm install            # also activates the commit-msg hook via core.hooksPath
 npm run dev:desktop    # Electron shell with HMR (Vite on :5173 strictPort + electron --dev)
 npm test -- --run      # full Vitest suite, single pass (bare `npm test` enters watch mode)
 npx vitest run src/tests/App.smoke.test.jsx   # run one test file
+npm run test:e2e       # Playwright desktop smoke (needs a fresh `npm run build` first)
 npm run lint           # ESLint over the project; zero errors and zero warnings expected
 npm run build          # production renderer build → dist/
 npm run start:desktop  # Electron against the built dist/ (run build first)
