@@ -131,6 +131,10 @@ src/
 | `dev:desktop` hangs at "waiting for http://localhost:5173" | Vite couldn't bind 5173 — usually Docker. | Stop the conflicting process or change `server.port` in `vite.config.js` (and `dev:desktop`'s `wait-on` URL). `strictPort: true` is on purpose so a port collision fails loud. |
 | Commit hook rejects "subject does not match the project convention" | Non-conventional subject. | See [CONTRIBUTING.md](./CONTRIBUTING.md). Format is `<type>(<scope>)?<!>?: <description>`, ≤72 chars, lowercase after the colon. |
 
+## Testing & verification
+
+`npm test -- --run` runs the Vitest suite (jsdom; the per-file baseline lives in VERIFICATION.md Stage 2). The canonical release checklist is [VERIFICATION.md](./VERIFICATION.md) — a six-stage V&V protocol covering static review, automated tests, the manual desktop walkthrough, adversarial checks, and the hard product constraints (renderer isolation, IPC allow-list, approval boundaries). Run it before any release or after any large refactor.
+
 ## Roadmap
 
 The full vision and phased plan live in [ROADMAP.md](./ROADMAP.md). Phase 5 is complete and the v1 ship-gate items are addressed across PRs #36 / #37 / #38 / #40 / #41. Remaining v1.1 work and deferred items are listed there.
@@ -138,3 +142,5 @@ The full vision and phased plan live in [ROADMAP.md](./ROADMAP.md). Phase 5 is c
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) and [AGENTS.md](./AGENTS.md). Short version: AI agents propose changes via PRs; CI gates the merge.
+
+Work is tracked in the project-cycle files: defects in [bugs.md](./bugs.md), scoped features in [features.md](./features.md), shipped/fixed history in [CHANGELOG.md](./CHANGELOG.md). File a `BUG-NNN` / `FEAT-NNN` entry before fixing or building; migrate it to the changelog when it lands. The full lifecycle is described in [AGENTS.md](./AGENTS.md).

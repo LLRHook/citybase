@@ -78,3 +78,28 @@ The agent runner implements the provider-neutral `AgentProvider` interface in [d
 ## Roadmap
 
 Long-term plan and phase definitions live in [ROADMAP.md](./ROADMAP.md). Phase 0A through Phase 5 are complete; v1.1 cleanup and deferred items are tracked under "Status (post Phase 5)" and "Out of v1 scope".
+
+### Project-cycle files (`bugs.md` / `features.md` / `CHANGELOG.md` / `VERIFICATION.md`)
+
+The four trackers (the five canonical files minus `README.md`) are
+interlocked: defects and features are *filed*, work is
+*verified* against `VERIFICATION.md`, and shipped or fixed entries are
+*migrated* into `CHANGELOG.md` as a permanent record. `README.md` is the
+public face that links them all together.
+
+- When you find a bug, file a `BUG-NNN` entry in `bugs.md / ## Open` in
+  the same change. Never silently fix a bug.
+- When a fix lands: tick the checkbox, add a `**Fix:**` line, move the
+  entry to `## Migrated to changelog`, copy a one-liner into
+  `CHANGELOG.md / Unreleased / Fixed`. Do not delete.
+- When you scope a feature, file a `FEAT-NNN` in `features.md / ## Open`
+  *before* writing code.
+- When a feature ships: tick, add `**Implementation:**` line, move to
+  `## Shipped`, copy a one-liner into `CHANGELOG.md / Unreleased / Added`
+  (or `Changed`).
+- When a `VERIFICATION.md` run goes green: append a `Verified` entry to
+  `CHANGELOG.md / Unreleased` per `VERIFICATION.md § 6.5`, bump test
+  counts in `VERIFICATION.md § 2` if the suite size changed.
+- When `README.md` drifts from reality: treat the drift as a `BUG`
+  (area `docs`). Do not silently update it.
+- Empty `## Open` sections are the desired steady state.
