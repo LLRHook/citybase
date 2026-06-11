@@ -174,11 +174,15 @@ A failure in this stage is a hard block.
 | `cityModel.test.js` | 11 | | `ClaudeAdapter.test.js` | 17 |
 | `CliAgentAdapter.test.js` | 8 | | `CodexAdapter.test.js` | 25 |
 
-- [ ] 2.4 E2E layer: **none exists yet** — tracked as
-  [FEAT-001](./features.md) (desktop-mode smoke test). Until it lands, the
-  Electron launch path is covered only by the manual walkthrough in Stage 3.
-  This step ticks by confirming FEAT-001 is still open (or replacing this
-  step with the real `test:e2e` command once it ships).
+- [ ] 2.4 Desktop E2E smoke (Playwright `_electron`, FEAT-001) — requires a
+  fresh `dist/`:
+  ```bash
+  npm run build
+  npm run test:e2e
+  ```
+  Expected: `1 passed` — window opens titled "Citybase", `window.citybase`
+  bridge alive (`app.getVersion()` resolves over real IPC), renderer sandboxed
+  (`require`/`process` undefined), agent detection answers with boolean shape.
 
 A failure in this stage is a hard block.
 

@@ -54,6 +54,7 @@ A normal session looks like this — every step is real activity, not seeded dat
 | `npm run package:mac` | macOS `.app`, ad-hoc / unsigned for local dev |
 | `npm run lint` | ESLint over the project |
 | `npm test` | Vitest in watch mode (`npm test -- --run` for one pass) |
+| `npm run test:e2e` | Playwright desktop smoke test against the built `dist/` (run `npm run build` first) |
 
 `package:dir` and `package:mac` are dev-only — no DMG, no notarization, no signing. `electron-builder` config lives in the `build` field of `package.json`; output goes to gitignored `dist-electron/`.
 

@@ -9,6 +9,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "test": "vitest",
+    "test:e2e": "playwright test",
     "dev:desktop": "concurrently -k -n vite,electron -c blue,magenta \"vite\" \"wait-on http://localhost:5173 && electron . --dev\"",
     "build:desktop": "vite build",
     "start:desktop": "electron .",
@@ -30,7 +31,13 @@
     ],
     "mac": {
       "target": [
-        { "target": "dir", "arch": ["arm64", "x64"] }
+        {
+          "target": "dir",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ],
       "category": "public.app-category.developer-tools",
       "identity": null
@@ -42,6 +49,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.60.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
