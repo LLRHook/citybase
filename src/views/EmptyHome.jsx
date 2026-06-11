@@ -47,12 +47,14 @@ export function EmptyHome({ onPickWorkspace, agentDetect }) {
             name="claude"
             found={!!claude?.found}
             path={claude?.path}
+            detectError={agentDetect?.status === 'error' ? agentDetect.error : null}
             hint="Required. Install Claude Code CLI and run `claude login`."
           />
           <AgentRow
             name="codex"
             found={!!codex?.found}
             path={codex?.path}
+            detectError={agentDetect?.status === 'error' ? agentDetect.error : null}
             hint="Optional. Codex is a fallback adapter."
           />
         </div>
@@ -61,7 +63,9 @@ export function EmptyHome({ onPickWorkspace, agentDetect }) {
   );
 }
 
-function AgentRow({ name, found, path, hint }) {
+// A detect *error* is not "not installed" (R17): when the scan itself failed
+// we don't know what's installed, so say that — and skip the install hint.
+function AgentRow({ name, found, path, hint, detectError }) {
   const color = found ? NEON.green : NEON.red;
   return (
     <div
@@ -79,9 +83,13 @@ function AgentRow({ name, found, path, hint }) {
       />
       <Mono size={11} color="ink" weight={600}>{name}</Mono>
       <Mono size={10} color={found ? 'green' : 'red'}>
-        {found ? `installed · ${path || '(detected)'}` : 'not installed'}
+        {found ? `installed · ${path || '(detected)'}`
+          : detectError ? `detect failed: ${detectError.message}`
+          : 'not installed'}
       </Mono>
-      {!found && <Mono size={10} color="ink3" style={{ marginLeft: 'auto' }}>{hint}</Mono>}
+      {!found && !detectError && (
+        <Mono size={10} color="ink3" style={{ marginLeft: 'auto' }}>{hint}</Mono>
+      )}
     </div>
   );
 }

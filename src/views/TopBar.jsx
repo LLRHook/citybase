@@ -82,14 +82,14 @@ export function TopBar({
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <Mono size={9} color="ink3">AGENTS</Mono>
-        <AgentDot label="claude" found={!!claude?.found} />
-        <AgentDot label="codex" found={!!codex?.found} />
+        <AgentDot label="claude" found={!!claude?.found} detectFailed={agentDetect?.status === 'error'} />
+        <AgentDot label="codex" found={!!codex?.found} detectFailed={agentDetect?.status === 'error'} />
       </div>
     </div>
   );
 }
 
-function AgentDot({ label, found }) {
+function AgentDot({ label, found, detectFailed }) {
   const color = found ? NEON.green : NEON.red;
   return (
     <span
@@ -110,7 +110,7 @@ function AgentDot({ label, found }) {
       />
       {label}
       <span style={{ color: NEON.ink3, marginLeft: 2 }}>
-        {found ? 'installed' : 'not installed'}
+        {found ? 'installed' : detectFailed ? 'detect failed' : 'not installed'}
       </span>
     </span>
   );
