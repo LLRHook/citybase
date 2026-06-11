@@ -49,7 +49,7 @@ _Filed 2026-06-11 from [docs/srs-and-plan-of-action.md](./docs/srs-and-plan-of-a
 ids (WS) reference that document._
 
 ### [BUG-001] Preload bridge dead under `sandbox: true` — desktop degrades to browser stub
-- [ ] **Severity:** high
+- [x] **Severity:** high
 - **Area:** ipc, electron
 - **File(s):** electron/preload/preload.cjs, electron/main/agents/constants.cjs
 - **Observation:** `preload.cjs:5` requires `../main/agents/constants.cjs`; sandboxed
@@ -63,10 +63,16 @@ ids (WS) reference that document._
   requires) + a unit test asserting it equals the `constants.cjs` export. FEAT-001's
   smoke test (`app.getVersion()` resolves) is the permanent guard. Land bundled with
   BUG-002 + FEAT-001.
-- **Status:** open
+- **Fix:** fixed upstream in the v1 wave (`preload.cjs` inlines the channel
+  literals; drift guarded by `src/tests/preload.contract.test.js`). An equivalent
+  local fix was superseded and dropped at merge time. Verified live by the
+  FEAT-001 smoke test: the pre-wave baseline launch had `window.citybase` absent;
+  current `main` launches with a live bridge (`app.getVersion()` resolves over
+  real IPC).
+- **Status:** fixed-pending-migration
 
 ### [BUG-002] Agent detection always reports "not installed"; `auto` provider always throws
-- [ ] **Severity:** high
+- [x] **Severity:** high
 - **Area:** agents
 - **File(s):** electron/main/agents/detect.cjs, electron/main/ipcHandlers.cjs, electron/main/ipc.cjs, src/App.jsx
 - **Observation:** `detect.cjs:67` defaults `fsExists` to `() => false` and both
@@ -79,7 +85,14 @@ ids (WS) reference that document._
 - **Repro / Notes:** call `detectAgentBinaries()` with zero args → both not found
   regardless of PATH. Fix per WS0.2: default `fsExists` to a real `fs.existsSync`
   wrapper; add a glue-level zero-arg test; render the detect-error state distinctly.
-- **Status:** open
+- **Fix:** the fs default fixed upstream in the v1 wave (`detect.cjs`
+  `defaultFsExists` + real-filesystem glue tests + Windows codex-shim
+  preference); verified at merge time — a zero-arg `detectAgentBinaries()` finds
+  both real CLIs on this machine. The R17 remainder landed here: EmptyHome rows
+  and TopBar chips render `detect failed: <message>` distinctly from
+  "not installed" (suppressing the misleading install hint), with view tests in
+  `src/tests/AgentDetectError.test.jsx`.
+- **Status:** fixed-pending-migration
 
 ### [BUG-003] Agent runs block until exit, fabricate events, cancel unreachable, killed at 15 s
 - [ ] **Severity:** high
@@ -347,6 +360,31 @@ ids (WS) reference that document._
 - **Expected:** latent traps closed before the phases that trigger them land.
 - **Repro / Notes:** see SRS §6.2 for line refs. Batch ticket by design — slice freely
   when picked up; none blocks the v1 ship gate.
+- **Status:** open
+
+### [BUG-019] Docs and backlog drift after the upstream v1 wave
+- [ ] **Severity:** med
+- **Area:** docs
+- **File(s):** AGENTS.md, README.md, VERIFICATION.md, docs/srs-and-plan-of-action.md, bugs.md, features.md
+- **Observation:** eleven upstream commits (`62f67b0..4f7f45e`, the "v1 wave")
+  landed between the SRS baseline (`1356437`) and this merge, shipping large parts
+  of the SRS plan independently: real `claude` CLI flags + real-output
+  `streamEvents` (8c6043e ≈ parts of BUG-003/FEAT-005), Windows shim wrap
+  (4f7f45e ≈ BUG-006), a preload contract test (≈ FEAT-010), run history panel
+  (02aad50 ≈ parts of FEAT-008), README safety model + troubleshooting
+  (a6a31bd = FEAT-002), boot-payload detection (b461642), browser-path removal
+  (035490d), Electron 42 (344f4aa). Residual drift: AGENTS.md "Running the app"
+  still quotes the deleted `npm run dev` script; README/AGENTS reference the
+  deleted `src/game/data.js` shim; VERIFICATION.md Stage 2 baseline counts
+  (26 files / 313 cases) and several SRS findings predate the wave; README notes
+  Claude runs still use `--permission-mode bypassPermissions` (BUG-004's approval
+  boundary remains open).
+- **Expected:** docs describe reality; every open ticket's premise re-checked
+  against current `main`.
+- **Repro / Notes:** run `/protocol-v-and-v` (its freshness audit reconciles
+  counts and commands), then re-groom the open backlog against current `main` —
+  at minimum re-verify BUG-003/004/005/006 and FEAT-005/008/010 before
+  implementing them as filed.
 - **Status:** open
 
 ---
