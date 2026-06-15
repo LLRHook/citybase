@@ -6,7 +6,7 @@
 
 Citybase is a local-first desktop app: open one Git repository from disk, **see it as a living isometric city**, dispatch a Claude Code run from the UI, and watch the agent work the city in real time — then review the result without staring at raw diffs.
 
-**v2.0 — "The Living City."** The signature view renders your repo as an isometric city: top-level folders are districts on raised slabs, files are extruded buildings (signature files stand taller), and Git status lights the skyline — staged changes glow green, unstaged amber. Dispatch an agent and the buildings it edits light up live as the working tree changes, with an "agent at work" banner tracking the run. A City / Work toggle in the top bar switches between the map and the run/commit workflow.
+**v3.0 — "Real-Time City."** Dispatch is **non-blocking and streaming**: the UI never freezes, the run shows as `running` the instant it starts, and **cancel actually terminates the agent**. While it works, a live **agent presence** scans the city and the buildings it touches light up, resolving with a completion ripple. Run history is **persisted across restarts**. Built on v2.0's foundation — the isometric city where top-level folders are districts on raised slabs, files are extruded buildings, and Git status lights the skyline (staged green, unstaged amber), with a City / Work toggle.
 
 Claude Code runs inside the IDE end-to-end; Codex CLI is wired through the same provider contract as a fallback adapter.
 

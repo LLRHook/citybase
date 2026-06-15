@@ -4,14 +4,20 @@ Citybase is a downloadable desktop code editor shell with a game-like visual int
 
 The product is not a cloud SaaS agent platform and not a replacement for Codex or Claude Code. It is a local-first UI layer over a single Git workspace and a pluggable AI agent harness. The user should be able to open the app, pick one software project, connect Git, choose an agent provider, and drive work through a visual city instead of staring at code by default.
 
-## Status — v2.0 "The Living City" (current)
+## Status — v3.0 "Real-Time City" (current)
 
-The visual city — the founding promise — is shipped as the default view, projected
-from real Git state and fused with live agent runs (buildings light up as the agent
-edits). This is the v2.0 milestone. See [CHANGELOG.md](./CHANGELOG.md) (FEAT-013 →
-FEAT-018) and [features.md](./features.md) for the work; the open backlog
-(approval-boundary wiring BUG-004, design-system depth, run persistence) continues
-from here.
+v2.0 made the repo a living isometric city; v3.0 makes the workbench **real-time
+and durable**. Agent dispatch is non-blocking and streaming (the UI never freezes;
+runs show `running` immediately; cancel terminates the process for real), the city
+animates live as the agent works (agent presence + completion ripple), and run
+history is **persisted across restarts**. See [CHANGELOG.md](./CHANGELOG.md)
+(FEAT-004 / FEAT-008 / FEAT-019) and [features.md](./features.md). Optional v3.x
+deepening: live token-by-token events via claude `--output-format stream-json`
+(FEAT-005) and an incrementally-streaming run detail (FEAT-020).
+
+v2.0 shipped the visual city — the founding promise — as the default view,
+projected from real Git state and fused with live agent runs, plus the
+approval-boundary safety gate (BUG-004).
 
 ## Product Boundary
 

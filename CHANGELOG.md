@@ -12,6 +12,38 @@ sections under each release/date heading.
 
 ## Unreleased
 
+## 3.0.0 — "Real-Time City"
+
+The workbench goes real-time and durable. Agent dispatch is non-blocking and
+streaming, the city animates live as the agent works, runs can be cancelled for
+real, and run history survives restarts.
+
+### Added
+
+- FEAT-004 Streaming process runner (`processService.spawnStream`): non-blocking,
+  line-streamed, killable child processes (Windows `taskkill /t`, POSIX
+  SIGTERM→SIGKILL), alongside the buffered `run` git/checks keep using.
+- FEAT-008 Run history persisted across restarts (`runStore`, atomic writes); the
+  manager seeds from disk on boot and replays historical runs' recorded events.
+- FEAT-019 Live agent presence in the city: a scanning marker over the area being
+  worked while a run is active, plus a completion ripple — respecting
+  `prefers-reduced-motion`.
+
+### Changed
+
+- Agent dispatch is now **non-blocking and streaming**: `startRun` returns a
+  `running` run immediately, status flips live (`running → done/failed/cancelled`)
+  through the shared run reference, and the city animates throughout. Version
+  bumped to 3.0.0.
+
+### Fixed
+
+- BUG-003 (partial) Agent runs no longer block the UI until exit, are no longer
+  SIGTERM'd at the 15s git timeout (10-min configurable cap via `spawnStream`),
+  and `cancel` is reachable mid-run and actually terminates the child process.
+
+## 2.0.0 — "The Living City"
+
 ### Verified
 
 - 2026-06-15 V&V pass (SHA `0fb551d`): Stages 0–5 green. 361 Vitest cases across

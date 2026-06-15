@@ -61,7 +61,7 @@ Priority guide: crit / high / med / low.
 - **Status:** open
 
 ### [FEAT-004] Streaming process runner
-- [ ] **Priority:** high
+- [x] **Priority:** high
 - **Status note:** in-progress (v3.0) — `processService.spawnStream`.
 - **Area:** electron
 - **File(s):** electron/main/services/processService.cjs, src/tests/processService.test.js (new)
@@ -83,7 +83,8 @@ Priority guide: crit / high / med / low.
   timeout, output truncation; full existing suite stays green.
 - **Out of scope:** adapter adoption (BUG-003), Windows `.cmd` strategy (BUG-006),
   real CLI argv (FEAT-005).
-- **Status:** open
+- **Implementation:** `processService.spawnStream` (non-blocking, line-streamed, killable) adopted by the adapters for non-blocking dispatch + real cancel; tested + harness-verified (running→done).
+- **Status:** shipped-pending-migration
 
 ### [FEAT-005] Real CLI integration: correct `claude` / `codex` argv + event normalization
 - [ ] **Priority:** high
@@ -153,7 +154,7 @@ Priority guide: crit / high / med / low.
 - **Status:** open
 
 ### [FEAT-008] Persist run history beside workspaces.json
-- [ ] **Priority:** med
+- [x] **Priority:** med
 - **Area:** agents, electron
 - **File(s):** electron/main/agents/agentManager.cjs, electron/main/services/ (new run store), src/tests/
 - **Why:** ROADMAP Phase 3 work item "Store runs locally with timestamps, provider,
@@ -170,7 +171,8 @@ Priority guide: crit / high / med / low.
 - **Test plan:** unit tests for the store with injected fs; agentManager integration
   test.
 - **Out of scope:** run-review UI changes.
-- **Status:** open
+- **Implementation:** `runStore` (atomic writes, terminal-only, capped) + manager seed/persist + graceful historical handling + ipc wiring; verified a real run persists to runs.json and seeds on next launch.
+- **Status:** shipped-pending-migration
 
 ### [FEAT-009] `useWorkspace` test suite
 - [ ] **Priority:** med
@@ -280,7 +282,7 @@ backlog: **FEAT-004** (streaming runner), **FEAT-005** (real streaming events in
 codex), **FEAT-008** (run persistence). New visual + release tickets below.
 
 ### [FEAT-019] Live real-time city animation
-- [ ] **Priority:** high
+- [x] **Priority:** high
 - **Area:** renderer
 - **File(s):** src/views/CityView.jsx, src/app/runCity.js
 - **Why:** with streaming (FEAT-004) the city can react to each touched file the
@@ -295,7 +297,8 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
 - **Test plan:** unit-test the event→touched-paths mapping; component test that
   live touched paths apply the active class.
 - **Out of scope:** the streaming runner itself (FEAT-004).
-- **Status:** open
+- **Implementation:** Live agent presence (scanning marker over the worked area) + completion ripple in CityView, reduced-motion respected; captured live during a real run.
+- **Status:** shipped-pending-migration
 
 ### [FEAT-020] Streaming run detail
 - [ ] **Priority:** high
@@ -312,7 +315,7 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
 - **Status:** open
 
 ### [FEAT-021] Version 3.0 cut + docs
-- [ ] **Priority:** med
+- [x] **Priority:** med
 - **Area:** docs, build
 - **File(s):** package.json, src/views/TopBar.jsx, README.md, ROADMAP.md, CHANGELOG.md, VERIFICATION.md
 - **Why:** the version bump and docs that describe the real-time workbench are part
@@ -323,7 +326,8 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
   shipped app.
 - **Test plan:** version assertion; doc-drift check.
 - **Out of scope:** production packaging (FEAT-003).
-- **Status:** open
+- **Implementation:** package.json 3.0.0, TopBar v3.0 label, CHANGELOG 3.0.0 section, README/ROADMAP real-time framing.
+- **Status:** shipped-pending-migration
 
 ---
 
