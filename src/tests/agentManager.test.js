@@ -455,3 +455,48 @@ describe('createAgentManager — pre-flight approval gate (BUG-004)', () => {
     expect(emitEvent).not.toHaveBeenCalled();
   });
 });
+
+describe('createAgentManager — run persistence (FEAT-008)', () => {
+  const seed = [{
+    runId: 'old-1', questId: 'q', adventurerId: 'a', status: 'done',
+    provider: 'claude', branch: 'main', startedAt: 1,
+    events: [{ runId: 'old-1', t: '00:00', kind: 'edit', text: 'claude: prior run' }],
+  }];
+
+  it('seeds history from initialRuns so past runs show in listRuns', () => {
+    const mgr = createAgentManager({ adapters: { fake: makeAdapter() }, initialRuns: seed });
+    const out = mgr.listRuns();
+    expect(out.map((r) => r.runId)).toContain('old-1');
+    expect(out.find((r) => r.runId === 'old-1')).toMatchObject({ status: 'done', provider: 'claude' });
+  });
+
+  it('replays a historical run\'s events and serves empty diff/checks (no live adapter)', async () => {
+    const mgr = createAgentManager({ adapters: { fake: makeAdapter() }, initialRuns: seed });
+    const events = await mgr.getEvents('old-1');
+    expect(events).toEqual(seed[0].events);
+    expect(await mgr.produceDiff('old-1')).toEqual({ files: [] });
+    expect(await mgr.runChecks('old-1')).toEqual([]);
+  });
+
+  it('still throws for a truly unknown runId', async () => {
+    const mgr = createAgentManager({ adapters: { fake: makeAdapter() }, initialRuns: seed });
+    await expect(mgr.getEvents('ghost')).rejects.toThrow(/unknown runId/);
+    expect(() => mgr.streamEvents('ghost')).toThrow(/unknown runId/);
+  });
+
+  it('persists run history after a run settles', async () => {
+    const persist = vi.fn();
+    const adapter = makeAdapter({
+      startTask: vi.fn(async (p) => ({ runId: p.runId || 'gen', questId: p.questId, adventurerId: p.adventurerId, status: 'done', contextUsed: 0, maxContext: 1 })),
+      streamEvents: vi.fn(() => (async function* () { yield { runId: 'x', t: '00:00', kind: 'edit', text: 'done' }; })()),
+    });
+    const mgr = createAgentManager({ adapters: { fake: adapter }, persist });
+    await mgr.startRun({ ...startParams });
+    // captureWhenDone fires getEvents then persist on the microtask queue.
+    await new Promise((r) => setImmediate(r));
+    expect(persist).toHaveBeenCalled();
+    const lastArg = persist.mock.calls.at(-1)[0];
+    expect(Array.isArray(lastArg)).toBe(true);
+    expect(lastArg[0]).toHaveProperty('events');
+  });
+});
