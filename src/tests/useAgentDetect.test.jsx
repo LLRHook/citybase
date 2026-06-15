@@ -71,19 +71,39 @@ describe('useAgentDetect', () => {
     expect(screen.getByTestId('codex').textContent).toBe('false');
   });
 
-  it('starts in ready when an initial detect result is supplied (auto-boot)', () => {
-    const api = makeApi(vi.fn());
+  it('paints instantly from the initial seed, then confirms in the background', async () => {
+    // Boot seed says both installed; the live probe later corrects codex away.
+    const api = makeApi(vi.fn(async () => ({
+      codex: { found: false },
+      claude: { found: true, path: '/live/claude' },
+    })));
     render(<Probe api={api} initial={{
       codex: { found: true, path: '/from/boot/codex' },
       claude: { found: true, path: '/from/boot/claude' },
     }} />);
-    // Synchronously ready — no awaiting waitFor.
+    // Instant first paint from the seed — no awaiting.
     expect(screen.getByTestId('status').textContent).toBe('ready');
     expect(screen.getByTestId('codex').textContent).toBe('true');
-    expect(screen.getByTestId('codex-path').textContent).toBe('/from/boot/codex');
+    // Background confirm runs and self-heals the seed (the bug fix).
+    await waitFor(() => {
+      expect(screen.getByTestId('codex').textContent).toBe('false');
+    });
     expect(screen.getByTestId('claude').textContent).toBe('true');
-    // The IPC roundtrip MUST be skipped — that's the whole point.
-    expect(api.agents.detect).not.toHaveBeenCalled();
+    expect(api.agents.detect).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a good seed when the background probe returns null', async () => {
+    const api = makeApi(vi.fn(async () => null));
+    render(<Probe api={api} initial={{
+      codex: { found: true, path: '/boot/codex' },
+      claude: { found: true, path: '/boot/claude' },
+    }} />);
+    expect(screen.getByTestId('status').textContent).toBe('ready');
+    await Promise.resolve();
+    await waitFor(() => expect(api.agents.detect).toHaveBeenCalledTimes(1));
+    // The transient null must not wipe the good seed.
+    expect(screen.getByTestId('codex').textContent).toBe('true');
+    expect(screen.getByTestId('claude').textContent).toBe('true');
   });
 
   it('falls back to the IPC roundtrip when initial is malformed', async () => {

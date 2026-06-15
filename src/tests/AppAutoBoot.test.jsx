@@ -135,23 +135,25 @@ describe('App auto-boot (desktop bridge present)', () => {
     });
   });
 
-  it('skips the agents.detect IPC roundtrip when the boot payload was already cached', async () => {
-    // Simulate the main process having pushed the boot payload before
-    // App mounted. With the cached value, useAgentDetect should start
-    // in 'ready' and never call agents.detect.
+  it('paints from a cached boot payload, then confirms via agents.detect', async () => {
+    // The main process pushed the boot payload before App mounted. The seed
+    // gives an instant first paint, but the hook now also confirms with a
+    // live probe so a stale/empty boot payload self-heals (BUG-024).
     desktopBridge.app.getBoot.mockImplementationOnce(() => ({
       detect: { codex: { found: true, path: '/x' }, claude: { found: true, path: '/c' } },
       workspace: null,
       timestamp: 0,
     }));
     render(<App />);
-    // The status rows render directly from useAgentDetect's initial state.
+    // Background confirm now runs (it was skipped before the fix).
+    await waitFor(() => {
+      expect(desktopBridge.agents.detect).toHaveBeenCalled();
+    });
+    // After the confirm resolves, the live result drives the status rows.
     await waitFor(() => {
       const rows = screen.getAllByRole('status');
-      // both codex and claude found -> two 'ok' rows
-      expect(rows.filter(r => r.getAttribute('data-state') === 'ok').length).toBeGreaterThanOrEqual(2);
+      expect(rows.some(r => r.getAttribute('data-state') === 'ok')).toBe(true);
     });
-    expect(desktopBridge.agents.detect).not.toHaveBeenCalled();
   });
 
   it('falls back to agents.detect when onBoot fires AFTER mount with detect data', async () => {
