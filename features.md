@@ -60,32 +60,6 @@ Priority guide: crit / high / med / low.
 - **Out of scope (now):** everything — this is a tracked deferral, not ready work.
 - **Status:** open
 
-### [FEAT-004] Streaming process runner
-- [x] **Priority:** high
-- **Status note:** in-progress (v3.0) — `processService.spawnStream`.
-- **Area:** electron
-- **File(s):** electron/main/services/processService.cjs, src/tests/processService.test.js (new)
-- **Why:** buffered `execFile` with 15 s / 4 MB defaults structurally cannot host agent
-  sessions (SRS M4); cancel needs a live handle (M7); orphaned `npm` grandchildren and
-  silent truncation (M15). Unlocks the whole agent-harness arc (SRS WS0.3 — rated L,
-  split from adapter adoption which is BUG-003).
-- **Approach:** spawn-based API returning a handle (`{pid, onStdout, kill, done}`) with
-  line-buffered NDJSON parsing, configurable/disabled timeout, SIGTERM→SIGKILL
-  escalation, and process-group kill for `npm`. Existing `processService.run` callers
-  (git, checks) keep working — either unchanged or reimplemented atop the new core.
-- **Library / dependency notes:** Node built-in `child_process.spawn`; no new deps.
-- **Acceptance criteria:**
-  - A long-running fake CLI is killable within seconds, including its process tree.
-  - NDJSON lines surface incrementally via the handle, not after exit.
-  - Timeout is configurable per call and can be disabled for agent runs.
-  - All existing git/checks call sites stay green.
-- **Test plan:** direct unit tests with fake scripts: streaming, kill escalation,
-  timeout, output truncation; full existing suite stays green.
-- **Out of scope:** adapter adoption (BUG-003), Windows `.cmd` strategy (BUG-006),
-  real CLI argv (FEAT-005).
-- **Implementation:** `processService.spawnStream` (non-blocking, line-streamed, killable) adopted by the adapters for non-blocking dispatch + real cancel; tested + harness-verified (running→done).
-- **Status:** shipped-pending-migration
-
 ### [FEAT-005] Real CLI integration: correct `claude` / `codex` argv + event normalization
 - [ ] **Priority:** high
 - **Area:** agents
@@ -152,27 +126,6 @@ Priority guide: crit / high / med / low.
 - **Test plan:** CI run; `package:dir` + smoke launch.
 - **Out of scope:** dependency version upgrades beyond the Node baseline.
 - **Status:** open
-
-### [FEAT-008] Persist run history beside workspaces.json
-- [x] **Priority:** med
-- **Area:** agents, electron
-- **File(s):** electron/main/agents/agentManager.cjs, electron/main/services/ (new run store), src/tests/
-- **Why:** ROADMAP Phase 3 work item "Store runs locally with timestamps, provider,
-  prompt, and final result" — today runs are in-memory only and lost on restart (SRS
-  FR-A2, WS2.6). Doubles as the eviction store BUG-014 needs.
-- **Approach:** persist runs in Electron `userData` next to `workspaces.json`,
-  injected-fs pattern like `workspaceService`; load history on boot. Open question Q2:
-  per-workspace `runs.json` keyed by workspace id (SRS assumption) or global — confirm
-  at plan time.
-- **Library / dependency notes:** none (JSON file).
-- **Acceptance criteria:**
-  - A completed run survives app restart and is listed in history.
-  - Registry eviction (BUG-014) wired to the store.
-- **Test plan:** unit tests for the store with injected fs; agentManager integration
-  test.
-- **Out of scope:** run-review UI changes.
-- **Implementation:** `runStore` (atomic writes, terminal-only, capped) + manager seed/persist + graceful historical handling + ipc wiring; verified a real run persists to runs.json and seeds on next launch.
-- **Status:** shipped-pending-migration
 
 ### [FEAT-009] `useWorkspace` test suite
 - [ ] **Priority:** med
@@ -281,25 +234,6 @@ agent works, real cancel, and persistent runs. Functional core is the existing
 backlog: **FEAT-004** (streaming runner), **FEAT-005** (real streaming events incl.
 codex), **FEAT-008** (run persistence). New visual + release tickets below.
 
-### [FEAT-019] Live real-time city animation
-- [x] **Priority:** high
-- **Area:** renderer
-- **File(s):** src/views/CityView.jsx, src/app/runCity.js
-- **Why:** with streaming (FEAT-004) the city can react to each touched file the
-  instant it changes, not on a 2.5s poll. A visible live agent presence is the v3
-  "wow".
-- **Approach:** derive touched paths from the live event stream as they arrive;
-  pulse/illuminate those buildings immediately; show a glowing "agent at work"
-  presence and a completion ripple; smooth camera ease (optional focus on the
-  active district). Respect `prefers-reduced-motion`.
-- **Acceptance criteria:** during a streamed run, buildings light within ~1s of
-  the edit; completion visibly resolves; no-op cleanly when idle/reduced-motion.
-- **Test plan:** unit-test the event→touched-paths mapping; component test that
-  live touched paths apply the active class.
-- **Out of scope:** the streaming runner itself (FEAT-004).
-- **Implementation:** Live agent presence (scanning marker over the worked area) + completion ripple in CityView, reduced-motion respected; captured live during a real run.
-- **Status:** shipped-pending-migration
-
 ### [FEAT-020] Streaming run detail
 - [ ] **Priority:** high
 - **Area:** renderer
@@ -313,21 +247,6 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
 - **Test plan:** component test with an incremental event stream.
 - **Out of scope:** changing the event protocol.
 - **Status:** open
-
-### [FEAT-021] Version 3.0 cut + docs
-- [x] **Priority:** med
-- **Area:** docs, build
-- **File(s):** package.json, src/views/TopBar.jsx, README.md, ROADMAP.md, CHANGELOG.md, VERIFICATION.md
-- **Why:** the version bump and docs that describe the real-time workbench are part
-  of shipping v3.
-- **Approach:** bump to 3.0.0 + TopBar label; README/ROADMAP describe streaming +
-  persistence; CHANGELOG 3.0.0 section; VERIFICATION baseline refreshed via V&V.
-- **Acceptance criteria:** version consistent across manifest + UI; docs match the
-  shipped app.
-- **Test plan:** version assertion; doc-drift check.
-- **Out of scope:** production packaging (FEAT-003).
-- **Implementation:** package.json 3.0.0, TopBar v3.0 label, CHANGELOG 3.0.0 section, README/ROADMAP real-time framing.
-- **Status:** shipped-pending-migration
 
 ---
 
@@ -502,4 +421,85 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
 - **Test plan:** version assertion; doc-drift check (VERIFICATION Stage 1).
 - **Out of scope:** production packaging (FEAT-003).
 - **Implementation:** package.json 2.0.0, TopBar v2.0 label, CHANGELOG/README/ROADMAP.
+- **Status:** shipped-pending-migration
+
+### [FEAT-004] Streaming process runner
+- [x] **Priority:** high
+- **Status note:** in-progress (v3.0) — `processService.spawnStream`.
+- **Area:** electron
+- **File(s):** electron/main/services/processService.cjs, src/tests/processService.test.js (new)
+- **Why:** buffered `execFile` with 15 s / 4 MB defaults structurally cannot host agent
+  sessions (SRS M4); cancel needs a live handle (M7); orphaned `npm` grandchildren and
+  silent truncation (M15). Unlocks the whole agent-harness arc (SRS WS0.3 — rated L,
+  split from adapter adoption which is BUG-003).
+- **Approach:** spawn-based API returning a handle (`{pid, onStdout, kill, done}`) with
+  line-buffered NDJSON parsing, configurable/disabled timeout, SIGTERM→SIGKILL
+  escalation, and process-group kill for `npm`. Existing `processService.run` callers
+  (git, checks) keep working — either unchanged or reimplemented atop the new core.
+- **Library / dependency notes:** Node built-in `child_process.spawn`; no new deps.
+- **Acceptance criteria:**
+  - A long-running fake CLI is killable within seconds, including its process tree.
+  - NDJSON lines surface incrementally via the handle, not after exit.
+  - Timeout is configurable per call and can be disabled for agent runs.
+  - All existing git/checks call sites stay green.
+- **Test plan:** direct unit tests with fake scripts: streaming, kill escalation,
+  timeout, output truncation; full existing suite stays green.
+- **Out of scope:** adapter adoption (BUG-003), Windows `.cmd` strategy (BUG-006),
+  real CLI argv (FEAT-005).
+- **Implementation:** `processService.spawnStream` (non-blocking, line-streamed, killable) adopted by the adapters for non-blocking dispatch + real cancel; tested + harness-verified (running→done).
+- **Status:** shipped-pending-migration
+
+### [FEAT-008] Persist run history beside workspaces.json
+- [x] **Priority:** med
+- **Area:** agents, electron
+- **File(s):** electron/main/agents/agentManager.cjs, electron/main/services/ (new run store), src/tests/
+- **Why:** ROADMAP Phase 3 work item "Store runs locally with timestamps, provider,
+  prompt, and final result" — today runs are in-memory only and lost on restart (SRS
+  FR-A2, WS2.6). Doubles as the eviction store BUG-014 needs.
+- **Approach:** persist runs in Electron `userData` next to `workspaces.json`,
+  injected-fs pattern like `workspaceService`; load history on boot. Open question Q2:
+  per-workspace `runs.json` keyed by workspace id (SRS assumption) or global — confirm
+  at plan time.
+- **Library / dependency notes:** none (JSON file).
+- **Acceptance criteria:**
+  - A completed run survives app restart and is listed in history.
+  - Registry eviction (BUG-014) wired to the store.
+- **Test plan:** unit tests for the store with injected fs; agentManager integration
+  test.
+- **Out of scope:** run-review UI changes.
+- **Implementation:** `runStore` (atomic writes, terminal-only, capped) + manager seed/persist + graceful historical handling + ipc wiring; verified a real run persists to runs.json and seeds on next launch.
+- **Status:** shipped-pending-migration
+
+### [FEAT-019] Live real-time city animation
+- [x] **Priority:** high
+- **Area:** renderer
+- **File(s):** src/views/CityView.jsx, src/app/runCity.js
+- **Why:** with streaming (FEAT-004) the city can react to each touched file the
+  instant it changes, not on a 2.5s poll. A visible live agent presence is the v3
+  "wow".
+- **Approach:** derive touched paths from the live event stream as they arrive;
+  pulse/illuminate those buildings immediately; show a glowing "agent at work"
+  presence and a completion ripple; smooth camera ease (optional focus on the
+  active district). Respect `prefers-reduced-motion`.
+- **Acceptance criteria:** during a streamed run, buildings light within ~1s of
+  the edit; completion visibly resolves; no-op cleanly when idle/reduced-motion.
+- **Test plan:** unit-test the event→touched-paths mapping; component test that
+  live touched paths apply the active class.
+- **Out of scope:** the streaming runner itself (FEAT-004).
+- **Implementation:** Live agent presence (scanning marker over the worked area) + completion ripple in CityView, reduced-motion respected; captured live during a real run.
+- **Status:** shipped-pending-migration
+
+### [FEAT-021] Version 3.0 cut + docs
+- [x] **Priority:** med
+- **Area:** docs, build
+- **File(s):** package.json, src/views/TopBar.jsx, README.md, ROADMAP.md, CHANGELOG.md, VERIFICATION.md
+- **Why:** the version bump and docs that describe the real-time workbench are part
+  of shipping v3.
+- **Approach:** bump to 3.0.0 + TopBar label; README/ROADMAP describe streaming +
+  persistence; CHANGELOG 3.0.0 section; VERIFICATION baseline refreshed via V&V.
+- **Acceptance criteria:** version consistent across manifest + UI; docs match the
+  shipped app.
+- **Test plan:** version assertion; doc-drift check.
+- **Out of scope:** production packaging (FEAT-003).
+- **Implementation:** package.json 3.0.0, TopBar v3.0 label, CHANGELOG 3.0.0 section, README/ROADMAP real-time framing.
 - **Status:** shipped-pending-migration

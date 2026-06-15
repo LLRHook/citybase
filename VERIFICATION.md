@@ -147,33 +147,34 @@ A failure in this stage is a hard block.
   ```bash
   npm test -- --run
   ```
-  Expected: `Test Files  29 passed (29)`, `Tests  361 passed (361)`, exit 0.
+  Expected: `Test Files  30 passed (30)`, `Tests  380 passed (380)`, exit 0.
 - [ ] 2.3 Test-count baseline matches the collector:
   ```bash
-  npx vitest list | wc -l   # expect: 361
+  npx vitest list | wc -l   # expect: 380
   ```
   A mismatch with the table below means tests appeared or disappeared without
   a deliberate decision — investigate before ticking, then update the table
   in the same change as the run.
 
-**Baseline (2026-06-15, SHA `0fb551d`): 29 test files / 361 test cases — all Vitest (jsdom). The desktop launch path is covered by the Playwright smoke (2.4); the real-`claude` agent path by the integration harnesses (Appendix F).**
+**Baseline (2026-06-15, SHA `0e20a02`, v3.0.0): 30 test files / 380 test cases — all Vitest (jsdom). The desktop launch path is covered by the Playwright smoke (2.4); the real-`claude` agent path (incl. non-blocking streaming dispatch + persistence) by the integration harnesses (Appendix F).**
 
 | Test file | Cases | | Test file | Cases |
 |---|---|---|---|---|
 | `AgentDetectError.test.jsx` | 5 | | `iso.test.js` | 8 |
 | `agentAdapter.test.js` | 13 | | `menuTemplate.test.js` | 8 |
-| `agentManager.test.js` | 38 | | `parseBranchList.test.js` | 8 |
+| `agentManager.test.js` | 42 | | `parseBranchList.test.js` | 8 |
 | `AppAutoBoot.test.jsx` | 9 | | `parseFiles.test.js` | 12 |
 | `ApprovalModal.test.jsx` | 10 | | `parseUnifiedDiff.test.js` | 10 |
 | `bootPayload.test.js` | 8 | | `preload.contract.test.js` | 3 |
-| `BranchSelector.test.jsx` | 12 | | `processService.test.js` | 7 |
+| `BranchSelector.test.jsx` | 12 | | `processService.test.js` | 13 |
 | `ClaudeAdapter.test.js` | 28 | | `resolveProvider.test.js` | 7 |
 | `CliAgentAdapter.test.js` | 19 | | `runCity.test.js` | 10 |
-| `cityModel.test.js` | 9 | | `useAgentDetect.test.jsx` | 8 |
-| `CityView.test.jsx` | 6 | | `useRunHistory.test.jsx` | 6 |
-| `citybaseApi.test.js` | 2 | | `windowConfig.test.js` | 10 |
-| `CodexAdapter.test.js` | 25 | | `workspaceChecks.test.js` | 13 |
-| `detectAgentBinaries.test.js` | 19 | | `gitMutations.test.js` | 14 |
+| `cityModel.test.js` | 9 | | `runStore.test.js` | 7 |
+| `CityView.test.jsx` | 8 | | `useAgentDetect.test.jsx` | 8 |
+| `citybaseApi.test.js` | 2 | | `useRunHistory.test.jsx` | 6 |
+| `CodexAdapter.test.js` | 25 | | `windowConfig.test.js` | 10 |
+| `detectAgentBinaries.test.js` | 19 | | `workspaceChecks.test.js` | 13 |
+| `gitMutations.test.js` | 14 | | | |
 | `ipcHandlers.test.js` | 34 | | | |
 
 - [ ] 2.4 Desktop E2E smoke (Playwright `_electron`, FEAT-001) — requires a
@@ -363,6 +364,12 @@ cat "$HOME/Library/Application Support/Citybase/workspaces.json"   # macOS
 
 Shape: `{ "currentId": "<sha1-16>", "workspaces": [{ id, name, rootPath,
 openedAt, lastOpenedAt }] }` — max 12 recents, most recent first.
+
+Run history persists alongside it in `runs.json` (same `userData` dir, FEAT-008):
+an array of terminal run records `{ runId, questId, adventurerId, status,
+provider, branch, startedAt, events[] }` (max 100, events capped). Written
+atomically (temp + rename); seeded into `agentManager` on boot so the Run
+History panel survives restarts. Delete it to clear history.
 
 ## Appendix B — Reusable command recipes
 
