@@ -101,7 +101,7 @@ function dirtyColor(b) {
   return b.staged ? NEON.green : NEON.amber;
 }
 
-export function CityView({ snapshot, activePaths }) {
+export function CityView({ snapshot, activePaths, activeRun, phase, onOpenRun }) {
   const repoTree = snapshot?.repoTree;
   const files = snapshot?.files;
   const model = React.useMemo(
@@ -264,6 +264,23 @@ export function CityView({ snapshot, activePaths }) {
         </g>
       </svg>
 
+      {/* agent-at-work banner (FEAT-016) */}
+      {activeRun && (
+        <button
+          onClick={() => onOpenRun?.(activeRun.runId)}
+          style={runBanner}
+          title="Open run detail"
+        >
+          <span className="city-active" style={{ width: 8, height: 8, borderRadius: '50%', background: NEON.green, boxShadow: `0 0 8px ${NEON.green}`, display: 'inline-block' }} />
+          <span style={{ color: NEON.green, fontWeight: 600 }}>AGENT AT WORK</span>
+          <span style={{ color: NEON.ink2 }}>{activeRun.provider || 'claude'}</span>
+          <span style={{ color: NEON.ink3 }}>· {phase?.label || 'running'}</span>
+          {activePaths && activePaths.length > 0 && (
+            <span style={{ color: NEON.amber }}>· {activePaths.length} building{activePaths.length === 1 ? '' : 's'} lit</span>
+          )}
+        </button>
+      )}
+
       {/* hover tooltip */}
       {hover && (
         <div style={{
@@ -326,6 +343,13 @@ const legend = {
 const fitBtn = {
   background: alpha(NEON.cyan, 0.12), border: `1px solid ${alpha(NEON.cyan, 0.5)}`, color: NEON.cyan,
   borderRadius: 2, padding: '3px 7px', cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 9,
+};
+const runBanner = {
+  position: 'absolute', left: '50%', top: 12, transform: 'translateX(-50%)',
+  display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+  background: alpha(NEON.bg1, 0.92), border: `1px solid ${alpha(NEON.green, 0.5)}`, borderRadius: 4,
+  padding: '6px 12px', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: NEON.ink,
+  boxShadow: `0 0 16px ${alpha(NEON.green, 0.25)}`,
 };
 
 // Injected city-specific motion (migrates to index.css in FEAT-017).

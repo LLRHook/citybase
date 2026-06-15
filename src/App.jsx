@@ -4,6 +4,8 @@ import { useWorkspace } from './app/useWorkspace.js';
 import { useAgentDetect } from './app/useAgentDetect.js';
 import { useApprovalRequests } from './app/useApprovalRequests.js';
 import { useRunHistory } from './app/useRunHistory.js';
+import { useRunEvents } from './app/useRunEvents.js';
+import { runPhase, activePathsForRun, activeRunFrom } from './app/runCity.js';
 import { ApprovalModal, Toasts } from './game/modals.jsx';
 import { TopBar } from './views/TopBar.jsx';
 import { RunHistorySidebar } from './views/RunHistorySidebar.jsx';
@@ -82,6 +84,27 @@ function CitybaseApp() {
     if (!selectedRunId) return null;
     return runHistory.find((r) => r.runId === selectedRunId) || null;
   }, [runHistory, selectedRunId]);
+
+  // ── Living city: the active run drives a live overlay ──
+  const activeRun = React.useMemo(() => activeRunFrom(runHistory), [runHistory]);
+  const activeEvents = useRunEvents(activeRun?.runId);
+  const phase = React.useMemo(() => runPhase(activeRun, activeEvents), [activeRun, activeEvents]);
+  const activePaths = React.useMemo(
+    () => activePathsForRun(activeRun, workspace.snapshot),
+    [activeRun, workspace.snapshot],
+  );
+
+  // While an agent is running it mutates the working tree; poll the snapshot so
+  // the city lights up the buildings being changed in near-real time. A final
+  // refresh fires when the run leaves the running state.
+  const refreshRef = React.useRef(workspace.refresh);
+  React.useEffect(() => { refreshRef.current = workspace.refresh; }, [workspace.refresh]);
+  const activeRunId = activeRun?.runId || null;
+  React.useEffect(() => {
+    if (!activeRunId) return undefined;
+    const id = setInterval(() => { refreshRef.current?.(); }, 2500);
+    return () => { clearInterval(id); refreshRef.current?.(); };
+  }, [activeRunId]);
 
   // ── Action handlers ──
 
@@ -194,7 +217,13 @@ function CitybaseApp() {
         )}
 
         {workspace.workspace && view === 'city' && (
-          <CityView snapshot={workspace.snapshot} />
+          <CityView
+            snapshot={workspace.snapshot}
+            activePaths={activePaths}
+            activeRun={activeRun}
+            phase={phase}
+            onOpenRun={(runId) => { setSelectedRunId(runId); setView('work'); }}
+          />
         )}
 
         {workspace.workspace && view === 'work' && (
