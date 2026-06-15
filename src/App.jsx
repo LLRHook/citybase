@@ -10,6 +10,7 @@ import { RunHistorySidebar } from './views/RunHistorySidebar.jsx';
 import { EmptyHome } from './views/EmptyHome.jsx';
 import { NewRunForm } from './views/NewRunForm.jsx';
 import { RunDetail } from './views/RunDetail.jsx';
+import { CityView } from './views/CityView.jsx';
 import { NEON } from './game/palette.js';
 
 // App — the top-level Electron renderer shell. Three regions:
@@ -65,6 +66,7 @@ function CitybaseApp() {
 
   const [selectedRunId, setSelectedRunId] = React.useState(null);
   const [selectedBranch, setSelectedBranch] = React.useState(null);
+  const [view, setView] = React.useState('city'); // 'city' | 'work'
   const [toasts, setToasts] = React.useState([]);
   const toastIdRef = React.useRef(0);
 
@@ -101,6 +103,7 @@ function CitybaseApp() {
       });
       if (run?.runId) {
         setSelectedRunId(run.runId);
+        setView('work');
         pushToast({ text: `Run dispatched · ${run.runId.slice(0, 8)}`, color: 'green', icon: '★' });
       }
       return run;
@@ -179,40 +182,49 @@ function CitybaseApp() {
         onCheckoutBranch={onCheckoutBranch}
         agentDetect={agentDetect}
         citybaseApi={citybaseApi}
+        view={view}
+        onSetView={setView}
       />
 
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <RunHistorySidebar
-          runs={runHistory}
-          selectedRunId={selectedRunId}
-          onSelectRun={setSelectedRunId}
-        />
-
-        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {!workspace.workspace && (
+        {!workspace.workspace && (
+          <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <EmptyHome onPickWorkspace={workspace.pick} agentDetect={agentDetect} />
-          )}
+          </main>
+        )}
 
-          {workspace.workspace && selectedRun && (
-            <RunDetail
-              run={selectedRun}
-              citybaseApi={citybaseApi}
-              workspaceBranch={workspace.snapshot?.branch}
-              onCancelRun={onCancelRun}
-              onCloseRun={() => setSelectedRunId(null)}
-            />
-          )}
+        {workspace.workspace && view === 'city' && (
+          <CityView snapshot={workspace.snapshot} />
+        )}
 
-          {workspace.workspace && !selectedRun && (
-            <NewRunForm
-              workspace={workspace.workspace}
-              snapshot={workspace.snapshot}
-              onRun={onRun}
-              onCommit={onCommit}
-              defaultProvider={agentDetect?.result?.claude?.found ? 'claude' : 'auto'}
+        {workspace.workspace && view === 'work' && (
+          <>
+            <RunHistorySidebar
+              runs={runHistory}
+              selectedRunId={selectedRunId}
+              onSelectRun={setSelectedRunId}
             />
-          )}
-        </main>
+            <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              {selectedRun ? (
+                <RunDetail
+                  run={selectedRun}
+                  citybaseApi={citybaseApi}
+                  workspaceBranch={workspace.snapshot?.branch}
+                  onCancelRun={onCancelRun}
+                  onCloseRun={() => setSelectedRunId(null)}
+                />
+              ) : (
+                <NewRunForm
+                  workspace={workspace.workspace}
+                  snapshot={workspace.snapshot}
+                  onRun={onRun}
+                  onCommit={onCommit}
+                  defaultProvider={agentDetect?.result?.claude?.found ? 'claude' : 'auto'}
+                />
+              )}
+            </main>
+          </>
+        )}
       </div>
 
       <ApprovalModal

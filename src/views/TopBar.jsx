@@ -1,9 +1,9 @@
-import { NEON } from '../game/palette.js';
+import { NEON, alpha } from '../game/palette.js';
 import { Pill, Mono, NButton, Title } from '../game/theme.jsx';
 import { BranchSelector } from '../game/branchSelector.jsx';
 
-// TopBar — workspace name pill, branch selector, open/refresh, agent
-// install indicators. Always visible. The workspace pill is the only
+// TopBar — workspace name pill, branch selector, City/Work nav, open/refresh,
+// agent install indicators. Always visible. The workspace pill is the only
 // "ambient state" surface; everything else is action-or-status.
 export function TopBar({
   workspace,
@@ -16,6 +16,8 @@ export function TopBar({
   onCheckoutBranch,
   agentDetect,
   citybaseApi,
+  view,
+  onSetView,
 }) {
   const wsLinked = !!workspace;
   const wsName = wsLinked ? `WORKSPACE · ${workspace.name}` : 'NO WORKSPACE · open one';
@@ -63,6 +65,14 @@ export function TopBar({
         />
       )}
 
+      {wsLinked && onSetView && (
+        <SegNav
+          value={view}
+          onChange={onSetView}
+          items={[{ id: 'city', label: '◍ CITY' }, { id: 'work', label: '⚙ WORK' }]}
+        />
+      )}
+
       <div style={{ display: 'flex', gap: 6 }}>
         <NButton
           accent={wsLinked ? 'cyan' : 'amber'}
@@ -85,6 +95,33 @@ export function TopBar({
         <AgentDot label="claude" found={!!claude?.found} detectFailed={agentDetect?.status === 'error'} />
         <AgentDot label="codex" found={!!codex?.found} detectFailed={agentDetect?.status === 'error'} />
       </div>
+    </div>
+  );
+}
+
+// Segmented City/Work toggle. Mono, neon-underlined active segment.
+function SegNav({ value, onChange, items }) {
+  return (
+    <div style={{ display: 'inline-flex', border: `1px solid ${NEON.line}`, borderRadius: 3, overflow: 'hidden' }}>
+      {items.map((it) => {
+        const on = value === it.id;
+        return (
+          <button
+            key={it.id}
+            onClick={() => onChange(it.id)}
+            style={{
+              fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1,
+              padding: '5px 10px', cursor: 'pointer', border: 'none',
+              color: on ? NEON.cyan : NEON.ink3,
+              background: on ? alpha(NEON.cyan, 0.14) : 'transparent',
+              boxShadow: on ? `inset 0 -2px 0 ${NEON.cyan}` : 'none',
+              transition: 'all .12s',
+            }}
+          >
+            {it.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
