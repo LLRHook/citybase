@@ -1,27 +1,17 @@
 // ClaudeAdapter — wraps the Anthropic Claude Code CLI behind the
 // AgentProvider contract.
 //
-// Phase 6 / v1 ship gate: the adapter now invokes the REAL claude CLI
-// flags (`--print --output-format json --permission-mode bypassPermissions`
-// + the prompt as a positional arg). The previous slice carried placeholder
-// flags (`--quiet --prompt`) that don't exist on the real binary; any
-// dispatch would have errored out. This is the minimum change required
-// for a click-to-run Claude session inside Citybase.
+// v3.0: the adapter invokes claude with `--print --output-format stream-json
+// --verbose` and parses the NDJSON stream incrementally, pushing a real
+// AgentEvent for each assistant text block and tool use as it arrives. This
+// makes the run detail stream token-by-token and — because Edit/Write tool
+// uses carry a `file_path` — lets the city light the exact buildings claude
+// touches the instant it touches them. The final `result` line drives the run
+// outcome. streamEvents drains the live queue (base `_drainEvents`); the
+// synthetic plan/edit/test/pr trail is gone — only real Claude output shows.
 //
-// streamEvents is overridden to parse the JSON envelope claude prints on
-// stdout and yield one real AgentEvent (or an error event on failure)
-// instead of the synthetic plan/edit/test/pr trail the base class
-// fabricates from the exit state. The synthetic trail is mock UI activity
-// — the user has been clear that the IDE must surface only real output.
-//
-// Per docs/agent-runtime.md, Claude Sonnet 4.6 is the default model;
-// callers can override via params.model (e.g. to push to Opus 4.7 for
-// high-complexity quests or Haiku 4.5 for cheap routine work).
-//
-// Real-time streaming (token-by-token) is still future work — it requires
-// processService to surface stdout chunks on a child handle. For now we
-// run claude to completion and yield the parsed result. That's still
-// real Claude output, just buffered.
+// Per docs/agent-runtime.md, Claude Sonnet 4.6 is the default model; callers
+// can override via params.model.
 const { CliAgentAdapter } = require('./CliAgentAdapter.cjs');
 
 const NOT_FOUND_MESSAGE = 'claude CLI not found on PATH';
@@ -30,22 +20,23 @@ const DEFAULT_MODEL = 'claude-sonnet-4-6';
 function buildClaudeArgv({ params }) {
   return [
     '--print',
-    '--output-format', 'json',
+    // stream-json emits one JSON object per line (NDJSON) as the run
+    // progresses; --verbose is required to enable it under --print.
+    '--output-format', 'stream-json',
+    '--verbose',
     '--model', params.model || DEFAULT_MODEL,
-    // bypassPermissions matches the behaviour the user gets by launching
-    // claude themselves from a terminal: the run is non-interactive so
-    // there is nowhere to surface a permission prompt yet. When approval
-    // routing is wired into the renderer (later slice), switch to
-    // 'auto' or 'default' and pump prompts through onApprovalRequest.
+    // bypassPermissions: the run is non-interactive, so there's nowhere to
+    // surface a CLI permission prompt. Citybase gates write runs with its own
+    // approval modal (BUG-004) before the process ever spawns.
     '--permission-mode', 'bypassPermissions',
     params.promptContext,
   ];
 }
 
-// Parse the JSON envelope claude prints on stdout under
-// `--print --output-format json`. Defensive: claude can also print
-// human-readable text on failure, so when JSON parsing fails we treat
-// the raw stdout as the message text.
+// Parse claude's terminal `--output-format json` envelope (also the shape of
+// the `result` line under stream-json):
+//   { type:'result', subtype, is_error, result:'<text>', usage, ... }
+// Defensive: non-JSON stdout is treated as plain text.
 function parseClaudeJsonResult(stdout) {
   if (typeof stdout !== 'string' || stdout.length === 0) {
     return { ok: false, isError: true, text: '', raw: '' };
@@ -56,9 +47,6 @@ function parseClaudeJsonResult(stdout) {
   if (!parsed || typeof parsed !== 'object') {
     return { ok: true, isError: false, text: trimmed, raw: trimmed };
   }
-  // Claude's --output-format json envelope:
-  //   { type: 'result', subtype: 'success'|..., is_error: boolean,
-  //     result: '<assistant text>', session_id, duration_ms, usage, ... }
   const text = typeof parsed.result === 'string'
     ? parsed.result
     : typeof parsed.text === 'string' ? parsed.text : '';
@@ -78,36 +66,97 @@ class ClaudeAdapter extends CliAgentAdapter {
       detectKey: 'claude',
       buildArgv: buildClaudeArgv,
       ...opts,
-      // Map the friendlier `claudePath` option into the base's binaryPath.
       binaryPath: opts.claudePath ?? opts.binaryPath,
     });
   }
 
-  async *streamEvents(runId) {
-    const entry = await this._settled(runId);
-    const t = formatHHMM(this._now());
+  _ev(entry, kind, text, payload) {
+    const e = { runId: entry.run.runId, t: formatHHMM(this._now()), kind, text };
+    if (payload) e.payload = payload;
+    this._pushEvent(entry, e);
+  }
 
-    if (entry.cancelled) {
-      yield { runId, t, kind: 'error', text: 'claude: run cancelled' };
+  // Buffer stdout into complete NDJSON lines and handle each as it arrives.
+  _onStdout(entry, chunk) {
+    entry.lineBuf += chunk;
+    let idx;
+    while ((idx = entry.lineBuf.indexOf('\n')) >= 0) {
+      const line = entry.lineBuf.slice(0, idx);
+      entry.lineBuf = entry.lineBuf.slice(idx + 1);
+      this._handleLine(entry, line);
+    }
+  }
+
+  _handleLine(entry, line) {
+    const s = line.trim();
+    if (!s) return;
+    let obj;
+    try { obj = JSON.parse(s); } catch { return; } // ignore non-JSON noise
+    if (!obj || typeof obj !== 'object') return;
+
+    if (obj.type === 'system' && obj.subtype === 'init') {
+      this._ev(entry, 'plan', `claude: session started (${obj.model || 'default'})`);
       return;
     }
-    if (entry.exitState === 'timeout') {
-      yield { runId, t, kind: 'error', text: 'claude: timed out before completing' };
+    if (obj.type === 'assistant' && obj.message && Array.isArray(obj.message.content)) {
+      for (const block of obj.message.content) {
+        if (block.type === 'text' && typeof block.text === 'string' && block.text.trim()) {
+          this._ev(entry, 'edit', `claude: ${block.text.trim()}`);
+        } else if (block.type === 'tool_use') {
+          const input = block.input || {};
+          const path = input.file_path || input.path || input.notebook_path;
+          this._ev(
+            entry,
+            'edit',
+            `claude: ${block.name}${path ? ` ${path}` : ''}`,
+            path ? { path, tool: block.name } : { tool: block.name },
+          );
+        }
+        // thinking blocks are intentionally not surfaced (verbose internal text).
+      }
       return;
     }
-
-    const parsed = parseClaudeJsonResult(entry.stdout);
-
-    if (entry.exitState !== 'pass' || parsed.isError) {
-      const reason = parsed.text
-        || (entry.stderr || '').trim()
-        || 'claude exited with a non-zero status';
-      yield { runId, t, kind: 'error', text: `claude: ${reason}` };
-      return;
+    if (obj.type === 'result') {
+      entry.claudeResult = obj;
+      if (obj.is_error) {
+        this._ev(entry, 'error', `claude: ${obj.result || obj.subtype || 'error'}`);
+      }
     }
+  }
 
-    const text = parsed.text || '(claude returned an empty result)';
-    yield { runId, t, kind: 'edit', text: `claude: ${text}` };
+  // Flush any trailing partial line, factor claude's is_error into the run
+  // status, and guarantee the panel never sits empty.
+  _finalize(entry) {
+    if (entry.lineBuf && entry.lineBuf.trim()) {
+      this._handleLine(entry, entry.lineBuf);
+      entry.lineBuf = '';
+    }
+    if (entry.claudeResult && entry.claudeResult.is_error && entry.run.status === 'done') {
+      entry.run.status = 'failed';
+      entry.exitState = 'fail';
+    }
+    if (entry.events.length === 0) {
+      if (entry.cancelled) this._ev(entry, 'error', 'claude: run cancelled');
+      else if (entry.exitState === 'timeout') this._ev(entry, 'error', 'claude: timed out before completing');
+      else if (entry.exitState !== 'pass') {
+        const reason = (entry.stderr || '').trim() || 'claude exited with a non-zero status';
+        this._ev(entry, 'error', `claude: ${reason}`);
+      } else {
+        const parsed = parseClaudeJsonResult(entry.stdout);
+        this._ev(entry, 'edit', `claude: ${parsed.text || '(no output)'}`);
+      }
+    } else if (entry.exitState !== 'pass' && !entry.cancelled
+      && !entry.events.some((e) => e.kind === 'error')) {
+      const reason = (entry.stderr || '').trim() || 'claude exited with a non-zero status';
+      this._ev(entry, 'error', `claude: ${reason}`);
+    }
+  }
+
+  // Stream the real, live event queue (token-by-token as claude emits NDJSON).
+  // _drainEvents calls _requireRun internally, so an unknown id throws on first
+  // iteration — matching the async-generator contract the manager relies on.
+  streamEvents(runId) {
+    return this._drainEvents(runId);
   }
 }
 
