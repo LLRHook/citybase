@@ -17,6 +17,9 @@ dist-electron
 test-results
 playwright-report
 
+# Local visual-capture output (dev-capture.mjs)
+.dev-screens
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
