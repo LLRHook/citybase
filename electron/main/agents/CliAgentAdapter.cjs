@@ -200,7 +200,23 @@ class CliAgentAdapter extends AgentAdapter {
 
   async produceDiff(runId) {
     const entry = this._requireRun(runId);
-    const result = await this._processService.run('git', ['diff', '--unified=3', '--no-color'], { cwd: entry.cwd });
+    const cwd = entry.cwd;
+    // Newly created files are untracked, and plain `git diff` ignores them —
+    // yet creating files is the most common agent output. Mark untracked
+    // files intent-to-add so the diff includes them as new-file additions,
+    // capture the diff, then undo the intent-to-add to leave the index
+    // exactly as we found it (produceDiff must not mutate working state).
+    const others = await this._processService.run(
+      'git', ['ls-files', '--others', '--exclude-standard', '-z'], { cwd },
+    );
+    const newFiles = (others.ok ? (others.stdout || '') : '').split('\0').filter(Boolean);
+    if (newFiles.length > 0) {
+      await this._processService.run('git', ['add', '--intent-to-add', '--', ...newFiles], { cwd });
+    }
+    const result = await this._processService.run('git', ['diff', '--unified=3', '--no-color'], { cwd });
+    if (newFiles.length > 0) {
+      await this._processService.run('git', ['reset', '--quiet', '--', ...newFiles], { cwd });
+    }
     if (!result.ok && !result.stdout) {
       return { files: [] };
     }
