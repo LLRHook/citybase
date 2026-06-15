@@ -18,6 +18,15 @@ The workbench goes real-time and durable. Agent dispatch is non-blocking and
 streaming, the city animates live as the agent works, runs can be cancelled for
 real, and run history survives restarts.
 
+### Verified
+
+- 2026-06-15 V&V pass (SHA `0e20a02`, v3.0.0): Stages 0–5 green. 380 Vitest cases
+  across 30 files, 1 Playwright desktop smoke, lint + build clean, renderer
+  isolation / IPC allow-list / single-spawn-site / no-telemetry invariants
+  re-confirmed. Real-`claude` harnesses green: `claude-e2e` 11/11 (incl.
+  running→done non-blocking lifecycle), `gui-claude-e2e` 5/5 (approval gate +
+  live mid-run city + persisted `runs.json`). Baseline bumped 361 → 380.
+
 ### Added
 
 - FEAT-004 Streaming process runner (`processService.spawnStream`): non-blocking,
