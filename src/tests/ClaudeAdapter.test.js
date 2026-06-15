@@ -34,14 +34,30 @@ const ERROR_STDOUT = JSON.stringify({
   result: 'rate limit hit; please retry later',
 });
 
+// Non-blocking dispatch: startTask uses spawnStream; the agent run's result
+// (the claude JSON envelope) comes from the handle's `done`. `run` is now only
+// for git/gh/npm. Tests shape the agent result via `streamResult`.
 function makeProcessService(overrides = {}) {
+  const streamResult = overrides.streamResult || {
+    ok: true, code: 0, signal: null, stdout: SUCCESS_STDOUT, stderr: '',
+    timedOut: false, killed: false, truncated: false, durationMs: 12, error: null,
+  };
   return {
-    run: vi.fn(async () => ({
-      ok: true, code: 0, signal: null, stdout: SUCCESS_STDOUT, stderr: '',
+    run: overrides.run || vi.fn(async () => ({
+      ok: true, code: 0, signal: null, stdout: '', stderr: '',
       timedOut: false, durationMs: 12, error: null,
     })),
-    ...overrides,
+    spawnStream: overrides.spawnStream
+      || vi.fn(() => ({ pid: 1, kill: vi.fn(), done: Promise.resolve(streamResult) })),
   };
+}
+
+// Drain streamEvents to force the run to settle, then the run object (mutated
+// in place) carries its terminal status.
+async function settle(adapter, run) {
+  const it = adapter.streamEvents(run.runId);
+  while (!(await it.next()).done) { /* drain to force the run to settle */ }
+  return run;
 }
 
 function makeAdapter(overrides = {}) {
@@ -91,7 +107,7 @@ describe('ClaudeAdapter — claude CLI presence', () => {
       claudePath: '/opt/custom/claude',
     });
     await adapter.startTask(VALID_PARAMS);
-    expect(ps.run).toHaveBeenCalledWith(
+    expect(ps.spawnStream).toHaveBeenCalledWith(
       '/opt/custom/claude',
       expect.any(Array),
       expect.objectContaining({ cwd: '/abs/repo' }),
@@ -138,33 +154,43 @@ describe('ClaudeAdapter — startTask', () => {
     const ps = makeProcessService();
     const adapter = makeAdapter({ processService: ps });
     await adapter.startTask(VALID_PARAMS);
-    const argv = ps.run.mock.calls.at(-1)[1];
+    const argv = ps.spawnStream.mock.calls.at(-1)[1];
     expect(argv[0]).toBe('--print');
     expect(argv).toContain('do the thing');
     expect(argv).not.toContain('--quiet');
   });
 
-  it('marks the run as done on a clean exit', async () => {
-    const run = await makeAdapter().startTask(VALID_PARAMS);
+  it('returns a running run immediately, then marks it done on a clean exit', async () => {
+    // Deferred done so we can observe 'running' before the process settles.
+    let resolveDone;
+    const ps = makeProcessService({
+      spawnStream: vi.fn(() => ({ pid: 1, kill: vi.fn(), done: new Promise((r) => { resolveDone = r; }) })),
+    });
+    const adapter = makeAdapter({ processService: ps });
+    const run = await adapter.startTask(VALID_PARAMS);
     expect(run).toMatchObject({
       questId: 'TASK-1',
       adventurerId: 'alpha-7',
-      status: 'done',
+      status: 'running', // non-blocking: live immediately
       contextUsed: 0,
       maxContext: 200_000,
       branch: 'main',
     });
     expect(run.runId).toMatch(/.+/);
+    resolveDone({ ok: true, code: 0, signal: null, stdout: SUCCESS_STDOUT, stderr: '', timedOut: false, killed: false, truncated: false, durationMs: 10, error: null });
+    await settle(adapter, run);
+    expect(run.status).toBe('done');
   });
 
   it('marks the run as failed on a non-zero exit', async () => {
     const ps = makeProcessService({
-      run: vi.fn(async () => ({
+      streamResult: {
         ok: false, code: 1, signal: null, stdout: '', stderr: 'boom',
-        timedOut: false, durationMs: 8, error: { message: 'exit 1', code: 1 },
-      })),
+        timedOut: false, killed: false, truncated: false, durationMs: 8, error: { message: 'exit 1', code: 1 },
+      },
     });
-    const run = await makeAdapter({ processService: ps }).startTask(VALID_PARAMS);
+    const adapter = makeAdapter({ processService: ps });
+    const run = await settle(adapter, await adapter.startTask(VALID_PARAMS));
     expect(run.status).toBe('failed');
   });
 });
@@ -189,10 +215,10 @@ describe('ClaudeAdapter — streamEvents (real CLI output, no synthetic trail)',
 
   it('yields an error event when claude reports is_error in the JSON envelope', async () => {
     const ps = makeProcessService({
-      run: vi.fn(async () => ({
+      streamResult: {
         ok: true, code: 0, signal: null, stdout: ERROR_STDOUT, stderr: '',
-        timedOut: false, durationMs: 12, error: null,
-      })),
+        timedOut: false, killed: false, truncated: false, durationMs: 12, error: null,
+      },
     });
     const adapter = makeAdapter({ processService: ps });
     const run = await adapter.startTask(VALID_PARAMS);
@@ -204,10 +230,10 @@ describe('ClaudeAdapter — streamEvents (real CLI output, no synthetic trail)',
 
   it('yields an error event when the process exits non-zero', async () => {
     const ps = makeProcessService({
-      run: vi.fn(async () => ({
+      streamResult: {
         ok: false, code: 2, signal: null, stdout: '', stderr: 'fatal: claude died',
-        timedOut: false, durationMs: 5, error: { message: 'exit 2', code: 2 },
-      })),
+        timedOut: false, killed: false, truncated: false, durationMs: 5, error: { message: 'exit 2', code: 2 },
+      },
     });
     const adapter = makeAdapter({ processService: ps });
     const run = await adapter.startTask(VALID_PARAMS);
@@ -219,10 +245,10 @@ describe('ClaudeAdapter — streamEvents (real CLI output, no synthetic trail)',
 
   it('yields an error event with the timeout message when the run timed out', async () => {
     const ps = makeProcessService({
-      run: vi.fn(async () => ({
+      streamResult: {
         ok: false, code: null, signal: null, stdout: '', stderr: '',
-        timedOut: true, durationMs: 15_000, error: { message: 'timed out', code: 'ETIMEDOUT' },
-      })),
+        timedOut: true, killed: false, truncated: false, durationMs: 15_000, error: { message: 'timed out', code: 'ETIMEDOUT' },
+      },
     });
     const adapter = makeAdapter({ processService: ps });
     const run = await adapter.startTask(VALID_PARAMS);

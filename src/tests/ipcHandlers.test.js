@@ -321,12 +321,18 @@ describe('createIpcHandlers — agent.startRun + event fan-out', () => {
     await handlers['citybase:agent.startRun'](null, { provider: 'codex' });
     // Drain microtasks so the fire-and-forget pump finishes.
     await new Promise((resolve) => setImmediate(resolve));
-    expect(stubs.sendAgentEvent).toHaveBeenCalledTimes(2);
+    // 1 immediate "started" event (so the renderer sees the live run) + the
+    // 2 streamed trail events.
+    expect(stubs.sendAgentEvent).toHaveBeenCalledTimes(3);
     expect(stubs.sendAgentEvent).toHaveBeenNthCalledWith(1, {
+      runId: 'run-1',
+      event: { runId: 'run-1', t: '00:00', kind: 'plan', text: 'agent run started', payload: { status: 'running' } },
+    });
+    expect(stubs.sendAgentEvent).toHaveBeenNthCalledWith(2, {
       runId: 'run-1',
       event: { runId: 'run-1', t: '12:00', kind: 'plan', text: 'planning' },
     });
-    expect(stubs.sendAgentEvent).toHaveBeenNthCalledWith(2, {
+    expect(stubs.sendAgentEvent).toHaveBeenNthCalledWith(3, {
       runId: 'run-1',
       event: { runId: 'run-1', t: '12:01', kind: 'edit', text: 'editing' },
     });
