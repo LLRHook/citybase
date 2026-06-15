@@ -167,8 +167,12 @@ function createAgentManager({
     }
 
     const adapterRun = await adapter.startTask(preRunId ? { ...rest, runId: preRunId } : rest);
+    // Use the adapter's actual run object when it carries a runId, so the
+    // adapter's in-place status mutations (running → done/failed/cancelled for
+    // non-blocking runs) are visible through getRun/listRuns. Only spread to
+    // inject a generated id when the adapter didn't provide one.
     const run = adapterRun && typeof adapterRun === 'object'
-      ? { ...adapterRun, runId: adapterRun.runId || generateRunId() }
+      ? (adapterRun.runId ? adapterRun : { ...adapterRun, runId: generateRunId() })
       : null;
     if (!run || !run.runId) {
       throw new Error(`agentManager.startRun: adapter '${provider}' did not return an AgentRun`);
@@ -177,10 +181,11 @@ function createAgentManager({
       throw new Error(`agentManager.startRun: runId collision: ${run.runId}`);
     }
     inFlight.set(run.runId, { provider, adapter, run });
-    // Capture a snapshot in history so a later cancel() doesn't erase
-    // the record. Trim to historyLimit (FIFO) to keep memory bounded
-    // on long-lived sessions.
-    history.set(run.runId, { run: { ...run }, provider, startedAt: now() });
+    // Hold the LIVE run reference (not a copy) in history so listRuns reflects
+    // status flips as the non-blocking run progresses (running → done/failed/
+    // cancelled). The entry persists across cancel/eviction, so the record
+    // isn't lost. Trim to historyLimit (FIFO) to bound memory.
+    history.set(run.runId, { run, provider, startedAt: now() });
     trimHistory();
     return run;
   }
@@ -282,12 +287,11 @@ function createAgentManager({
       entry.resolve('rejected');
     }
     await adapter.cancel(runId);
-    inFlight.delete(runId);
-    // History keeps the record but reflects the final state.
+    // Guarantee the cancelled status on the shared run reference (the real
+    // adapter also does this; this makes the manager correct regardless).
     const histEntry = history.get(runId);
-    if (histEntry) {
-      histEntry.run = { ...histEntry.run, status: 'cancelled' };
-    }
+    if (histEntry && histEntry.run) histEntry.run.status = 'cancelled';
+    inFlight.delete(runId);
   }
 
   /**

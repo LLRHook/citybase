@@ -84,7 +84,7 @@ class ClaudeAdapter extends CliAgentAdapter {
   }
 
   async *streamEvents(runId) {
-    const entry = this._requireRun(runId);
+    const entry = await this._settled(runId);
     const t = formatHHMM(this._now());
 
     if (entry.cancelled) {
