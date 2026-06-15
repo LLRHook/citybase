@@ -15,14 +15,19 @@ const { detectAgentBinaries } = require('./agents/detect.cjs');
 const { CodexAdapter } = require('./agents/CodexAdapter.cjs');
 const { ClaudeAdapter } = require('./agents/ClaudeAdapter.cjs');
 const { runWorkspaceChecks } = require('./services/workspaceChecks.cjs');
+const { createRunStore } = require('./services/runStore.cjs');
 
 function buildAgentManager(emitEvent) {
   const codex = new CodexAdapter({ processService });
   const claude = new ClaudeAdapter({ processService });
+  // Persist run history across restarts (FEAT-008): seed from disk, save on change.
+  const runStore = createRunStore({ userDataDir: app.getPath('userData') });
   return createAgentManager({
     adapters: { codex, claude },
     detect: () => detectAgentBinaries(),
     emitEvent,
+    initialRuns: runStore.loadSync(),
+    persist: (runs) => { runStore.save(runs).catch(() => {}); },
   });
 }
 

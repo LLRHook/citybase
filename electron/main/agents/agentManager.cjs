@@ -50,16 +50,53 @@ function createAgentManager({
   emitEvent,
   now = defaultNow,
   historyLimit = 100,
+  initialRuns = [],
+  persist,
 } = {}) {
   const registry = new Map();
   // runId -> { provider, adapter, run }
   const inFlight = new Map();
-  // runId -> { run, provider, startedAt }; survives cancel() so the
-  // renderer's Run History panel can render every run from this session
-  // regardless of how it ended.
+  // runId -> { run, provider, startedAt, events?, historical? }; survives
+  // cancel() so the Run History panel can render every run from this session,
+  // and is seeded from persisted runs so it also shows past sessions (FEAT-008).
   const history = new Map();
   // runId -> { resolve, summary }; resolve('approved' | 'rejected')
   const pendingApprovals = new Map();
+
+  // Seed history from persisted runs (oldest first, so live runs sort newest).
+  for (const r of Array.isArray(initialRuns) ? initialRuns : []) {
+    if (!r || typeof r.runId !== 'string') continue;
+    history.set(r.runId, {
+      run: {
+        runId: r.runId, questId: r.questId, adventurerId: r.adventurerId,
+        status: r.status, branch: r.branch, contextUsed: 0, maxContext: 0,
+      },
+      provider: r.provider,
+      startedAt: r.startedAt,
+      events: Array.isArray(r.events) ? r.events : [],
+      historical: true,
+    });
+  }
+
+  // Flat, serializable snapshot of all runs (incl. events) for the run store.
+  function serializeRuns() {
+    return [...history.values()].map((e) => ({
+      runId: e.run.runId,
+      questId: e.run.questId,
+      adventurerId: e.run.adventurerId,
+      status: e.run.status,
+      provider: e.provider,
+      branch: e.run.branch,
+      startedAt: e.startedAt,
+      events: Array.isArray(e.events) ? e.events : [],
+    }));
+  }
+
+  function doPersist() {
+    if (typeof persist === 'function') {
+      try { persist(serializeRuns()); } catch { /* persistence is best-effort */ }
+    }
+  }
 
   function register(name, adapter) {
     if (typeof name !== 'string' || name.length === 0) {
@@ -187,10 +224,23 @@ function createAgentManager({
     // isn't lost. Trim to historyLimit (FIFO) to bound memory.
     history.set(run.runId, { run, provider, startedAt: now() });
     trimHistory();
+    // Snapshot the run's events once it settles, then persist (best-effort).
+    captureWhenDone(run.runId);
     return run;
   }
 
+  // When a non-blocking run settles, record its event trail on the history
+  // entry and persist the run history so it survives a restart (FEAT-008).
+  function captureWhenDone(runId) {
+    getEvents(runId).then(
+      (events) => { const h = history.get(runId); if (h) h.events = events; doPersist(); },
+      () => { doPersist(); },
+    );
+  }
+
   function getRun(runId) {
+    // In-flight only: null once a run is cancelled/forgotten. Historical runs
+    // are surfaced through listRuns (with their recorded status), not here.
     return inFlight.get(runId)?.run ?? null;
   }
 
@@ -200,29 +250,53 @@ function createAgentManager({
     return entry.adapter;
   }
 
+  // Historical (persisted / non-in-flight) runs have no live adapter — their
+  // recorded events replay from history; live diff/checks aren't available.
   function streamEvents(runId) {
-    return adapterFor(runId).streamEvents(runId);
+    if (inFlight.has(runId)) return adapterFor(runId).streamEvents(runId);
+    const h = history.get(runId);
+    if (h) {
+      const events = Array.isArray(h.events) ? h.events : [];
+      return (async function* replay() { for (const e of events) yield e; })();
+    }
+    throw new Error(`unknown runId: ${runId}`);
   }
 
-  // Collect a run's full event trail into an array. Runs complete
-  // synchronously, so the live streamEvents fan-out can fire before the
-  // renderer subscribes and there's no replay; the renderer calls this on
-  // RunDetail mount to reliably show a finished run's events.
+  // Collect a run's full event trail. For a live run this drains the adapter
+  // stream (and waits for it to settle); for a historical run it returns the
+  // recorded trail. The renderer calls this on RunDetail mount.
   async function getEvents(runId) {
+    if (!inFlight.has(runId)) {
+      const h = history.get(runId);
+      if (h) return Array.isArray(h.events) ? h.events : [];
+      throw new Error(`unknown runId: ${runId}`);
+    }
     const out = [];
     for await (const event of adapterFor(runId).streamEvents(runId)) out.push(event);
     return out;
   }
 
   async function reportUsage(runId) {
+    if (!inFlight.has(runId)) {
+      if (history.has(runId)) return { contextUsed: 0, maxContext: 0 };
+      throw new Error(`unknown runId: ${runId}`);
+    }
     return adapterFor(runId).reportUsage(runId);
   }
 
   async function produceDiff(runId) {
+    if (!inFlight.has(runId)) {
+      if (history.has(runId)) return { files: [] }; // past run: working tree has moved on
+      throw new Error(`unknown runId: ${runId}`);
+    }
     return adapterFor(runId).produceDiff(runId);
   }
 
   async function runChecks(runId) {
+    if (!inFlight.has(runId)) {
+      if (history.has(runId)) return [];
+      throw new Error(`unknown runId: ${runId}`);
+    }
     return adapterFor(runId).runChecks(runId);
   }
 
