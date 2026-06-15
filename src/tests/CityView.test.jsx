@@ -40,4 +40,23 @@ describe('CityView', () => {
     expect(screen.getByText('staged')).toBeInTheDocument();
     expect(screen.getByText('clean')).toBeInTheDocument();
   });
+
+  it('shows the agent-at-work banner and lights active buildings during a run', () => {
+    const { container } = render(
+      <CityView
+        snapshot={snapshot}
+        activeRun={{ runId: 'r1', provider: 'claude', status: 'running' }}
+        activePaths={['src/App.jsx']}
+        phase={{ phase: 'editing', label: 'editing files' }}
+      />,
+    );
+    expect(screen.getByText(/AGENT AT WORK/i)).toBeInTheDocument();
+    expect(screen.getByText(/editing files/i)).toBeInTheDocument();
+    expect(container.querySelector('g.city-active')).toBeTruthy();
+  });
+
+  it('has no banner when idle', () => {
+    render(<CityView snapshot={snapshot} />);
+    expect(screen.queryByText(/AGENT AT WORK/i)).not.toBeInTheDocument();
+  });
 });
