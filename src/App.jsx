@@ -5,7 +5,7 @@ import { useAgentDetect } from './app/useAgentDetect.js';
 import { useApprovalRequests } from './app/useApprovalRequests.js';
 import { useRunHistory } from './app/useRunHistory.js';
 import { useRunEvents } from './app/useRunEvents.js';
-import { runPhase, activePathsForRun, activeRunFrom } from './app/runCity.js';
+import { runPhase, activePathsForRun, activeRunFrom, touchedPathsFromEvents, toRepoRelative } from './app/runCity.js';
 import { ApprovalModal, Toasts } from './game/modals.jsx';
 import { TopBar } from './views/TopBar.jsx';
 import { RunHistorySidebar } from './views/RunHistorySidebar.jsx';
@@ -99,10 +99,15 @@ function CitybaseApp() {
   );
   const activeEvents = useRunEvents(historyActiveRun?.runId);
   const phase = React.useMemo(() => runPhase(activeRun, activeEvents), [activeRun, activeEvents]);
-  const activePaths = React.useMemo(
-    () => activePathsForRun(activeRun, workspace.snapshot),
-    [activeRun, workspace.snapshot],
-  );
+  const activePaths = React.useMemo(() => {
+    const dirty = activePathsForRun(activeRun, workspace.snapshot);
+    if (!activeRun) return dirty;
+    // Light the exact files the agent touches the instant they stream in
+    // (relativized to match the city's building paths), ahead of the snapshot.
+    const root = workspace.workspace?.rootPath;
+    const streamed = touchedPathsFromEvents(activeEvents).map((p) => toRepoRelative(p, root)).filter(Boolean);
+    return [...new Set([...dirty, ...streamed])];
+  }, [activeRun, workspace.snapshot, workspace.workspace, activeEvents]);
 
   // While an agent is running it mutates the working tree; poll the snapshot so
   // the city lights up the buildings being changed in near-real time. A final
