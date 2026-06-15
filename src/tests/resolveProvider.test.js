@@ -2,22 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { resolveProvider, PREFERRED_ORDER } from '../../electron/main/agents/resolveProvider.cjs';
 
 describe('resolveProvider', () => {
-  it('exposes the canonical preference order', () => {
-    expect([...PREFERRED_ORDER]).toEqual(['codex', 'claude']);
+  it('exposes the canonical preference order (claude is the v1 default)', () => {
+    expect([...PREFERRED_ORDER]).toEqual(['claude', 'codex']);
   });
 
-  it('picks codex when both are installed and registered', () => {
+  it('picks claude when both are installed and registered (v1 default)', () => {
     expect(resolveProvider(
-      { codex: { found: true, path: '/c/codex' }, claude: { found: true } },
-      ['codex', 'claude'],
-    )).toBe('codex');
-  });
-
-  it('falls back to claude when only claude is installed', () => {
-    expect(resolveProvider(
-      { codex: { found: false }, claude: { found: true, path: '/c/claude' } },
+      { codex: { found: true, path: '/c/codex' }, claude: { found: true, path: '/c/claude' } },
       ['codex', 'claude'],
     )).toBe('claude');
+  });
+
+  it('falls back to codex when only codex is installed', () => {
+    expect(resolveProvider(
+      { codex: { found: true, path: '/c/codex' }, claude: { found: false } },
+      ['codex', 'claude'],
+    )).toBe('codex');
   });
 
   it('skips an installed CLI that is not registered with the manager', () => {
