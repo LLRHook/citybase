@@ -387,6 +387,44 @@ ids (WS) reference that document._
   implementing them as filed.
 - **Status:** open
 
+### [BUG-020] Living-city overlay never activated (runs complete synchronously)
+- [x] **Severity:** med
+- **Area:** renderer
+- **File(s):** src/App.jsx, src/app/runCity.js
+- **Observation:** the FEAT-016 active-run overlay keyed off a run with
+  `status === 'running'`, but the adapters run the CLI to completion before
+  `startTask` returns (status jumps straight to `done`/`failed`), so no history
+  record is ever observably `running` — the banner and active-building glow
+  never fired in real use.
+- **Expected:** the city visibly reacts while an agent works.
+- **Repro / Notes:** found while wiring FEAT-016; dispatch a run and the overlay
+  stays dark.
+- **Fix:** App treats an in-flight dispatch (the awaited `startRun`) as the
+  active run via a `dispatchingProvider` state, so the banner + live snapshot
+  refresh activate during the dispatch window; a real `running` history record
+  still wins when one exists. Full frame-by-frame streaming still depends on
+  non-blocking dispatch (FEAT-004).
+- **Status:** fixed-pending-migration
+
+### [BUG-021] produceDiff omits agent-created (untracked) files
+- [x] **Severity:** high
+- **Area:** agents
+- **File(s):** electron/main/agents/CliAgentAdapter.cjs, src/tests/ClaudeAdapter.test.js, src/tests/CodexAdapter.test.js
+- **Observation:** `produceDiff` ran `git diff --unified=3 --no-color`, which
+  ignores untracked files. Creating new files is the most common agent output,
+  so the RunDetail diff panel showed "no file changes" for those runs — the
+  primary review artifact was wrong. Caught by the real-Claude integration
+  harness (`scripts/claude-e2e.mjs`): a run that created a file produced an
+  empty diff.
+- **Expected:** the diff surfaces every change the agent made, including new files.
+- **Repro / Notes:** `node scripts/claude-e2e.mjs` (needs an authenticated
+  `claude`) — pre-fix the "produceDiff returns the changed file" check failed.
+- **Fix:** before diffing, mark untracked files intent-to-add
+  (`git add --intent-to-add`) so new files render as additions, then
+  `git reset --quiet` them to leave the index unchanged. Harness now 10/10;
+  added unit coverage for the untracked path.
+- **Status:** fixed-pending-migration
+
 ---
 
 ## Migrated to changelog
