@@ -158,6 +158,19 @@ describe('createAgentManager — delegation by runId', () => {
     expect(fake.openPR).toHaveBeenCalledWith(run.runId, expect.objectContaining({ title: 't' }));
   });
 
+  it('getEvents collects the adapter stream into an array (events backstop)', async () => {
+    const trail = [
+      { runId: 'x', t: '00:00', kind: 'plan', text: 'planning' },
+      { runId: 'x', t: '00:01', kind: 'edit', text: 'claude: done' },
+    ];
+    const adapter = makeAdapter();
+    adapter.streamEvents = vi.fn(() => (async function* () { yield* trail; })());
+    const mgr = createAgentManager({ adapters: { fake: adapter } });
+    const run = await mgr.startRun({ provider: 'fake', questId: 'q', adventurerId: 'a', skill: 'docs', repoUrl: '/r', branch: 'main', promptContext: 'p' });
+    const events = await mgr.getEvents(run.runId);
+    expect(events).toEqual(trail);
+  });
+
   it('every delegating method throws on unknown runId', async () => {
     const mgr = createAgentManager({ adapters: { fake: makeAdapter() } });
     expect(() => mgr.streamEvents('nope')).toThrow(/unknown runId: nope/);
@@ -271,7 +284,7 @@ describe('createAgentManager — listRuns (Run History)', () => {
 });
 
 describe('createAgentManager — provider auto-resolution', () => {
-  it("resolves 'auto' to codex when both are installed (preference order)", async () => {
+  it("resolves 'auto' to claude when both are installed (v1 default preference)", async () => {
     const codex = makeAdapter();
     const claude = makeAdapter();
     const detect = vi.fn(async () => ({
@@ -280,20 +293,20 @@ describe('createAgentManager — provider auto-resolution', () => {
     }));
     const mgr = createAgentManager({ adapters: { codex, claude }, detect });
     await mgr.startRun({ ...startParams, provider: 'auto' });
-    expect(codex.startTask).toHaveBeenCalledTimes(1);
-    expect(claude.startTask).not.toHaveBeenCalled();
+    expect(claude.startTask).toHaveBeenCalledTimes(1);
+    expect(codex.startTask).not.toHaveBeenCalled();
   });
 
-  it("resolves 'auto' to claude when codex is not installed", async () => {
+  it("resolves 'auto' to codex when claude is not installed", async () => {
     const codex = makeAdapter();
     const claude = makeAdapter();
     const detect = vi.fn(async () => ({
-      codex: { found: false }, claude: { found: true, path: '/c/claude' },
+      codex: { found: true, path: '/c/codex' }, claude: { found: false },
     }));
     const mgr = createAgentManager({ adapters: { codex, claude }, detect });
     await mgr.startRun({ ...startParams, provider: 'auto' });
-    expect(claude.startTask).toHaveBeenCalledTimes(1);
-    expect(codex.startTask).not.toHaveBeenCalled();
+    expect(codex.startTask).toHaveBeenCalledTimes(1);
+    expect(claude.startTask).not.toHaveBeenCalled();
   });
 
   it("rejects 'auto' when nothing is installed", async () => {

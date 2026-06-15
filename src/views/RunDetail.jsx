@@ -17,6 +17,7 @@ export function RunDetail({
   workspaceBranch,
 }) {
   const events = useRunEvents(run?.runId, { api: citybaseApi });
+  const [fetchedEvents, setFetchedEvents] = React.useState(null);
   const [diff, setDiff] = React.useState(null);
   const [diffErr, setDiffErr] = React.useState(null);
   const [checks, setChecks] = React.useState(null);
@@ -32,6 +33,14 @@ export function RunDetail({
   React.useEffect(() => {
     if (!run || !isTerminal) return undefined;
     let alive = true;
+    // Backstop the live stream: a synchronous run can finish (and fan out its
+    // events) before this view subscribes, so fetch the full trail on mount.
+    if (typeof citybaseApi.agents.getEvents === 'function') {
+      citybaseApi.agents.getEvents(run.runId).then(
+        (evs) => { if (alive) setFetchedEvents(Array.isArray(evs) ? evs : []); },
+        () => { if (alive) setFetchedEvents([]); },
+      );
+    }
     citybaseApi.agents.produceDiff(run.runId).then(
       (d) => { if (alive) setDiff(d); },
       (err) => { if (alive) setDiffErr(err?.message || String(err)); },
@@ -114,7 +123,7 @@ export function RunDetail({
 
       <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Panel title="Events" accent={color}>
-          <EventLog events={events} runStatus={run.status} />
+          <EventLog events={events.length ? events : (fetchedEvents || [])} runStatus={run.status} />
         </Panel>
         <Panel title="CI Checks" accent="amber">
           <ChecksList checks={checks} error={checksErr} loading={!isTerminal} />

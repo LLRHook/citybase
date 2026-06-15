@@ -102,6 +102,7 @@ describe('createIpcHandlers — channel set', () => {
     expect(Object.keys(handlers).sort()).toEqual([
       'citybase:agent.approve',
       'citybase:agent.cancel',
+      'citybase:agent.getEvents',
       'citybase:agent.getRun',
       'citybase:agent.listPendingApprovals',
       'citybase:agent.listRuns',
