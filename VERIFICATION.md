@@ -147,32 +147,34 @@ A failure in this stage is a hard block.
   ```bash
   npm test -- --run
   ```
-  Expected: `Test Files  26 passed (26)`, `Tests  313 passed (313)`, exit 0.
+  Expected: `Test Files  29 passed (29)`, `Tests  361 passed (361)`, exit 0.
 - [ ] 2.3 Test-count baseline matches the collector:
   ```bash
-  npx vitest list | wc -l   # expect: 313
+  npx vitest list | wc -l   # expect: 361
   ```
   A mismatch with the table below means tests appeared or disappeared without
   a deliberate decision — investigate before ticking, then update the table
   in the same change as the run.
 
-**Baseline (2026-06-11, SHA `1356437`): 26 test files / 313 test cases — all Vitest (jsdom).**
+**Baseline (2026-06-15, SHA `0fb551d`): 29 test files / 361 test cases — all Vitest (jsdom). The desktop launch path is covered by the Playwright smoke (2.4); the real-`claude` agent path by the integration harnesses (Appendix F).**
 
 | Test file | Cases | | Test file | Cases |
 |---|---|---|---|---|
-| `activity.test.js` | 12 | | `detectAgentBinaries.test.js` | 10 |
-| `AdventurerAnalysis.test.jsx` | 7 | | `ipcHandlers.test.js` | 26 |
+| `AgentDetectError.test.jsx` | 5 | | `iso.test.js` | 8 |
 | `agentAdapter.test.js` | 13 | | `menuTemplate.test.js` | 8 |
-| `agentManager.test.js` | 28 | | `parseBranchList.test.js` | 8 |
-| `App.idle.test.jsx` | 16 | | `parseFiles.test.js` | 12 |
-| `App.smoke.test.jsx` | 2 | | `parseUnifiedDiff.test.js` | 10 |
-| `AppAutoBoot.test.jsx` | 7 | | `resolveProvider.test.js` | 7 |
-| `ApprovalModal.test.jsx` | 10 | | `runReview.test.js` | 23 |
-| `BranchSelector.test.jsx` | 8 | | `useAgentDetect.test.jsx` | 5 |
-| `citybaseApi.test.js` | 11 | | `windowConfig.test.js` | 10 |
-| `CityMapDirty.test.jsx` | 6 | | `workspaceChecks.test.js` | 13 |
-| `cityModel.test.js` | 11 | | `ClaudeAdapter.test.js` | 17 |
-| `CliAgentAdapter.test.js` | 8 | | `CodexAdapter.test.js` | 25 |
+| `agentManager.test.js` | 38 | | `parseBranchList.test.js` | 8 |
+| `AppAutoBoot.test.jsx` | 9 | | `parseFiles.test.js` | 12 |
+| `ApprovalModal.test.jsx` | 10 | | `parseUnifiedDiff.test.js` | 10 |
+| `bootPayload.test.js` | 8 | | `preload.contract.test.js` | 3 |
+| `BranchSelector.test.jsx` | 12 | | `processService.test.js` | 7 |
+| `ClaudeAdapter.test.js` | 28 | | `resolveProvider.test.js` | 7 |
+| `CliAgentAdapter.test.js` | 19 | | `runCity.test.js` | 10 |
+| `cityModel.test.js` | 9 | | `useAgentDetect.test.jsx` | 8 |
+| `CityView.test.jsx` | 6 | | `useRunHistory.test.jsx` | 6 |
+| `citybaseApi.test.js` | 2 | | `windowConfig.test.js` | 10 |
+| `CodexAdapter.test.js` | 25 | | `workspaceChecks.test.js` | 13 |
+| `detectAgentBinaries.test.js` | 19 | | `gitMutations.test.js` | 14 |
+| `ipcHandlers.test.js` | 34 | | | |
 
 - [ ] 2.4 Desktop E2E smoke (Playwright `_electron`, FEAT-001) — requires a
   fresh `dist/`:
@@ -202,14 +204,18 @@ A failure in this stage is a hard block.
   ```bash
   npm run build && npm run start:desktop
   ```
-  Accept: app loads `dist/index.html` from disk; the three views switch
-  (city / kanban / analysis); DevTools do **not** auto-open.
+  Accept: app loads `dist/index.html` from disk; the City/Work nav switches
+  views; DevTools do **not** auto-open.
 - [ ] 3.4 Workspace flow (manual): via the app menu, Open Workspace → pick a
   real local Git repository.
   Accept: top bar shows the repo name, current branch, and dirty/clean state;
   city districts reflect the folder tree; branch selector lists real branches.
   Then quit and relaunch: the workspace is restored automatically (v1
   auto-boot gate) with no intermediate clicks.
+- [ ] 3.4a City view (manual): switch to CITY. Accept: the isometric city
+  renders from the real tree — folders are districts on raised slabs, files are
+  buildings, dirty files glow (staged green / unstaged amber); pan/zoom/hover/
+  select work; no two districts overlap (BUG-008). Toggle back to WORK.
 - [ ] 3.5 Run-checks action (manual): trigger RUN CHECKS on the open
   workspace. Accept: one row per available npm script (`lint` / `test` /
   `typecheck` where defined) with pass/fail state and duration; the test row
@@ -223,8 +229,17 @@ A failure in this stage is a hard block.
     change; Approve proceeds, Reject cancels with no diff on disk.
   - Cancel mid-run terminates within a few seconds and the run shows
     `cancelled`, not `failed`.
-  Flag: this step cannot be scripted from this protocol (interactive CLIs,
-  user-present approvals). It is manual by design.
+  Flag: the *interactive* nuances stay manual, but the core agent path is now
+  scripted — see 3.7.
+- [ ] 3.7 Real-`claude` integration (scripted; requires an authenticated
+  `claude` on PATH — spends a few cents of tokens, edits only throwaway repos):
+  ```bash
+  node scripts/claude-e2e.mjs      # module path: detect → dispatch → events → diff → checks
+  npm run build && node scripts/gui-claude-e2e.mjs  # full GUI: approval modal → run → response → city
+  ```
+  Expected: `claude-e2e` 10/10; `gui-claude-e2e` 5/5 — the approval modal gates
+  the run, Approve lets it proceed, Claude's real response renders in Events,
+  the diff shows the edit, the city lights the changed building. See Appendix F.
 
 Failures here log a `BUG-NNN` and the run continues.
 
@@ -409,3 +424,18 @@ There is no browser-only variant: `citybaseApi` throws without the bridge
 - [ ] DevTools: `typeof process === 'undefined'` and `window.citybase` defined
 - [ ] Open Workspace on a real repo → branch + dirty state shown
 - [ ] Relaunch → workspace auto-restored
+
+## Appendix F — Real-`claude` integration harnesses
+
+Two repeatable harnesses exercise the agent path against the **real** `claude`
+CLI (not mocks). They need an authenticated `claude` on PATH, spend a few cents
+of tokens, and only ever edit a throwaway temp git repo — never a real project.
+Not wired into CI (token cost + auth); run them manually as Stage 3.7.
+
+| Harness | Layer | Asserts |
+|---|---|---|
+| `node scripts/claude-e2e.mjs` | production modules (`processService → ClaudeAdapter → agentManager`) | detect → dispatch → real response event → file created → `produceDiff` shows it → `runChecks` → git dirty (10 checks) |
+| `npm run build && node scripts/gui-claude-e2e.mjs` | the real Electron app via Playwright (preload → IPC → manager → adapter → CLI) | top bar shows installed · approval modal gates the run · Approve → run completes · Claude's real response in Events · diff shows the edit · the city lights the changed building (5 checks) |
+
+Both write screenshots to `.dev-screens/` (gitignored). A failing check here is a
+real integration regression — file a `BUG-NNN`.
