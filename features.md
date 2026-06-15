@@ -40,82 +40,6 @@ Priority guide: crit / high / med / low.
 
 ## Open
 
-### [FEAT-001] Desktop-mode E2E smoke test that opens the app window
-- [x] **Priority:** high
-- **Area:** tests
-- **File(s):** `e2e/desktop.smoke.spec.js` (new), `package.json`, `.github/workflows/ci.yml`
-- **Why:** ROADMAP Phase 1 work item "Add a 'desktop mode' smoke test that opens
-  the app window" was never landed. The v1 ship gate requires "Build, lint,
-  typecheck, and smoke tests are green", and today the Electron launch path
-  (`main.cjs` → preload → renderer) has zero automated coverage — all 313 Vitest
-  cases run in jsdom and never boot a real BrowserWindow. A regression in
-  `main.cjs` wiring would ship green. SRS §6.4 confirms this is exactly where the
-  two highest-impact integration bugs (M2, M3 → BUG-001, BUG-002) hid undetected
-  (T4, WS3.1); SRS §8: this test lands **first**, not last — bundle it with
-  BUG-001 + BUG-002 as the opening slice ("make the desktop shell real and
-  provable").
-- **Approach:** Add a minimal E2E layer that launches the packaged-dev app
-  (`electron . ` against a built `dist/`) and asserts: window opens with title
-  "Citybase", `window.citybase` is defined, `window.citybase.app.getVersion()`
-  resolves (proves the bridge survives `sandbox: true` — the BUG-001 guard),
-  `window.require`/`window.process` are undefined (isolation), and the city view
-  root renders. Wire as a separate npm script (`test:e2e`) and an opt-in CI job
-  (xvfb on ubuntu-latest), plus an `npx electron-builder --dir` packaging step in
-  CI so a broken main entry, preload path, or `files` glob can't ship green (T4).
-- **Library / dependency notes:** Playwright's `_electron` launcher is the
-  current standard for Electron E2E (WebdriverIO's Electron service is the
-  alternative; Spectron is dead). Recommendation: `@playwright/test` as a dev
-  dependency — dev deps for testing are explicitly allowed by AGENTS.md.
-  Verify latest stable version and Electron-support status before installing.
-- **Acceptance criteria:**
-  - `npm run test:e2e` builds nothing implicitly; it requires `dist/` and fails with a clear message if absent.
-  - The spec launches Electron, waits for the window, and passes the five assertions above.
-  - CI runs the E2E job on PRs (xvfb or headless equivalent) without flaking, and
-    runs `npx electron-builder --dir` as a packaging step.
-  - VERIFICATION.md Stage 2/3 steps referencing FEAT-001 are replaced with the real commands.
-- **Test plan:** the feature *is* a test; additionally one negative assertion
-  (isolation probe) so the suite guards the Stage 5 renderer-isolation constraint.
-- **Out of scope:** E2E against the packaged app bundle (the CI packaging step only
-  proves `electron-builder --dir` succeeds), multi-window flows, agent-run E2E
-  against real CLIs, visual regression.
-- **Implementation:** `e2e/desktop.smoke.spec.js` (Playwright 1.60 `_electron`,
-  serial worker, CI-only `--no-sandbox`) asserting title, live bridge,
-  `getVersion()` over real IPC, sandboxed renderer, rendered `#root`, and detect
-  shape; `playwright.config.js`; `test:e2e` script with a clear dist-missing
-  error; Vitest `exclude: e2e/**`; `desktop-smoke` CI job (xvfb + pinned SHAs +
-  `electron-builder --dir`); VERIFICATION.md Stage 2.4 placeholder replaced;
-  `index.html` title aligned to "Citybase". Captured the pre-wave bridge failure
-  live before any fix existed.
-- **Status:** shipped-pending-migration
-
-### [FEAT-002] README safety model and troubleshooting sections
-- [x] **Priority:** med
-- **Area:** docs
-- **File(s):** `README.md`
-- **Why:** the v1 ship gate (ROADMAP) requires "README includes setup, app
-  architecture, safety model, and troubleshooting". Setup and architecture
-  exist; a user-facing safety-model section (approval boundaries, what agents
-  may and may not do, renderer isolation) and a troubleshooting section
-  (missing git, missing agent binaries, port 5173 busy, Windows Developer Mode
-  for packaging) do not.
-- **Approach:** add two sections to README.md: "Safety model" (summarise the
-  approval boundary from ROADMAP + the isolation guarantees from main.cjs/
-  preload.cjs in user terms) and "Troubleshooting" (the four failure modes
-  above, each with symptom → cause → fix).
-- **Library / dependency notes:** none.
-- **Acceptance criteria:**
-  - README gains both sections; every claim in them is traceable to code or ROADMAP.
-  - No duplication drift: safety section links to docs/agent-runtime.md rather than restating the contract.
-- **Test plan:** n/a (docs); VERIFICATION.md Stage 1 doc-drift check covers it.
-- **Out of scope:** restructuring the rest of README; marketing copy.
-- **Implementation:** shipped upstream in the v1 operator-guide rewrite
-  (a6a31bd) — README gained "Safety model" (isolation flags, allow-listed IPC,
-  single spawn site, git-mutation validation, the bypassPermissions caveat) and
-  a symptom/cause/fix "Troubleshooting" table. Verified present at merge time;
-  the agent-runtime.md cross-link this ticket wanted is folded into BUG-019's
-  doc pass.
-- **Status:** shipped-pending-migration
-
 ### [FEAT-003] Production packaging and distribution
 - [ ] **Priority:** low
 - **Area:** build
@@ -326,6 +250,102 @@ gone from `src`). v2.0 makes the founding promise real: the repo rendered as a
 living isometric city, fused with real agent runs, on top of v1's real-data
 foundation. This is the major-version content. Sequenced FEAT-013 → FEAT-019.
 
+### [FEAT-017] Design system 2.0 — depth, motion, ambient
+- [ ] **Priority:** med
+- **Area:** renderer
+- **File(s):** src/game/palette.js, src/game/theme.jsx, src/index.css
+- **Why:** the current system is flat and sparse. v2.0 needs elevation, motion,
+  and an ambient backdrop to feel cohesive and alive.
+- **Approach:** extend tokens (elevation/shadow scale, spacing scale, motion
+  durations, glow helpers); add reusable keyframes (pulse/scan/float) in index.css;
+  an ambient gradient/grid backdrop behind the city; refine primitives. Additive —
+  no breaking changes to existing components.
+- **Acceptance criteria:** existing screens unbroken; new tokens used by the city;
+  motion respects `prefers-reduced-motion`.
+- **Test plan:** visual via dev-capture; existing suite green.
+- **Out of scope:** a full component-library rewrite.
+- **Status:** open
+
+---
+
+## Shipped
+
+### [FEAT-001] Desktop-mode E2E smoke test that opens the app window
+- [x] **Priority:** high
+- **Area:** tests
+- **File(s):** `e2e/desktop.smoke.spec.js` (new), `package.json`, `.github/workflows/ci.yml`
+- **Why:** ROADMAP Phase 1 work item "Add a 'desktop mode' smoke test that opens
+  the app window" was never landed. The v1 ship gate requires "Build, lint,
+  typecheck, and smoke tests are green", and today the Electron launch path
+  (`main.cjs` → preload → renderer) has zero automated coverage — all 313 Vitest
+  cases run in jsdom and never boot a real BrowserWindow. A regression in
+  `main.cjs` wiring would ship green. SRS §6.4 confirms this is exactly where the
+  two highest-impact integration bugs (M2, M3 → BUG-001, BUG-002) hid undetected
+  (T4, WS3.1); SRS §8: this test lands **first**, not last — bundle it with
+  BUG-001 + BUG-002 as the opening slice ("make the desktop shell real and
+  provable").
+- **Approach:** Add a minimal E2E layer that launches the packaged-dev app
+  (`electron . ` against a built `dist/`) and asserts: window opens with title
+  "Citybase", `window.citybase` is defined, `window.citybase.app.getVersion()`
+  resolves (proves the bridge survives `sandbox: true` — the BUG-001 guard),
+  `window.require`/`window.process` are undefined (isolation), and the city view
+  root renders. Wire as a separate npm script (`test:e2e`) and an opt-in CI job
+  (xvfb on ubuntu-latest), plus an `npx electron-builder --dir` packaging step in
+  CI so a broken main entry, preload path, or `files` glob can't ship green (T4).
+- **Library / dependency notes:** Playwright's `_electron` launcher is the
+  current standard for Electron E2E (WebdriverIO's Electron service is the
+  alternative; Spectron is dead). Recommendation: `@playwright/test` as a dev
+  dependency — dev deps for testing are explicitly allowed by AGENTS.md.
+  Verify latest stable version and Electron-support status before installing.
+- **Acceptance criteria:**
+  - `npm run test:e2e` builds nothing implicitly; it requires `dist/` and fails with a clear message if absent.
+  - The spec launches Electron, waits for the window, and passes the five assertions above.
+  - CI runs the E2E job on PRs (xvfb or headless equivalent) without flaking, and
+    runs `npx electron-builder --dir` as a packaging step.
+  - VERIFICATION.md Stage 2/3 steps referencing FEAT-001 are replaced with the real commands.
+- **Test plan:** the feature *is* a test; additionally one negative assertion
+  (isolation probe) so the suite guards the Stage 5 renderer-isolation constraint.
+- **Out of scope:** E2E against the packaged app bundle (the CI packaging step only
+  proves `electron-builder --dir` succeeds), multi-window flows, agent-run E2E
+  against real CLIs, visual regression.
+- **Implementation:** `e2e/desktop.smoke.spec.js` (Playwright 1.60 `_electron`,
+  serial worker, CI-only `--no-sandbox`) asserting title, live bridge,
+  `getVersion()` over real IPC, sandboxed renderer, rendered `#root`, and detect
+  shape; `playwright.config.js`; `test:e2e` script with a clear dist-missing
+  error; Vitest `exclude: e2e/**`; `desktop-smoke` CI job (xvfb + pinned SHAs +
+  `electron-builder --dir`); VERIFICATION.md Stage 2.4 placeholder replaced;
+  `index.html` title aligned to "Citybase". Captured the pre-wave bridge failure
+  live before any fix existed.
+- **Status:** shipped-pending-migration
+
+### [FEAT-002] README safety model and troubleshooting sections
+- [x] **Priority:** med
+- **Area:** docs
+- **File(s):** `README.md`
+- **Why:** the v1 ship gate (ROADMAP) requires "README includes setup, app
+  architecture, safety model, and troubleshooting". Setup and architecture
+  exist; a user-facing safety-model section (approval boundaries, what agents
+  may and may not do, renderer isolation) and a troubleshooting section
+  (missing git, missing agent binaries, port 5173 busy, Windows Developer Mode
+  for packaging) do not.
+- **Approach:** add two sections to README.md: "Safety model" (summarise the
+  approval boundary from ROADMAP + the isolation guarantees from main.cjs/
+  preload.cjs in user terms) and "Troubleshooting" (the four failure modes
+  above, each with symptom → cause → fix).
+- **Library / dependency notes:** none.
+- **Acceptance criteria:**
+  - README gains both sections; every claim in them is traceable to code or ROADMAP.
+  - No duplication drift: safety section links to docs/agent-runtime.md rather than restating the contract.
+- **Test plan:** n/a (docs); VERIFICATION.md Stage 1 doc-drift check covers it.
+- **Out of scope:** restructuring the rest of README; marketing copy.
+- **Implementation:** shipped upstream in the v1 operator-guide rewrite
+  (a6a31bd) — README gained "Safety model" (isolation flags, allow-listed IPC,
+  single spawn site, git-mutation validation, the bypassPermissions caveat) and
+  a symptom/cause/fix "Troubleshooting" table. Verified present at merge time;
+  the agent-runtime.md cross-link this ticket wanted is folded into BUG-019's
+  doc pass.
+- **Status:** shipped-pending-migration
+
 ### [FEAT-013] City projection model
 - [x] **Priority:** high
 - **Area:** renderer
@@ -405,22 +425,6 @@ foundation. This is the major-version content. Sequenced FEAT-013 → FEAT-019.
 - **Implementation:** `runCity.js` + active-run overlay/banner + live snapshot refresh.
 - **Status:** shipped-pending-migration
 
-### [FEAT-017] Design system 2.0 — depth, motion, ambient
-- [ ] **Priority:** med
-- **Area:** renderer
-- **File(s):** src/game/palette.js, src/game/theme.jsx, src/index.css
-- **Why:** the current system is flat and sparse. v2.0 needs elevation, motion,
-  and an ambient backdrop to feel cohesive and alive.
-- **Approach:** extend tokens (elevation/shadow scale, spacing scale, motion
-  durations, glow helpers); add reusable keyframes (pulse/scan/float) in index.css;
-  an ambient gradient/grid backdrop behind the city; refine primitives. Additive —
-  no breaking changes to existing components.
-- **Acceptance criteria:** existing screens unbroken; new tokens used by the city;
-  motion respects `prefers-reduced-motion`.
-- **Test plan:** visual via dev-capture; existing suite green.
-- **Out of scope:** a full component-library rewrite.
-- **Status:** open
-
 ### [FEAT-018] Version 2.0 cut + docs
 - [x] **Priority:** med
 - **Area:** docs, build
@@ -436,7 +440,3 @@ foundation. This is the major-version content. Sequenced FEAT-013 → FEAT-019.
 - **Out of scope:** production packaging (FEAT-003).
 - **Implementation:** package.json 2.0.0, TopBar v2.0 label, CHANGELOG/README/ROADMAP.
 - **Status:** shipped-pending-migration
-
----
-
-## Shipped

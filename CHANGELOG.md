@@ -14,6 +14,13 @@ sections under each release/date heading.
 
 ### Verified
 
+- 2026-06-15 V&V pass (SHA `0fb551d`): Stages 0–5 green. 361 Vitest cases across
+  29 files (jsdom), 1 Playwright desktop smoke, lint + build clean, renderer
+  isolation / IPC allow-list / single-spawn-site / no-telemetry invariants
+  re-confirmed. Agent path verified against the real `claude` CLI by the
+  integration harnesses (`scripts/claude-e2e.mjs` 10/10, `scripts/gui-claude-e2e.mjs`
+  5/5 incl. the approval gate). Test baseline bumped 313 → 361 in VERIFICATION.md.
+
 ### Added
 
 - FEAT-013 City projection model (`cityModel.js` + `hex.js` + `iso.js`): pure,
