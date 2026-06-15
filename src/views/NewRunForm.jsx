@@ -1,4 +1,5 @@
 import React from 'react';
+import { NEON, alpha } from '../game/palette.js';
 import { Panel, Mono, Title, NButton, TextArea, NSelect } from '../game/theme.jsx';
 
 // NewRunForm — the primary action surface when a workspace is open and
@@ -58,8 +59,11 @@ export function NewRunForm({
   };
 
   return (
-    <div style={{ flex: 1, padding: 18, overflowY: 'auto' }}>
-      <div style={{ maxWidth: 720 }}>
+    <div style={{
+      flex: 1, padding: '36px 18px', overflowY: 'auto',
+      background: `radial-gradient(ellipse 90% 70% at 50% 0%, ${alpha(NEON.cyan, 0.05)} 0%, ${NEON.bg0} 60%)`,
+    }}>
+      <div style={{ maxWidth: 760, margin: '0 auto' }}>
         <Title size={20} weight={700}>Run an agent on {workspace.name}</Title>
         <Mono size={11} color="ink3" style={{ display: 'block', marginTop: 4 }}>
           {workspace.rootPath}
