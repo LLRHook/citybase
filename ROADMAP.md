@@ -4,6 +4,15 @@ Citybase is a downloadable desktop code editor shell with a game-like visual int
 
 The product is not a cloud SaaS agent platform and not a replacement for Codex or Claude Code. It is a local-first UI layer over a single Git workspace and a pluggable AI agent harness. The user should be able to open the app, pick one software project, connect Git, choose an agent provider, and drive work through a visual city instead of staring at code by default.
 
+## Status — v2.0 "The Living City" (current)
+
+The visual city — the founding promise — is shipped as the default view, projected
+from real Git state and fused with live agent runs (buildings light up as the agent
+edits). This is the v2.0 milestone. See [CHANGELOG.md](./CHANGELOG.md) (FEAT-013 →
+FEAT-018) and [features.md](./features.md) for the work; the open backlog
+(approval-boundary wiring BUG-004, design-system depth, run persistence) continues
+from here.
+
 ## Product Boundary
 
 Citybase v1 should do these things well:

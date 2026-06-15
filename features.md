@@ -327,7 +327,7 @@ living isometric city, fused with real agent runs, on top of v1's real-data
 foundation. This is the major-version content. Sequenced FEAT-013 → FEAT-019.
 
 ### [FEAT-013] City projection model
-- [ ] **Priority:** high
+- [x] **Priority:** high
 - **Area:** renderer
 - **File(s):** src/app/cityModel.js (new), src/game/hex.js (new), src/tests/cityModel.test.js (new)
 - **Why:** the city renderer needs a pure projection from the live git snapshot
@@ -344,10 +344,11 @@ foundation. This is the major-version content. Sequenced FEAT-013 → FEAT-019.
 - **Test plan:** `src/tests/cityModel.test.js` — projection shape, ordering,
   dirty propagation, ring overflow, empty tree.
 - **Out of scope:** rendering (FEAT-014), agent overlay (FEAT-016).
-- **Status:** open
+- **Implementation:** `cityModel.js`/`hex.js`/`iso.js` projection + 17 unit tests.
+- **Status:** shipped-pending-migration
 
 ### [FEAT-014] Isometric City renderer
-- [ ] **Priority:** high
+- [x] **Priority:** high
 - **Area:** renderer
 - **File(s):** src/views/CityView.jsx (new), src/game/iso.js (new), src/tests/CityView.test.jsx (new)
 - **Why:** the signature visual. A polished 2.5D isometric city is the
@@ -365,10 +366,11 @@ foundation. This is the major-version content. Sequenced FEAT-013 → FEAT-019.
 - **Test plan:** `src/tests/CityView.test.jsx` — renders from a fixture snapshot,
   building count matches model, dirty class applied, empty-tree empty state.
 - **Out of scope:** live agent avatars (FEAT-016).
-- **Status:** open
+- **Implementation:** `CityView.jsx` isometric renderer + slabs/grid/lighting + tests.
+- **Status:** shipped-pending-migration
 
 ### [FEAT-015] App shell navigation + canvas fill
-- [ ] **Priority:** high
+- [x] **Priority:** high
 - **Area:** renderer
 - **File(s):** src/App.jsx, src/views/TopBar.jsx, src/game/theme.jsx
 - **Why:** v1 wastes most of the window and has no way to reach the city. Need a
@@ -382,10 +384,11 @@ foundation. This is the major-version content. Sequenced FEAT-013 → FEAT-019.
 - **Test plan:** App-level tests for nav switching + default view; existing suite
   stays green.
 - **Out of scope:** command palette (later).
-- **Status:** open
+- **Implementation:** City/Work SegNav in TopBar; city is the default open-workspace view.
+- **Status:** shipped-pending-migration
 
 ### [FEAT-016] Living agent runs in the city
-- [ ] **Priority:** high
+- [x] **Priority:** high
 - **Area:** renderer, agents
 - **File(s):** src/views/CityView.jsx, src/app/useRunEvents.js, src/app/runCity.js (new)
 - **Why:** the differentiator — watch an agent work in your city. Fuses the
@@ -399,7 +402,8 @@ foundation. This is the major-version content. Sequenced FEAT-013 → FEAT-019.
 - **Test plan:** unit-test the event→city mapping; component test that active-run
   props apply activity classes.
 - **Out of scope:** changing the agent protocol.
-- **Status:** open
+- **Implementation:** `runCity.js` + active-run overlay/banner + live snapshot refresh.
+- **Status:** shipped-pending-migration
 
 ### [FEAT-017] Design system 2.0 — depth, motion, ambient
 - [ ] **Priority:** med
@@ -418,7 +422,7 @@ foundation. This is the major-version content. Sequenced FEAT-013 → FEAT-019.
 - **Status:** open
 
 ### [FEAT-018] Version 2.0 cut + docs
-- [ ] **Priority:** med
+- [x] **Priority:** med
 - **Area:** docs, build
 - **File(s):** package.json, src/views/TopBar.jsx, README.md, ROADMAP.md, CHANGELOG.md, VERIFICATION.md
 - **Why:** the version bump and the docs that describe the living city are part of
@@ -430,7 +434,8 @@ foundation. This is the major-version content. Sequenced FEAT-013 → FEAT-019.
   the shipped app; release notes accurate.
 - **Test plan:** version assertion; doc-drift check (VERIFICATION Stage 1).
 - **Out of scope:** production packaging (FEAT-003).
-- **Status:** open
+- **Implementation:** package.json 2.0.0, TopBar v2.0 label, CHANGELOG/README/ROADMAP.
+- **Status:** shipped-pending-migration
 
 ---
 
