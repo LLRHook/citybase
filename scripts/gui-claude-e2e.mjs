@@ -76,6 +76,13 @@ try {
   check('approval modal gates the run before it spawns', sawApproval);
   if (sawApproval) await approveBtn.click();
 
+  // Capture the live city mid-run: the run is non-blocking, so switch to CITY
+  // while the agent works and grab the live agent presence (FEAT-019).
+  await win.getByRole('button', { name: /CITY/ }).first().click().catch(() => {});
+  await win.waitForTimeout(2500);
+  await win.screenshot({ path: path.join(outDir, 'gui-03-live.png') });
+  await win.getByRole('button', { name: /WORK/ }).first().click().catch(() => {});
+
   // RunDetail renders the parsed claude output as an "edit" event.
   let sawClaude = true;
   try {
