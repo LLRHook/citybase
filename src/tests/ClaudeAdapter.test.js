@@ -274,13 +274,47 @@ describe('parseClaudeJsonResult', () => {
 
 describe('ClaudeAdapter — produceDiff / runChecks / openPR / cancel', () => {
   it('produceDiff invokes git diff inside the run cwd', async () => {
-    const ps = makeProcessService();
+    // ls-files (untracked probe) returns nothing; only the diff matters here.
+    const ps = makeProcessService({
+      run: vi.fn(async (cmd, args) => ({
+        ok: true, code: 0, signal: null,
+        stdout: cmd === 'git' && args[0] === 'ls-files' ? '' : '',
+        stderr: '', timedOut: false, durationMs: 5, error: null,
+      })),
+    });
     const adapter = makeAdapter({ processService: ps });
     const run = await adapter.startTask(VALID_PARAMS);
     await adapter.produceDiff(run.runId);
-    const gitCalls = ps.run.mock.calls.filter(c => c[0] === 'git');
-    expect(gitCalls).toHaveLength(1);
-    expect(gitCalls[0][1]).toEqual(['diff', '--unified=3', '--no-color']);
+    const diffCall = ps.run.mock.calls.find(c => c[0] === 'git' && c[1][0] === 'diff');
+    expect(diffCall[1]).toEqual(['diff', '--unified=3', '--no-color']);
+    expect(diffCall[2]).toEqual({ cwd: '/abs/repo' });
+  });
+
+  it('produceDiff includes agent-created (untracked) files via intent-to-add', async () => {
+    const newFileDiff = [
+      'diff --git a/NEW.txt b/NEW.txt',
+      'new file mode 100644',
+      '--- /dev/null',
+      '+++ b/NEW.txt',
+      '@@ -0,0 +1 @@',
+      '+hello',
+    ].join('\n');
+    const ps = makeProcessService({
+      run: vi.fn(async (cmd, args) => {
+        let stdout = '';
+        if (cmd === 'git' && args[0] === 'ls-files') stdout = 'NEW.txt\0';
+        else if (cmd === 'git' && args[0] === 'diff') stdout = newFileDiff;
+        return { ok: true, code: 0, signal: null, stdout, stderr: '', timedOut: false, durationMs: 5, error: null };
+      }),
+    });
+    const adapter = makeAdapter({ processService: ps });
+    const run = await adapter.startTask(VALID_PARAMS);
+    const out = await adapter.produceDiff(run.runId);
+    const gitArgs = ps.run.mock.calls.filter(c => c[0] === 'git').map(c => c[1]);
+    expect(gitArgs).toContainEqual(['ls-files', '--others', '--exclude-standard', '-z']);
+    expect(gitArgs).toContainEqual(['add', '--intent-to-add', '--', 'NEW.txt']);
+    expect(gitArgs).toContainEqual(['reset', '--quiet', '--', 'NEW.txt']);
+    expect(out.files.some(f => f.file === 'NEW.txt')).toBe(true);
   });
 
   it('runChecks runs declared npm scripts and forwards --run for test', async () => {
