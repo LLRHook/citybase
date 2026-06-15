@@ -59,11 +59,14 @@ try {
     promptContext: 'Create a new file named CITYBASE_HELLO.txt whose only contents are the line: hello from citybase. Do not change any other files.',
   });
   check('startRun resolved with a runId', !!run?.runId, JSON.stringify(run));
-  check('run status is terminal done', run?.status === 'done', `status=${run?.status}`);
+  // Non-blocking dispatch: the run is 'running' immediately and completes async.
+  check('run starts in the running state', run?.status === 'running', `status=${run?.status}`);
 
   // 5. streamEvents → a real edit event (not an error), carrying claude text.
+  //    Draining the stream also waits for the run to settle.
   const events = [];
   for await (const e of manager.streamEvents(run.runId)) events.push(e);
+  check('run settles to done after streaming', run?.status === 'done', `status=${run?.status}`);
   check('streamEvents yielded ≥1 event', events.length >= 1, `n=${events.length}`);
   const hasError = events.some((e) => e.kind === 'error');
   check('no error event in the stream', !hasError, JSON.stringify(events));

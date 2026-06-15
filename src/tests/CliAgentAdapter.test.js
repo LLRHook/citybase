@@ -15,12 +15,19 @@ const VALID = {
   promptContext: 'do the thing',
 };
 
-function makeProcessService() {
+function makeProcessService(streamResult) {
+  const done = streamResult || {
+    ok: true, code: 0, signal: null, stdout: '', stderr: '',
+    timedOut: false, killed: false, truncated: false, durationMs: 10, error: null,
+  };
   return {
     run: vi.fn(async () => ({
       ok: true, code: 0, signal: null, stdout: '', stderr: '',
       timedOut: false, durationMs: 10, error: null,
     })),
+    // Non-blocking streaming dispatch: startTask uses this; the handle's
+    // `done` resolves to the canned terminal result.
+    spawnStream: vi.fn(() => ({ pid: 4321, kill: vi.fn(), done: Promise.resolve(done) })),
   };
 }
 
@@ -51,7 +58,7 @@ describe('CliAgentAdapter — buildArgv contract', () => {
       binaryPath: '/usr/local/bin/codex',
     });
     await adapter.startTask({ ...VALID, model: 'opus' });
-    const argv = ps.run.mock.calls[0][1];
+    const argv = ps.spawnStream.mock.calls[0][1];
     expect(argv).toEqual(['--quiet', '--prompt', 'do the thing', '--model', 'opus']);
   });
 
@@ -82,7 +89,7 @@ describe('CliAgentAdapter — buildArgv contract', () => {
     });
     await adapter.startTask(VALID);
     expect(buildArgv).toHaveBeenCalledWith(expect.objectContaining({ params: expect.any(Object), skill: 'refactor' }));
-    expect(ps.run.mock.calls[0][1]).toEqual(['--bespoke', 'refactor']);
+    expect(ps.spawnStream.mock.calls[0][1]).toEqual(['--bespoke', 'refactor']);
   });
 });
 
@@ -142,7 +149,11 @@ describe('CliAgentAdapter — openPR via gh CLI', () => {
       stdout: 'https://github.com/owner/repo/pull/77\n',
       stderr: '', timedOut: false, durationMs: 12, error: null,
     }));
-    const ps = { run };
+    const spawnStream = vi.fn(() => ({
+      pid: 1, kill: vi.fn(),
+      done: Promise.resolve({ ok: true, code: 0, signal: null, stdout: '', stderr: '', timedOut: false, killed: false, truncated: false, durationMs: 5, error: null }),
+    }));
+    const ps = { run, spawnStream };
     const adapter = new CliAgentAdapter({
       binaryName: 'codex',
       detectKey: 'codex',

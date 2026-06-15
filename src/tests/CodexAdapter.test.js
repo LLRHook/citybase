@@ -10,14 +10,27 @@ const VALID_PARAMS = {
   promptContext: 'do the thing',
 };
 
+// Non-blocking dispatch: startTask uses spawnStream; `run` is for git/gh/npm.
+// Shape the agent run result via `streamResult`.
 function makeProcessService(overrides = {}) {
+  const streamResult = overrides.streamResult || {
+    ok: true, code: 0, signal: null, stdout: '', stderr: '',
+    timedOut: false, killed: false, truncated: false, durationMs: 12, error: null,
+  };
   return {
-    run: vi.fn(async () => ({
+    run: overrides.run || vi.fn(async () => ({
       ok: true, code: 0, signal: null, stdout: '', stderr: '',
       timedOut: false, durationMs: 12, error: null,
     })),
-    ...overrides,
+    spawnStream: overrides.spawnStream
+      || vi.fn(() => ({ pid: 1, kill: vi.fn(), done: Promise.resolve(streamResult) })),
   };
+}
+
+async function settle(adapter, run) {
+  const it = adapter.streamEvents(run.runId);
+  while (!(await it.next()).done) { /* drain to force the run to settle */ }
+  return run;
 }
 
 function makeAdapter(overrides = {}) {
@@ -66,7 +79,7 @@ describe('CodexAdapter — codex CLI presence', () => {
       codexPath: '/opt/custom/codex',
     });
     await adapter.startTask(VALID_PARAMS);
-    expect(ps.run).toHaveBeenCalledWith(
+    expect(ps.spawnStream).toHaveBeenCalledWith(
       '/opt/custom/codex',
       expect.any(Array),
       expect.objectContaining({ cwd: '/abs/repo' }),
@@ -86,7 +99,7 @@ describe('CodexAdapter — startTask', () => {
     const ps = makeProcessService();
     const adapter = makeAdapter({ processService: ps });
     await adapter.startTask({ ...VALID_PARAMS, model: 'gpt-5-codex' });
-    const [, args, options] = ps.run.mock.calls[0];
+    const [, args, options] = ps.spawnStream.mock.calls[0];
     expect(args[0]).toBe('exec');
     expect(args).toContain('--cd');
     expect(args).toContain('/abs/repo');
@@ -101,42 +114,43 @@ describe('CodexAdapter — startTask', () => {
     expect(options.stdin).toContain('do the thing');
   });
 
-  it('marks the run as done and returns AgentRun shape on a clean exit', async () => {
+  it('returns AgentRun shape running, then done on a clean exit', async () => {
     const adapter = makeAdapter();
     const run = await adapter.startTask(VALID_PARAMS);
     expect(run).toMatchObject({
       questId: 'TASK-1',
       adventurerId: 'alpha-7',
-      status: 'done',
       contextUsed: 0,
       maxContext: 200_000,
       branch: 'main',
     });
     expect(typeof run.runId).toBe('string');
     expect(run.runId.length).toBeGreaterThan(0);
+    await settle(adapter, run);
+    expect(run.status).toBe('done');
   });
 
-  it('marks the run as failed when processService reports a non-zero exit', async () => {
+  it('marks the run as failed when the process reports a non-zero exit', async () => {
     const ps = makeProcessService({
-      run: vi.fn(async () => ({
+      streamResult: {
         ok: false, code: 1, signal: null, stdout: 'partial', stderr: 'boom',
-        timedOut: false, durationMs: 8, error: { message: 'exit 1', code: 1 },
-      })),
+        timedOut: false, killed: false, truncated: false, durationMs: 8, error: { message: 'exit 1', code: 1 },
+      },
     });
     const adapter = makeAdapter({ processService: ps });
-    const run = await adapter.startTask(VALID_PARAMS);
+    const run = await settle(adapter, await adapter.startTask(VALID_PARAMS));
     expect(run.status).toBe('failed');
   });
 
-  it('marks the run as failed when processService reports a timeout', async () => {
+  it('marks the run as failed when the process times out', async () => {
     const ps = makeProcessService({
-      run: vi.fn(async () => ({
+      streamResult: {
         ok: false, code: null, signal: 'SIGTERM', stdout: '', stderr: '',
-        timedOut: true, durationMs: 15000, error: { message: 'ETIMEDOUT' },
-      })),
+        timedOut: true, killed: true, truncated: false, durationMs: 15000, error: { message: 'ETIMEDOUT' },
+      },
     });
     const adapter = makeAdapter({ processService: ps });
-    const run = await adapter.startTask(VALID_PARAMS);
+    const run = await settle(adapter, await adapter.startTask(VALID_PARAMS));
     expect(run.status).toBe('failed');
   });
 });
@@ -168,10 +182,10 @@ describe('CodexAdapter — streamEvents', () => {
 
   it('emits an error event on a failed run', async () => {
     const ps = makeProcessService({
-      run: vi.fn(async () => ({
+      streamResult: {
         ok: false, code: 2, signal: null, stdout: '', stderr: '',
-        timedOut: false, durationMs: 5, error: { message: 'exit 2', code: 2 },
-      })),
+        timedOut: false, killed: false, truncated: false, durationMs: 5, error: { message: 'exit 2', code: 2 },
+      },
     });
     const adapter = makeAdapter({ processService: ps });
     const run = await adapter.startTask(VALID_PARAMS);
