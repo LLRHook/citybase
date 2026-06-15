@@ -167,7 +167,14 @@ class CliAgentAdapter extends AgentAdapter {
       maxContext: 200_000,
       branch: params.branch,
     };
-    const entry = { run, cwd, skill, stdout: '', stderr: '', exitState: null, cancelled: false, handle: null, donePromise: null };
+    const entry = {
+      run, cwd, skill, stdout: '', stderr: '', exitState: null, cancelled: false,
+      handle: null, donePromise: null,
+      // Live event queue: subclasses push parsed events as output streams in;
+      // streamEvents drains it live. The base leaves it empty and synthesizes a
+      // trail on completion instead (see streamEvents).
+      events: [], eventWaiters: [], eventsEnded: false, lineBuf: '',
+    };
     this._runs.set(runId, entry);
 
     const handle = this._processService.spawnStream(binary, args, {
@@ -190,10 +197,14 @@ class CliAgentAdapter extends AgentAdapter {
           : result.ok ? 'pass' : 'fail';
         entry.exitState = exitState;
         entry.run.status = exitState === 'pass' ? 'done' : exitState === 'cancelled' ? 'cancelled' : 'failed';
+        try { this._finalize(entry); } catch { /* ignore */ }
+        this._endEvents(entry);
       },
       () => {
         entry.exitState = entry.cancelled ? 'cancelled' : 'fail';
         entry.run.status = entry.cancelled ? 'cancelled' : 'failed';
+        try { this._finalize(entry); } catch { /* ignore */ }
+        this._endEvents(entry);
       },
     );
     return run;
@@ -202,6 +213,39 @@ class CliAgentAdapter extends AgentAdapter {
   // Hook for subclasses that parse streamed chunks into live events
   // (ClaudeAdapter overrides this for stream-json). The base no-ops.
   _onStdout() {}
+
+  // Hook called once the process settles, before the event queue is closed —
+  // subclasses flush buffered lines / push a final event. The base no-ops.
+  _finalize() {}
+
+  // Live event-queue plumbing. _pushEvent appends and wakes any drain waiting
+  // for more; _endEvents marks the stream complete and wakes all waiters.
+  _pushEvent(entry, event) {
+    entry.events.push(event);
+    const waiters = entry.eventWaiters;
+    entry.eventWaiters = [];
+    for (const resolve of waiters) resolve();
+  }
+
+  _endEvents(entry) {
+    entry.eventsEnded = true;
+    const waiters = entry.eventWaiters;
+    entry.eventWaiters = [];
+    for (const resolve of waiters) resolve();
+  }
+
+  // Drain a run's live event queue, yielding events as they are pushed until
+  // the stream ends. Subclasses that stream real output (ClaudeAdapter) use
+  // this; the base streamEvents synthesizes a trail instead.
+  async *_drainEvents(runId) {
+    const entry = this._requireRun(runId);
+    let i = 0;
+    for (;;) {
+      while (i < entry.events.length) { yield entry.events[i]; i += 1; }
+      if (entry.eventsEnded) return;
+      await new Promise((resolve) => { entry.eventWaiters.push(resolve); });
+    }
+  }
 
   // Resolve once the run's process has settled, so events / diff / checks
   // operate on the finished state. Used by everything that needs the result.
