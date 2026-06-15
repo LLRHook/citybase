@@ -318,4 +318,120 @@ Priority guide: crit / high / med / low.
 
 ---
 
+## v2.0 — "The Living City" epic
+
+The v1 wave shipped a solid but plain agent-dispatch shell and **deleted** the
+entire repository-as-city visualization (map/cityModel/hex/kanban/analysis are
+gone from `src`). v2.0 makes the founding promise real: the repo rendered as a
+living isometric city, fused with real agent runs, on top of v1's real-data
+foundation. This is the major-version content. Sequenced FEAT-013 → FEAT-019.
+
+### [FEAT-013] City projection model
+- [ ] **Priority:** high
+- **Area:** renderer
+- **File(s):** src/app/cityModel.js (new), src/game/hex.js (new), src/tests/cityModel.test.js (new)
+- **Why:** the city renderer needs a pure projection from the live git snapshot
+  (`repoTree` tracked paths + `files` dirty entries) to districts/buildings.
+  Ports the deleted projection from history `1356437` and improves it.
+- **Approach:** `projectRepoTreeToCityModel(repoTree, files)` → `{ districts, buildings }`.
+  Top-level folders → districts on concentric hex rings (busiest innermost);
+  root files → synthetic `core`; buildings carry path/type/dirty/status; district
+  carries file count + dirty count + health. Deterministic ordering. Pointy-top
+  hex math in `hex.js`.
+- **Acceptance criteria:** pure + deterministic; empty/edge inputs safe; dirty
+  files flagged on buildings and counted per district; unit tested incl. a
+  unicode/quoted-path fixture (guards BUG-009 at the model boundary).
+- **Test plan:** `src/tests/cityModel.test.js` — projection shape, ordering,
+  dirty propagation, ring overflow, empty tree.
+- **Out of scope:** rendering (FEAT-014), agent overlay (FEAT-016).
+- **Status:** open
+
+### [FEAT-014] Isometric City renderer
+- [ ] **Priority:** high
+- **Area:** renderer
+- **File(s):** src/views/CityView.jsx (new), src/game/iso.js (new), src/tests/CityView.test.jsx (new)
+- **Why:** the signature visual. A polished 2.5D isometric city is the
+  centerpiece that makes Citybase a "2.0", not a form app.
+- **Approach:** SVG isometric projection; each district is a raised platform
+  carrying extruded building blocks (towers taller), neon-lit by district color,
+  y-sorted for correct depth; dirty files glow (staged green / unstaged amber);
+  district labels + health. **Fix BUG-008**: districts spaced so footprints never
+  overlap and no building lands on a center/label tile (shared spacing constant
+  between model seats and renderer cluster radius). Pan/zoom, hover tooltips,
+  building selection.
+- **Acceptance criteria:** renders a real repo with no overlapping districts;
+  dirty files visibly distinct; legible at 1480×960; selecting a building surfaces
+  its path/status; no console errors.
+- **Test plan:** `src/tests/CityView.test.jsx` — renders from a fixture snapshot,
+  building count matches model, dirty class applied, empty-tree empty state.
+- **Out of scope:** live agent avatars (FEAT-016).
+- **Status:** open
+
+### [FEAT-015] App shell navigation + canvas fill
+- [ ] **Priority:** high
+- **Area:** renderer
+- **File(s):** src/App.jsx, src/views/TopBar.jsx, src/game/theme.jsx
+- **Why:** v1 wastes most of the window and has no way to reach the city. Need a
+  primary City ↔ Work navigation and a layout that fills the canvas.
+- **Approach:** a `view` state (`city` | `work`) with a segmented nav in the top
+  bar; City is default when a workspace is open; Work hosts the existing
+  run/commit/detail flow. Make main fill height; refine empty states.
+- **Acceptance criteria:** toggling nav switches views with workspace state
+  preserved; City is the default landing for an open workspace; no dead canvas;
+  existing run/commit flow intact and tested.
+- **Test plan:** App-level tests for nav switching + default view; existing suite
+  stays green.
+- **Out of scope:** command palette (later).
+- **Status:** open
+
+### [FEAT-016] Living agent runs in the city
+- [ ] **Priority:** high
+- **Area:** renderer, agents
+- **File(s):** src/views/CityView.jsx, src/app/useRunEvents.js, src/app/runCity.js (new)
+- **Why:** the differentiator — watch an agent work in your city. Fuses the
+  visual upgrade with the real run stream.
+- **Approach:** while a run is active, derive touched paths from the run's
+  `changed-area`/diff events (`useRunEvents`) and light up the corresponding
+  buildings/districts; show a run "spark"/avatar and a pulse on completion;
+  status color reflects running/done/failed. Pure mapping in `runCity.js`.
+- **Acceptance criteria:** dispatching a run animates the affected city areas;
+  completion/failure visibly resolves; no-op cleanly when the city view isn't open.
+- **Test plan:** unit-test the event→city mapping; component test that active-run
+  props apply activity classes.
+- **Out of scope:** changing the agent protocol.
+- **Status:** open
+
+### [FEAT-017] Design system 2.0 — depth, motion, ambient
+- [ ] **Priority:** med
+- **Area:** renderer
+- **File(s):** src/game/palette.js, src/game/theme.jsx, src/index.css
+- **Why:** the current system is flat and sparse. v2.0 needs elevation, motion,
+  and an ambient backdrop to feel cohesive and alive.
+- **Approach:** extend tokens (elevation/shadow scale, spacing scale, motion
+  durations, glow helpers); add reusable keyframes (pulse/scan/float) in index.css;
+  an ambient gradient/grid backdrop behind the city; refine primitives. Additive —
+  no breaking changes to existing components.
+- **Acceptance criteria:** existing screens unbroken; new tokens used by the city;
+  motion respects `prefers-reduced-motion`.
+- **Test plan:** visual via dev-capture; existing suite green.
+- **Out of scope:** a full component-library rewrite.
+- **Status:** open
+
+### [FEAT-018] Version 2.0 cut + docs
+- [ ] **Priority:** med
+- **Area:** docs, build
+- **File(s):** package.json, src/views/TopBar.jsx, README.md, ROADMAP.md, CHANGELOG.md, VERIFICATION.md
+- **Why:** the version bump and the docs that describe the living city are part of
+  shipping a 2.0.
+- **Approach:** bump version to 2.0.0 and the TopBar label; README/ROADMAP describe
+  the city + living runs as v2; CHANGELOG `2.0.0` release section; VERIFICATION
+  gains City stages + refreshed baselines (done via /protocol-v-and-v on green).
+- **Acceptance criteria:** version consistent across package.json + UI; docs match
+  the shipped app; release notes accurate.
+- **Test plan:** version assertion; doc-drift check (VERIFICATION Stage 1).
+- **Out of scope:** production packaging (FEAT-003).
+- **Status:** open
+
+---
+
 ## Shipped
