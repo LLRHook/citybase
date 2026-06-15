@@ -62,6 +62,7 @@ Priority guide: crit / high / med / low.
 
 ### [FEAT-004] Streaming process runner
 - [ ] **Priority:** high
+- **Status note:** in-progress (v3.0) — `processService.spawnStream`.
 - **Area:** electron
 - **File(s):** electron/main/services/processService.cjs, src/tests/processService.test.js (new)
 - **Why:** buffered `execFile` with 15 s / 4 MB defaults structurally cannot host agent
@@ -264,6 +265,64 @@ foundation. This is the major-version content. Sequenced FEAT-013 → FEAT-019.
   motion respects `prefers-reduced-motion`.
 - **Test plan:** visual via dev-capture; existing suite green.
 - **Out of scope:** a full component-library rewrite.
+- **Status:** open
+
+---
+
+## v3.0 — "Real-Time City" epic
+
+v2.0 made the city alive but runs are **buffered**: dispatch blocks ~10s, events
+appear all-at-once on completion, the city only refreshes on a 2.5s poll, and run
+history is lost on restart. v3.0 makes the workbench **real-time and durable** —
+streaming non-blocking dispatch, live token/line events, the city animating as the
+agent works, real cancel, and persistent runs. Functional core is the existing
+backlog: **FEAT-004** (streaming runner), **FEAT-005** (real streaming events incl.
+codex), **FEAT-008** (run persistence). New visual + release tickets below.
+
+### [FEAT-019] Live real-time city animation
+- [ ] **Priority:** high
+- **Area:** renderer
+- **File(s):** src/views/CityView.jsx, src/app/runCity.js
+- **Why:** with streaming (FEAT-004) the city can react to each touched file the
+  instant it changes, not on a 2.5s poll. A visible live agent presence is the v3
+  "wow".
+- **Approach:** derive touched paths from the live event stream as they arrive;
+  pulse/illuminate those buildings immediately; show a glowing "agent at work"
+  presence and a completion ripple; smooth camera ease (optional focus on the
+  active district). Respect `prefers-reduced-motion`.
+- **Acceptance criteria:** during a streamed run, buildings light within ~1s of
+  the edit; completion visibly resolves; no-op cleanly when idle/reduced-motion.
+- **Test plan:** unit-test the event→touched-paths mapping; component test that
+  live touched paths apply the active class.
+- **Out of scope:** the streaming runner itself (FEAT-004).
+- **Status:** open
+
+### [FEAT-020] Streaming run detail
+- [ ] **Priority:** high
+- **Area:** renderer
+- **File(s):** src/views/RunDetail.jsx
+- **Why:** events should append live with progress, not appear all at once when
+  the run finishes.
+- **Approach:** render the live `useRunEvents` stream incrementally; a context/
+  progress bar from `reportUsage`; a live "running…" indicator; auto-scroll.
+- **Acceptance criteria:** events appear as they stream; terminal state loads the
+  diff/checks; backstop (`getEvents`) still covers re-mounts.
+- **Test plan:** component test with an incremental event stream.
+- **Out of scope:** changing the event protocol.
+- **Status:** open
+
+### [FEAT-021] Version 3.0 cut + docs
+- [ ] **Priority:** med
+- **Area:** docs, build
+- **File(s):** package.json, src/views/TopBar.jsx, README.md, ROADMAP.md, CHANGELOG.md, VERIFICATION.md
+- **Why:** the version bump and docs that describe the real-time workbench are part
+  of shipping v3.
+- **Approach:** bump to 3.0.0 + TopBar label; README/ROADMAP describe streaming +
+  persistence; CHANGELOG 3.0.0 section; VERIFICATION baseline refreshed via V&V.
+- **Acceptance criteria:** version consistent across manifest + UI; docs match the
+  shipped app.
+- **Test plan:** version assertion; doc-drift check.
+- **Out of scope:** production packaging (FEAT-003).
 - **Status:** open
 
 ---
