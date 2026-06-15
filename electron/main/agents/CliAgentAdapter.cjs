@@ -152,41 +152,67 @@ class CliAgentAdapter extends AgentAdapter {
       ? params.runId
       : crypto.randomUUID();
     const cwd = params.repoUrl;
-    const result = await this._processService.run(binary, args, {
-      cwd,
-      timeoutMs: this._taskTimeoutMs,
-      maxBuffer: this._taskMaxBuffer,
-      stdin,
-    });
-    let exitState = 'pass';
-    if (result.timedOut) exitState = 'timeout';
-    else if (!result.ok) exitState = 'fail';
 
-    const status = exitState === 'pass' ? 'done' : 'failed';
-
+    // Non-blocking dispatch (v3): return a 'running' run immediately and let
+    // the CLI run in the background via spawnStream. The renderer sees the run
+    // as live, the UI stays responsive, the city animates while files change,
+    // and cancel() can actually terminate the child. The run object is mutated
+    // in place on completion so the manager's history reflects status live.
     const run = {
       runId,
       questId: params.questId,
       adventurerId: params.adventurerId,
-      status,
+      status: 'running',
       contextUsed: 0,
       maxContext: 200_000,
       branch: params.branch,
     };
-    this._runs.set(runId, {
-      run,
+    const entry = { run, cwd, skill, stdout: '', stderr: '', exitState: null, cancelled: false, handle: null, donePromise: null };
+    this._runs.set(runId, entry);
+
+    const handle = this._processService.spawnStream(binary, args, {
       cwd,
-      skill,
-      stdout: result.stdout || '',
-      stderr: result.stderr || '',
-      exitState,
-      cancelled: false,
+      timeoutMs: this._taskTimeoutMs,
+      maxBuffer: this._taskMaxBuffer,
+      stdin,
+      onStdout: (chunk) => { try { this._onStdout(entry, chunk); } catch { /* ignore */ } },
     });
+    entry.handle = handle;
+    entry.donePromise = Promise.resolve(handle.done).then(
+      (result) => {
+        entry.stdout = result.stdout || '';
+        entry.stderr = result.stderr || '';
+        // entry.cancelled means the *user* cancelled; a timeout also kills the
+        // child (result.killed) but is a failure, not a user cancel — so check
+        // cancelled first, then timeout, before the exit code.
+        const exitState = entry.cancelled ? 'cancelled'
+          : result.timedOut ? 'timeout'
+          : result.ok ? 'pass' : 'fail';
+        entry.exitState = exitState;
+        entry.run.status = exitState === 'pass' ? 'done' : exitState === 'cancelled' ? 'cancelled' : 'failed';
+      },
+      () => {
+        entry.exitState = entry.cancelled ? 'cancelled' : 'fail';
+        entry.run.status = entry.cancelled ? 'cancelled' : 'failed';
+      },
+    );
     return run;
   }
 
-  async *streamEvents(runId) {
+  // Hook for subclasses that parse streamed chunks into live events
+  // (ClaudeAdapter overrides this for stream-json). The base no-ops.
+  _onStdout() {}
+
+  // Resolve once the run's process has settled, so events / diff / checks
+  // operate on the finished state. Used by everything that needs the result.
+  async _settled(runId) {
     const entry = this._requireRun(runId);
+    if (entry.donePromise) { try { await entry.donePromise; } catch { /* ignore */ } }
+    return entry;
+  }
+
+  async *streamEvents(runId) {
+    const entry = await this._settled(runId);
     const trail = synthesizeTrail({
       binaryName: this._binaryName,
       runId,
@@ -203,7 +229,7 @@ class CliAgentAdapter extends AgentAdapter {
   }
 
   async produceDiff(runId) {
-    const entry = this._requireRun(runId);
+    const entry = await this._settled(runId);
     const cwd = entry.cwd;
     // Newly created files are untracked, and plain `git diff` ignores them —
     // yet creating files is the most common agent output. Mark untracked
@@ -228,7 +254,7 @@ class CliAgentAdapter extends AgentAdapter {
   }
 
   async runChecks(runId) {
-    const entry = this._requireRun(runId);
+    const entry = await this._settled(runId);
     return runWorkspaceChecks({
       workspace: { rootPath: entry.cwd },
       processService: this._processService,
@@ -287,7 +313,13 @@ class CliAgentAdapter extends AgentAdapter {
   async cancel(runId) {
     const entry = this._requireRun(runId);
     entry.cancelled = true;
-    entry.run = { ...entry.run, status: 'cancelled' };
+    // Really terminate the child (spawnStream handle); the done handler will
+    // also see `killed` and settle the run as cancelled. Mutate (don't
+    // reassign) run.status so the manager's shared reference reflects it.
+    if (entry.handle && typeof entry.handle.kill === 'function') {
+      try { entry.handle.kill(); } catch { /* ignore */ }
+    }
+    entry.run.status = 'cancelled';
     return undefined;
   }
 

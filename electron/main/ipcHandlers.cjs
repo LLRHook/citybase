@@ -120,6 +120,14 @@ function createIpcHandlers({
 
     'citybase:agent.startRun': async (_evt, params) => {
       const run = await agentManager.startRun(params);
+      // Non-blocking dispatch returns a 'running' run immediately. Tell the
+      // renderer right away so it reflects the live run and the city starts
+      // animating; the full event trail streams via pumpAgentEvents once the
+      // CLI produces output / finishes.
+      sendAgentEvent({
+        runId: run.runId,
+        event: { runId: run.runId, t: '00:00', kind: 'plan', text: 'agent run started', payload: { status: 'running' } },
+      });
       // Fire-and-forget the streamEvents fan-out; the request/response
       // pair only carries the AgentRun handle. Renderer subscribes to
       // AGENT_EVENT_CHANNEL via preload to consume the events.
