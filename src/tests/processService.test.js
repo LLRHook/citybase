@@ -8,8 +8,67 @@
 // caret-escaped). The `run` function itself is exercised end-to-end
 // by the agent adapter tests; here we lock down the pure invocation
 // builder in isolation.
+import process from 'node:process';
+import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import { buildInvocation } from '../../electron/main/services/processService.cjs';
+import { buildInvocation, spawnStream } from '../../electron/main/services/processService.cjs';
+
+// Exercise the streaming runner against the real node binary (cross-platform,
+// always present in the test env). node.exe is not a .cmd, so no shim wrap.
+const NODE = process.execPath;
+const cwd = tmpdir();
+
+describe('processService.spawnStream', () => {
+  it('streams stdout chunks and resolves ok with the full output', async () => {
+    const chunks = [];
+    const h = spawnStream(NODE, ['-e', "process.stdout.write('alpha\\n');process.stdout.write('beta\\n')"], {
+      cwd, onStdout: (c) => chunks.push(c),
+    });
+    expect(typeof h.pid === 'number' || h.pid === undefined).toBe(true);
+    const r = await h.done;
+    expect(r.ok).toBe(true);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('alpha');
+    expect(r.stdout).toContain('beta');
+    expect(chunks.join('')).toContain('beta'); // arrived via the live callback
+    expect(r.killed).toBe(false);
+    expect(r.timedOut).toBe(false);
+  });
+
+  it('reports a non-zero exit as not-ok with the code and stderr', async () => {
+    const r = await spawnStream(NODE, ['-e', "process.stderr.write('boom');process.exit(3)"], { cwd }).done;
+    expect(r.ok).toBe(false);
+    expect(r.code).toBe(3);
+    expect(r.stderr).toContain('boom');
+  });
+
+  it('kill() terminates a long-running child within seconds', async () => {
+    const h = spawnStream(NODE, ['-e', 'setInterval(() => {}, 1000)'], { cwd });
+    h.kill();
+    const r = await h.done;
+    expect(r.killed).toBe(true);
+    expect(r.ok).toBe(false);
+  });
+
+  it('enforces a timeout by killing the child', async () => {
+    const r = await spawnStream(NODE, ['-e', 'setInterval(() => {}, 1000)'], { cwd, timeoutMs: 300 }).done;
+    expect(r.timedOut).toBe(true);
+    expect(r.ok).toBe(false);
+  });
+
+  it('pipes stdin when provided', async () => {
+    const r = await spawnStream(NODE, ['-e', "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>process.stdout.write('GOT:'+d))"], {
+      cwd, stdin: 'hello',
+    }).done;
+    expect(r.stdout).toContain('GOT:hello');
+  });
+
+  it('validates command, args, and cwd', () => {
+    expect(() => spawnStream('', [], { cwd })).toThrow(/command/);
+    expect(() => spawnStream(NODE, 'nope', { cwd })).toThrow(/args/);
+    expect(() => spawnStream(NODE, [], {})).toThrow(/cwd/);
+  });
+});
 
 describe('processService.buildInvocation — passthrough', () => {
   it('returns command + args unchanged on POSIX', () => {
