@@ -86,8 +86,18 @@ function CitybaseApp() {
   }, [runHistory, selectedRunId]);
 
   // ── Living city: the active run drives a live overlay ──
-  const activeRun = React.useMemo(() => activeRunFrom(runHistory), [runHistory]);
-  const activeEvents = useRunEvents(activeRun?.runId);
+  // Runs complete synchronously today (status jumps straight to done), so a
+  // history scan rarely catches a 'running' record. We also treat an in-flight
+  // dispatch (the awaited startRun call) as active so the city lights up while
+  // the agent works. A real 'running' history record still wins when present.
+  const [dispatchingProvider, setDispatchingProvider] = React.useState(null);
+  const historyActiveRun = React.useMemo(() => activeRunFrom(runHistory), [runHistory]);
+  const activeRun = React.useMemo(
+    () => historyActiveRun
+      || (dispatchingProvider ? { runId: '__dispatching__', provider: dispatchingProvider, status: 'running' } : null),
+    [historyActiveRun, dispatchingProvider],
+  );
+  const activeEvents = useRunEvents(historyActiveRun?.runId);
   const phase = React.useMemo(() => runPhase(activeRun, activeEvents), [activeRun, activeEvents]);
   const activePaths = React.useMemo(
     () => activePathsForRun(activeRun, workspace.snapshot),
@@ -113,6 +123,7 @@ function CitybaseApp() {
       pushToast({ text: 'Open a workspace first', color: 'amber', icon: '⚠' });
       return null;
     }
+    setDispatchingProvider(provider || 'auto');
     try {
       const run = await citybaseApi.agents.startRun({
         provider,
@@ -133,6 +144,8 @@ function CitybaseApp() {
     } catch (err) {
       pushToast({ text: err?.message || 'dispatch failed', color: 'red', icon: '✕' });
       throw err;
+    } finally {
+      setDispatchingProvider(null);
     }
   }, [workspace.workspace, workspace.snapshot, pushToast]);
 
@@ -222,7 +235,7 @@ function CitybaseApp() {
             activePaths={activePaths}
             activeRun={activeRun}
             phase={phase}
-            onOpenRun={(runId) => { setSelectedRunId(runId); setView('work'); }}
+            onOpenRun={(runId) => { if (runId && runId !== '__dispatching__') { setSelectedRunId(runId); setView('work'); } }}
           />
         )}
 
