@@ -59,4 +59,21 @@ describe('CityView', () => {
     render(<CityView snapshot={snapshot} />);
     expect(screen.queryByText(/AGENT AT WORK/i)).not.toBeInTheDocument();
   });
+
+  it('renders a live agent presence over the worked area during a run (FEAT-019)', () => {
+    const { container } = render(
+      <CityView
+        snapshot={snapshot}
+        activeRun={{ runId: 'r1', provider: 'claude', status: 'running' }}
+        activePaths={['src/App.jsx']}
+        phase={{ phase: 'editing', label: 'editing files' }}
+      />,
+    );
+    expect(container.querySelector('.city-scan')).toBeTruthy();
+  });
+
+  it('shows no agent presence when idle', () => {
+    const { container } = render(<CityView snapshot={snapshot} />);
+    expect(container.querySelector('.city-scan')).toBeNull();
+  });
 });

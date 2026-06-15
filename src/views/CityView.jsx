@@ -147,6 +147,29 @@ export function CityView({ snapshot, activePaths, activeRun, phase, onOpenRun })
   const drag = React.useRef(null);
   const active = React.useMemo(() => new Set(activePaths || []), [activePaths]);
 
+  // Live agent presence + completion ripple (FEAT-019). The presence hovers
+  // over the centroid of the buildings being changed (or the city centre while
+  // a run is starting); a ripple fires when the run finishes.
+  const runActive = !!activeRun;
+  const [ripple, setRipple] = React.useState(0);
+  const prevRunActive = React.useRef(runActive);
+  React.useEffect(() => {
+    if (prevRunActive.current && !runActive) setRipple((r) => r + 1);
+    prevRunActive.current = runActive;
+  }, [runActive]);
+  const activeCentroid = React.useMemo(() => {
+    const pts = layout.blocks.filter((b) => active.has(b.path)).map((b) => b.anchor);
+    if (pts.length === 0) {
+      const b = layout.bounds;
+      if (!isFinite(b.minX)) return null;
+      return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+    }
+    return {
+      x: pts.reduce((s, p) => s + p.x, 0) / pts.length,
+      y: pts.reduce((s, p) => s + p.y, 0) / pts.length,
+    };
+  }, [layout, active]);
+
   // Fit the city to the viewport whenever the model changes.
   const fit = React.useCallback(() => {
     const el = wrapRef.current;
@@ -296,6 +319,27 @@ export function CityView({ snapshot, activePaths, activeRun, phase, onOpenRun })
               </g>
             );
           })}
+
+          {/* completion ripple — fires when a run finishes (FEAT-019) */}
+          {ripple > 0 && activeCentroid && (
+            <circle
+              key={`ripple-${ripple}`}
+              className="city-ripple"
+              cx={activeCentroid.x}
+              cy={activeCentroid.y}
+              fill="none"
+              stroke={NEON.green}
+              strokeWidth={2.5 / view.k}
+            />
+          )}
+          {/* live agent presence — scans the area being worked while a run is active */}
+          {runActive && activeCentroid && (
+            <g transform={`translate(${activeCentroid.x},${activeCentroid.y})`} style={{ pointerEvents: 'none' }}>
+              <circle className="city-scan" fill="none" stroke={alpha(NEON.green, 0.7)} strokeWidth={1.6 / view.k} />
+              <circle className="city-scan city-scan--delay" fill="none" stroke={alpha(NEON.green, 0.5)} strokeWidth={1.6 / view.k} />
+              <circle r={4 / view.k + 2} fill={NEON.green} filter="url(#cityGlow)" />
+            </g>
+          )}
         </g>
       </svg>
 
@@ -391,9 +435,16 @@ const runBanner = {
 const CITY_CSS = `
 @keyframes cityDirtyPulse { 0%,100% { opacity: .8 } 50% { opacity: 1 } }
 @keyframes cityActivePulse { 0%,100% { opacity: .55 } 50% { opacity: 1 } }
+@keyframes cityScan { 0% { r: 6px; opacity: .85 } 100% { r: 34px; opacity: 0 } }
+@keyframes cityRipple { 0% { r: 6px; opacity: .9 } 100% { r: 90px; opacity: 0 } }
 .city-dirty { animation: cityDirtyPulse 2.4s ease-in-out infinite; }
 .city-active { animation: cityActivePulse 1s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .city-dirty, .city-active { animation: none; } }
+.city-scan { animation: cityScan 2.2s ease-out infinite; }
+.city-scan--delay { animation-delay: 1.1s; }
+.city-ripple { animation: cityRipple 1.3s ease-out 1; }
+@media (prefers-reduced-motion: reduce) {
+  .city-dirty, .city-active, .city-scan, .city-ripple { animation: none; }
+}
 `;
 
 export default CityView;
