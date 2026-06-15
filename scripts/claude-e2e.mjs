@@ -68,9 +68,15 @@ try {
   for await (const e of manager.streamEvents(run.runId)) events.push(e);
   check('run settles to done after streaming', run?.status === 'done', `status=${run?.status}`);
   check('streamEvents yielded ≥1 event', events.length >= 1, `n=${events.length}`);
+  // stream-json (FEAT-005): the run streams multiple live events, not one envelope.
+  check('stream yields multiple live events', events.length >= 2, `n=${events.length}`);
   const hasError = events.some((e) => e.kind === 'error');
-  check('no error event in the stream', !hasError, JSON.stringify(events));
+  check('no error event in the stream', !hasError, JSON.stringify(events.map((e) => e.kind)));
   check('an edit event carries claude output', events.some((e) => e.kind === 'edit' && /claude:/.test(e.text)), JSON.stringify(events.map((e) => e.kind)));
+  // tool-use events carry the exact file claude touched — this drives the live city.
+  check('a tool-use event carries the touched file path',
+    events.some((e) => e.payload && typeof e.payload.path === 'string' && /CITYBASE_HELLO/.test(e.payload.path)),
+    JSON.stringify(events.map((e) => e.payload && e.payload.path).filter(Boolean)));
 
   // 6. The file actually got created on disk.
   const created = path.join(repo, 'CITYBASE_HELLO.txt');

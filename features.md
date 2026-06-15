@@ -61,7 +61,7 @@ Priority guide: crit / high / med / low.
 - **Status:** open
 
 ### [FEAT-005] Real CLI integration: correct `claude` / `codex` argv + event normalization
-- [ ] **Priority:** high
+- [x] **Priority:** high
 - **Area:** agents
 - **File(s):** electron/main/agents/ClaudeAdapter.cjs, electron/main/agents/CodexAdapter.cjs, electron/main/agents/CliAgentAdapter.cjs, src/tests/ClaudeAdapter.test.js, src/tests/CodexAdapter.test.js
 - **Why:** the current argv shapes match neither real CLI — `claude` wants
@@ -83,7 +83,8 @@ Priority guide: crit / high / med / low.
 - **Test plan:** unit tests against recorded stream fixtures per CLI; manual
   VERIFICATION.md Stage 3.6 walkthrough.
 - **Out of scope:** approval flow (BUG-004), runner internals (FEAT-004).
-- **Status:** open
+- **Implementation:** ClaudeAdapter switched to `--output-format stream-json --verbose`; NDJSON parsed incrementally into live AgentEvents (assistant text + tool-use `file_path`), drained live by streamEvents; codex keeps its trail. Verified with the real CLI (claude-e2e 13/13, gui shows live events while RUNNING). The streamed touched paths light the exact city buildings.
+- **Status:** shipped-pending-migration
 
 ### [FEAT-006] Navigation guards, CSP, and self-hosted fonts
 - [ ] **Priority:** med

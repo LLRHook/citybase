@@ -34,21 +34,39 @@ const ERROR_STDOUT = JSON.stringify({
   result: 'rate limit hit; please retry later',
 });
 
-// Non-blocking dispatch: startTask uses spawnStream; the agent run's result
-// (the claude JSON envelope) comes from the handle's `done`. `run` is now only
-// for git/gh/npm. Tests shape the agent result via `streamResult`.
+// NDJSON line builders mirroring claude --output-format stream-json.
+const L = {
+  init: JSON.stringify({ type: 'system', subtype: 'init', model: 'claude-sonnet-4-6', session_id: 's' }),
+  text: (t) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: t }] } }),
+  tool: (name, file) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name, input: file ? { file_path: file } : {} }] } }),
+  result: (isErr, text) => JSON.stringify({ type: 'result', subtype: isErr ? 'error' : 'success', is_error: !!isErr, result: text }),
+};
+
+// Non-blocking streaming dispatch: startTask uses spawnStream, which streams
+// NDJSON `lines` via onStdout (so the live parser runs) then settles to
+// `streamResult`. `run` is only for git/gh/npm. Tests shape the stream via
+// `lines` and/or the terminal envelope via `streamResult`.
 function makeProcessService(overrides = {}) {
+  const lines = overrides.lines;
   const streamResult = overrides.streamResult || {
-    ok: true, code: 0, signal: null, stdout: SUCCESS_STDOUT, stderr: '',
-    timedOut: false, killed: false, truncated: false, durationMs: 12, error: null,
+    ok: true, code: 0, signal: null,
+    stdout: Array.isArray(lines) ? lines.join('\n') : SUCCESS_STDOUT,
+    stderr: '', timedOut: false, killed: false, truncated: false, durationMs: 12, error: null,
   };
   return {
     run: overrides.run || vi.fn(async () => ({
       ok: true, code: 0, signal: null, stdout: '', stderr: '',
       timedOut: false, durationMs: 12, error: null,
     })),
-    spawnStream: overrides.spawnStream
-      || vi.fn(() => ({ pid: 1, kill: vi.fn(), done: Promise.resolve(streamResult) })),
+    spawnStream: overrides.spawnStream || vi.fn((cmd, args, opts) => {
+      const done = (async () => {
+        if (Array.isArray(lines) && opts && typeof opts.onStdout === 'function') {
+          for (const ln of lines) opts.onStdout(`${ln}\n`);
+        }
+        return streamResult;
+      })();
+      return { pid: 1, kill: vi.fn(), done };
+    }),
   };
 }
 
@@ -117,10 +135,11 @@ describe('ClaudeAdapter — claude CLI presence', () => {
 });
 
 describe('ClaudeAdapter — buildClaudeArgv (real Claude CLI flags)', () => {
-  it('uses --print and --output-format json (NOT --quiet/--prompt)', () => {
+  it('uses --print and streaming --output-format stream-json --verbose', () => {
     const argv = buildClaudeArgv({ params: VALID_PARAMS });
     expect(argv).toContain('--print');
-    expect(argv[argv.indexOf('--output-format') + 1]).toBe('json');
+    expect(argv[argv.indexOf('--output-format') + 1]).toBe('stream-json');
+    expect(argv).toContain('--verbose');
     expect(argv).not.toContain('--quiet');
     expect(argv).not.toContain('--prompt');
   });
@@ -202,30 +221,35 @@ describe('ClaudeAdapter — streamEvents (real CLI output, no synthetic trail)',
     return out;
   }
 
-  it('yields a single edit event with the parsed result text', async () => {
-    const adapter = makeAdapter();
-    const run = await adapter.startTask(VALID_PARAMS);
-    const events = await collect(adapter.streamEvents(run.runId));
-    expect(events).toHaveLength(1);
-    expect(events[0].kind).toBe('edit');
-    expect(events[0].text).toBe('claude: I refactored the file as you asked.');
-    expect(events[0].runId).toBe(run.runId);
-    expect(events[0].t).toMatch(/^\d{2}:\d{2}$/);
-  });
-
-  it('yields an error event when claude reports is_error in the JSON envelope', async () => {
-    const ps = makeProcessService({
-      streamResult: {
-        ok: true, code: 0, signal: null, stdout: ERROR_STDOUT, stderr: '',
-        timedOut: false, killed: false, truncated: false, durationMs: 12, error: null,
-      },
-    });
+  it('streams live events parsed from the NDJSON: init → assistant text', async () => {
+    const ps = makeProcessService({ lines: [L.init, L.text('I refactored the file as you asked.'), L.result(false, 'done')] });
     const adapter = makeAdapter({ processService: ps });
     const run = await adapter.startTask(VALID_PARAMS);
     const events = await collect(adapter.streamEvents(run.runId));
-    expect(events).toHaveLength(1);
-    expect(events[0].kind).toBe('error');
-    expect(events[0].text).toContain('rate limit hit');
+    expect(events[0].kind).toBe('plan'); // session init
+    const edit = events.find((e) => e.kind === 'edit');
+    expect(edit.text).toBe('claude: I refactored the file as you asked.');
+    expect(edit.runId).toBe(run.runId);
+    expect(edit.t).toMatch(/^\d{2}:\d{2}$/);
+  });
+
+  it('emits a touched-path event for an Edit tool use (drives the live city)', async () => {
+    const ps = makeProcessService({ lines: [L.init, L.tool('Edit', 'src/x.js'), L.result(false, 'done')] });
+    const adapter = makeAdapter({ processService: ps });
+    const run = await adapter.startTask(VALID_PARAMS);
+    const events = await collect(adapter.streamEvents(run.runId));
+    const tool = events.find((e) => e.payload && e.payload.path === 'src/x.js');
+    expect(tool).toBeTruthy();
+    expect(tool.payload.tool).toBe('Edit');
+  });
+
+  it('yields an error event when claude reports is_error in the result line', async () => {
+    const ps = makeProcessService({ lines: [L.init, L.result(true, 'rate limit hit; please retry later')] });
+    const adapter = makeAdapter({ processService: ps });
+    const run = await adapter.startTask(VALID_PARAMS);
+    const events = await collect(adapter.streamEvents(run.runId));
+    expect(events.some((e) => e.kind === 'error' && /rate limit hit/.test(e.text))).toBe(true);
+    expect(run.status).toBe('failed'); // is_error factored into the run outcome
   });
 
   it('yields an error event when the process exits non-zero', async () => {
@@ -238,9 +262,8 @@ describe('ClaudeAdapter — streamEvents (real CLI output, no synthetic trail)',
     const adapter = makeAdapter({ processService: ps });
     const run = await adapter.startTask(VALID_PARAMS);
     const events = await collect(adapter.streamEvents(run.runId));
-    expect(events).toHaveLength(1);
-    expect(events[0].kind).toBe('error');
-    expect(events[0].text).toContain('fatal: claude died');
+    expect(events.at(-1).kind).toBe('error');
+    expect(events.at(-1).text).toContain('fatal: claude died');
   });
 
   it('yields an error event with the timeout message when the run timed out', async () => {
@@ -258,9 +281,13 @@ describe('ClaudeAdapter — streamEvents (real CLI output, no synthetic trail)',
   });
 
   it('yields a cancelled-error event for cancelled runs', async () => {
-    const adapter = makeAdapter();
+    // Deferred done so cancel lands before the run settles.
+    let resolveDone;
+    const ps = makeProcessService({ spawnStream: vi.fn(() => ({ pid: 1, kill: vi.fn(), done: new Promise((r) => { resolveDone = r; }) })) });
+    const adapter = makeAdapter({ processService: ps });
     const run = await adapter.startTask(VALID_PARAMS);
     await adapter.cancel(run.runId);
+    resolveDone({ ok: false, code: null, signal: 'SIGTERM', stdout: '', stderr: '', timedOut: false, killed: true, truncated: false, durationMs: 5, error: null });
     const events = await collect(adapter.streamEvents(run.runId));
     expect(events.at(-1).kind).toBe('error');
     expect(events.at(-1).text).toMatch(/cancelled/);
@@ -375,12 +402,16 @@ describe('ClaudeAdapter — produceDiff / runChecks / openPR / cancel', () => {
   });
 
   it('cancel marks the run cancelled and is idempotent', async () => {
-    const adapter = makeAdapter();
+    let resolveDone;
+    const ps = makeProcessService({ spawnStream: vi.fn(() => ({ pid: 1, kill: vi.fn(), done: new Promise((r) => { resolveDone = r; }) })) });
+    const adapter = makeAdapter({ processService: ps });
     const run = await adapter.startTask(VALID_PARAMS);
     await adapter.cancel(run.runId);
-    await adapter.cancel(run.runId);
+    await adapter.cancel(run.runId); // idempotent — no throw
+    resolveDone({ ok: false, code: null, signal: 'SIGTERM', stdout: '', stderr: '', timedOut: false, killed: true, truncated: false, durationMs: 5, error: null });
     const events = [];
     for await (const e of adapter.streamEvents(run.runId)) events.push(e);
     expect(events.at(-1).kind).toBe('error');
+    expect(run.status).toBe('cancelled');
   });
 });

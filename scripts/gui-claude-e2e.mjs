@@ -97,12 +97,17 @@ try {
     console.log('providers:', JSON.stringify(runs));
     console.log('console logs:\n', logs.slice(-25).join('\n'));
   }
-  check('RunDetail shows real claude output', sawClaude);
-  await win.screenshot({ path: path.join(outDir, 'gui-01-rundetail.png') });
+  check('RunDetail shows real claude output (live stream)', sawClaude);
 
-  // The diff panel should list the edited file (BUG-021 path: tracked-file edit).
-  const sawDiffFile = await win.getByText('src/a.js').count().then((c) => c > 0).catch(() => false);
-  check('diff/event references src/a.js', sawDiffFile);
+  // Non-blocking + streaming: the first `claude:` event arrives before the Edit
+  // tool runs, so wait for the run to COMPLETE — the diff panel only lists the
+  // edited file once the run is terminal (RunDetail loads the diff then).
+  let sawDiffFile = true;
+  try {
+    await win.getByText('src/a.js').first().waitFor({ timeout: 180_000 });
+  } catch { sawDiffFile = false; }
+  check('diff lists the edited file once the run completes', sawDiffFile);
+  await win.screenshot({ path: path.join(outDir, 'gui-01-rundetail.png') });
 
   // The city should now show src/a.js dirty (amber glow) after the final refresh.
   await win.getByRole('button', { name: /CITY/ }).first().click();

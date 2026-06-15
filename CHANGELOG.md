@@ -37,6 +37,11 @@ real, and run history survives restarts.
 - FEAT-019 Live agent presence in the city: a scanning marker over the area being
   worked while a run is active, plus a completion ripple — respecting
   `prefers-reduced-motion`.
+- FEAT-005 Live token-by-token events: ClaudeAdapter streams `--output-format
+  stream-json`, parsing each NDJSON line into a real AgentEvent as it arrives, so
+  RunDetail fills in live while the run is `running`. Tool uses carry the exact
+  `file_path`, so the city lights the precise building claude touches the instant
+  it touches it — ahead of the snapshot refresh.
 
 ### Changed
 
