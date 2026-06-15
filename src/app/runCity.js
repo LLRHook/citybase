@@ -58,3 +58,42 @@ export function activeRunFrom(runs) {
   if (!Array.isArray(runs)) return null;
   return runs.find((r) => r && r.status === 'running') || null;
 }
+
+// Claude tool uses that change files — their `file_path` is what the city
+// should light the instant the agent touches it (read-only tools are skipped).
+const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Create']);
+
+/**
+ * Pull the file paths an agent has touched out of its live event stream
+ * (`payload.path` from stream-json tool uses). These light the exact buildings
+ * in real time, ahead of the 2.5s snapshot refresh. Raw paths (often absolute);
+ * the caller relativizes against the workspace root.
+ * @param {Array<{payload?:{path?:string,tool?:string}}>} events
+ * @returns {string[]}
+ */
+export function touchedPathsFromEvents(events) {
+  const out = [];
+  for (const e of Array.isArray(events) ? events : []) {
+    const pl = e && e.payload;
+    if (pl && typeof pl.path === 'string' && pl.path && (!pl.tool || EDIT_TOOLS.has(pl.tool))) {
+      out.push(pl.path);
+    }
+  }
+  return out;
+}
+
+/**
+ * Convert an agent's (often absolute) path to a repo-relative, POSIX-style path
+ * matching the city's building paths. Falls back to a normalized input when it
+ * isn't under the root (the dirty-file set still catches it within ~2.5s).
+ */
+export function toRepoRelative(p, rootPath) {
+  if (typeof p !== 'string' || !p) return p;
+  const norm = p.replace(/\\/g, '/');
+  if (rootPath) {
+    const root = rootPath.replace(/\\/g, '/').replace(/\/+$/, '');
+    if (norm === root) return '';
+    if (norm.startsWith(`${root}/`)) return norm.slice(root.length + 1);
+  }
+  return norm;
+}
