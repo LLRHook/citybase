@@ -139,6 +139,16 @@ function createAgentManager({
     return adapterFor(runId).streamEvents(runId);
   }
 
+  // Collect a run's full event trail into an array. Runs complete
+  // synchronously, so the live streamEvents fan-out can fire before the
+  // renderer subscribes and there's no replay; the renderer calls this on
+  // RunDetail mount to reliably show a finished run's events.
+  async function getEvents(runId) {
+    const out = [];
+    for await (const event of adapterFor(runId).streamEvents(runId)) out.push(event);
+    return out;
+  }
+
   async function reportUsage(runId) {
     return adapterFor(runId).reportUsage(runId);
   }
@@ -257,6 +267,7 @@ function createAgentManager({
     getRun,
     listRuns,
     streamEvents,
+    getEvents,
     reportUsage,
     produceDiff,
     runChecks,
