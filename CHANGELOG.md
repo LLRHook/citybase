@@ -37,6 +37,14 @@ sections under each release/date heading.
 
 ### Fixed
 
+- BUG-020 Living-city overlay now activates during an in-flight dispatch
+  (runs complete synchronously, so no history record was ever observably
+  `running`); the banner and live snapshot refresh fire while the agent works.
+- BUG-021 `produceDiff` now includes agent-created (untracked) files via
+  intent-to-add, so the RunDetail diff surfaces new files instead of showing
+  "no file changes" — verified against the real `claude` CLI by
+  `scripts/claude-e2e.mjs`.
+
 ### Removed
 
 ### Security
