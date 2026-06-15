@@ -14,9 +14,12 @@ const DISTRICT_SPACING = 6.2; // world units between hex seats (> platform span)
 const TILE = 1;               // world units per building cell
 const SUB = 0.8;              // building footprint within its cell
 const HEIGHT_SCALE = 0.9;     // world height per model height unit
+const SLAB_H = 0.18;          // raised-district platform thickness
+const SHADOW_PAD = 0.6;       // ground-shadow overhang beyond the platform
 
 function buildLayout(model) {
-  const platforms = [];
+  const slabs = [];
+  const shadows = [];
   const blocks = [];
   const labels = [];
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -31,11 +34,22 @@ function buildLayout(model) {
     byDistrict.get(b.d).push(b);
   }
 
+  // Track the world extent so we can lay an iso ground grid under the city.
+  let wMinX = Infinity, wMinY = Infinity, wMaxX = -Infinity, wMaxY = -Infinity;
+  const growWorld = (x, y) => {
+    if (x < wMinX) wMinX = x; if (x > wMaxX) wMaxX = x;
+    if (y < wMinY) wMinY = y; if (y > wMaxY) wMaxY = y;
+  };
+
   for (const d of model.districts) {
     const center = axialToWorld(d.q, d.r, DISTRICT_SPACING);
+    growWorld(center.x, center.y);
     const dBuildings = byDistrict.get(d.id) || [];
-    const rows = Math.max(1, Math.ceil(dBuildings.length / GRID_COLS));
-    const gridW = GRID_COLS * TILE;
+    // Fit the grid to the actual building count so sparse districts get small,
+    // tidy platforms instead of a 4-wide pad with one block on it.
+    const cols = Math.min(GRID_COLS, Math.max(1, dBuildings.length));
+    const rows = Math.max(1, Math.ceil(dBuildings.length / cols));
+    const gridW = cols * TILE;
     const gridH = rows * TILE;
     const platSide = Math.max(gridW, gridH) + 0.7;
     const platOX = center.x - platSide / 2;
@@ -43,20 +57,14 @@ function buildLayout(model) {
     const gridOX = center.x - gridW / 2;
     const gridOY = center.y - gridH / 2;
 
-    // Platform corners feed the bounds.
     [[platOX, platOY], [platOX + platSide, platOY], [platOX + platSide, platOY + platSide], [platOX, platOY + platSide]]
-      .forEach(([x, y]) => grow(project(x, y)));
+      .forEach(([x, y]) => { grow(project(x, y)); grow(project(x, y, SLAB_H)); });
 
-    const labelAnchor = project(platOX + platSide, platOY + platSide);
-    platforms.push({
-      id: d.id,
-      color: d.color,
-      points: tilePoints(platOX, platOY, platSide),
-      depth: depthKey(platOX, platOY),
-      health: d.health,
-      dirty: d.dirty,
-      files: d.files,
-    });
+    const slab = block(platOX, platOY, platSide, SLAB_H);
+    slabs.push({ id: d.id, color: d.color, roof: slab.roof, left: slab.left, right: slab.right, depth: depthKey(platOX, platOY) });
+    shadows.push({ id: d.id, points: tilePoints(platOX - SHADOW_PAD / 2, platOY - SHADOW_PAD / 2, platSide + SHADOW_PAD), depth: depthKey(platOX, platOY) - 0.001 });
+
+    const labelAnchor = project(platOX + platSide, platOY + platSide, SLAB_H);
     labels.push({
       x: labelAnchor.x,
       y: labelAnchor.y + 14,
@@ -65,13 +73,15 @@ function buildLayout(model) {
       color: d.color,
     });
 
-    for (const b of dBuildings) {
-      const bx = gridOX + b.col * TILE + (TILE - SUB) / 2;
-      const by = gridOY + b.row * TILE + (TILE - SUB) / 2;
+    dBuildings.forEach((b, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const bx = gridOX + col * TILE + (TILE - SUB) / 2;
+      const by = gridOY + row * TILE + (TILE - SUB) / 2;
       const h = b.h * HEIGHT_SCALE;
-      const g = block(bx, by, SUB, h);
+      const g = block(bx, by, SUB, h, SLAB_H);
       grow(g.roofFront);
-      grow({ x: g.front.x, y: g.front.y });
+      grow(g.front);
       blocks.push({
         key: b.path,
         d: b.d,
@@ -86,14 +96,33 @@ function buildLayout(model) {
         left: g.left,
         right: g.right,
         anchor: g.roofFront,
-        depth: depthKey(bx, by, h),
+        depth: depthKey(bx, by, h + SLAB_H),
       });
-    }
+    });
   }
 
   blocks.sort((a, b) => a.depth - b.depth);
-  platforms.sort((a, b) => a.depth - b.depth);
-  return { platforms, blocks, labels, bounds: { minX, minY, maxX, maxY } };
+  slabs.sort((a, b) => a.depth - b.depth);
+  shadows.sort((a, b) => a.depth - b.depth);
+
+  // Iso ground grid spanning the city's world extent, padded out a few tiles.
+  const grid = [];
+  if (isFinite(wMinX)) {
+    const pad = 5;
+    const x0 = Math.floor(wMinX - pad), x1 = Math.ceil(wMaxX + pad);
+    const y0 = Math.floor(wMinY - pad), y1 = Math.ceil(wMaxY + pad);
+    const step = 2;
+    for (let gx = x0; gx <= x1; gx += step) {
+      const a = project(gx, y0); const b = project(gx, y1);
+      grid.push(`${a.x},${a.y} ${b.x},${b.y}`);
+    }
+    for (let gy = y0; gy <= y1; gy += step) {
+      const a = project(x0, gy); const b = project(x1, gy);
+      grid.push(`${a.x},${a.y} ${b.x},${b.y}`);
+    }
+  }
+
+  return { slabs, shadows, blocks, labels, grid, bounds: { minX, minY, maxX, maxY } };
 }
 
 function dirtyColor(b) {
@@ -204,17 +233,23 @@ export function CityView({ snapshot, activePaths, activeRun, phase, onOpenRun })
           </filter>
         </defs>
         <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}>
-          {/* platforms */}
-          {layout.platforms.map((p) => {
-            const a = C(p.color);
+          {/* iso ground grid — gives the city a world to sit in */}
+          {layout.grid.map((pts, i) => (
+            <polyline key={`g-${i}`} points={pts} fill="none" stroke={alpha(NEON.cyan, 0.06)} strokeWidth={0.5 / view.k} />
+          ))}
+          {/* ground shadows — anchor each district to the plane */}
+          {layout.shadows.map((s) => (
+            <polygon key={`sh-${s.id}`} points={s.points} fill={alpha('#000000', 0.35)} />
+          ))}
+          {/* district slabs — raised islands the buildings sit on */}
+          {layout.slabs.map((s) => {
+            const a = C(s.color);
             return (
-              <polygon
-                key={`plat-${p.id}`}
-                points={p.points}
-                fill={alpha(a, 0.07)}
-                stroke={alpha(a, 0.4)}
-                strokeWidth={1 / view.k}
-              />
+              <g key={`slab-${s.id}`}>
+                <polygon points={s.left} fill={alpha(a, 0.1)} stroke={alpha(a, 0.3)} strokeWidth={0.5 / view.k} />
+                <polygon points={s.right} fill={alpha(a, 0.16)} stroke={alpha(a, 0.36)} strokeWidth={0.5 / view.k} />
+                <polygon points={s.roof} fill={alpha(a, 0.1)} stroke={alpha(a, 0.5)} strokeWidth={1 / view.k} />
+              </g>
             );
           })}
           {/* buildings, back-to-front */}
@@ -236,13 +271,13 @@ export function CityView({ snapshot, activePaths, activeRun, phase, onOpenRun })
                 onMouseLeave={() => setHover((h) => (h && h.path === b.path ? null : h))}
                 onClick={() => { if (!drag.current?.moved) setSelected(b.path); }}
               >
-                <polygon points={b.left} fill={alpha(dc || a, 0.28)} stroke={alpha(dc || a, 0.5)} strokeWidth={0.6 / view.k} />
-                <polygon points={b.right} fill={alpha(dc || a, 0.5)} stroke={alpha(dc || a, 0.65)} strokeWidth={0.6 / view.k} />
+                <polygon points={b.left} fill={alpha(dc || a, 0.26)} stroke={alpha(dc || a, 0.45)} strokeWidth={0.6 / view.k} />
+                <polygon points={b.right} fill={alpha(dc || a, 0.46)} stroke={alpha(dc || a, 0.6)} strokeWidth={0.6 / view.k} />
                 <polygon
                   points={b.roof}
                   fill={roofColor}
-                  stroke={sel || hov ? NEON.ink : alpha(NEON.bg0, 0.6)}
-                  strokeWidth={(sel || hov ? 1.6 : 0.6) / view.k}
+                  stroke={sel || hov ? NEON.ink : alpha(dc || a, 0.85)}
+                  strokeWidth={(sel || hov ? 1.8 : 0.7) / view.k}
                 />
               </g>
             );
