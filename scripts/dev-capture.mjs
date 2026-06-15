@@ -52,6 +52,9 @@ try {
   await win.setViewportSize({ width: 1480, height: 960 }).catch(() => {});
   await win.waitForTimeout(1500); // let boot payload + git snapshot settle
   await shot(win, '01-city.png');
+  // Centered detail crop so fine building/lighting detail survives downscaling.
+  await win.screenshot({ path: path.join(outDir, '01-detail.png'), clip: { x: 440, y: 150, width: 640, height: 480 } });
+  shots.push(path.join(outDir, '01-detail.png'));
 
   // Walk the primary views by clicking nav controls if present. Tolerant:
   // each click is best-effort so the harness still produces the boot shot.

@@ -24,20 +24,21 @@ export function tilePoints(wx, wy, s) {
   return `${a.x},${a.y} ${b.x},${b.y} ${c.x},${c.y} ${d.x},${d.y}`;
 }
 
-// Extruded square block: footprint side `s` (world units) raised to height `h`
-// (world units). Returns three face point-strings (roof + two visible walls)
-// plus the screen anchor of the roof's front corner for label placement.
-// Faces are ordered back-to-front so painting them in order is depth-correct.
-export function block(wx, wy, s, h) {
-  // Ground corners: A back, B right, C front, D left.
-  const B = project(wx + s, wy);
-  const C = project(wx + s, wy + s);
-  const D = project(wx, wy + s);
-  // Roof corners (same xy, raised by h).
-  const Ar = project(wx, wy, h);
-  const Br = project(wx + s, wy, h);
-  const Cr = project(wx + s, wy + s, h);
-  const Dr = project(wx, wy + s, h);
+// Extruded square block: footprint side `s` (world units) rising from height
+// `base` to `base + h` (world units). Returns three face point-strings (roof +
+// two visible walls) plus the screen anchor of the roof's front corner for
+// label placement. Faces paint back-to-front so drawing in order is depth-correct.
+export function block(wx, wy, s, h, base = 0) {
+  // Base corners: A back, B right, C front, D left (at height `base`).
+  const B = project(wx + s, wy, base);
+  const C = project(wx + s, wy + s, base);
+  const D = project(wx, wy + s, base);
+  // Roof corners (same xy, raised to base + h).
+  const top = base + h;
+  const Ar = project(wx, wy, top);
+  const Br = project(wx + s, wy, top);
+  const Cr = project(wx + s, wy + s, top);
+  const Dr = project(wx, wy + s, top);
   return {
     roof: `${Ar.x},${Ar.y} ${Br.x},${Br.y} ${Cr.x},${Cr.y} ${Dr.x},${Dr.y}`,
     // Right wall faces down-right (B→C), brighter-shaded side.
