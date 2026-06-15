@@ -65,6 +65,17 @@ try {
   console.log('Dispatching real claude run through the GUI…');
   await win.getByRole('button', { name: /Run/ }).first().click();
 
+  // Approval boundary (BUG-004): the run must wait for explicit approval
+  // before the CLI spawns. Confirm the modal appears, then approve.
+  const approveBtn = win.getByRole('button', { name: /Approve/i }).first();
+  let sawApproval = true;
+  try {
+    await approveBtn.waitFor({ timeout: 15_000 });
+    await win.screenshot({ path: path.join(outDir, 'gui-00-approval.png') });
+  } catch { sawApproval = false; }
+  check('approval modal gates the run before it spawns', sawApproval);
+  if (sawApproval) await approveBtn.click();
+
   // RunDetail renders the parsed claude output as an "edit" event.
   let sawClaude = true;
   try {
