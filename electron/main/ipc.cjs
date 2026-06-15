@@ -16,23 +16,26 @@ const { CodexAdapter } = require('./agents/CodexAdapter.cjs');
 const { ClaudeAdapter } = require('./agents/ClaudeAdapter.cjs');
 const { runWorkspaceChecks } = require('./services/workspaceChecks.cjs');
 
-function buildAgentManager() {
+function buildAgentManager(emitEvent) {
   const codex = new CodexAdapter({ processService });
   const claude = new ClaudeAdapter({ processService });
   return createAgentManager({
     adapters: { codex, claude },
     detect: () => detectAgentBinaries(),
+    emitEvent,
   });
 }
 
 function registerIpc({ getMainWindow }) {
-  const agentManager = buildAgentManager();
-
   const sendAgentEvent = (payload) => {
     const win = getMainWindow();
     if (!win || win.isDestroyed()) return;
     win.webContents.send(AGENT_EVENT_CHANNEL, payload);
   };
+
+  // The manager emits needsApproval events through the same channel so the
+  // renderer's approval queue can surface a pending run before it spawns.
+  const agentManager = buildAgentManager(sendAgentEvent);
 
   // Pre-bind processService so the IPC handler doesn't need to know
   // about it; tests inject their own runner instead.

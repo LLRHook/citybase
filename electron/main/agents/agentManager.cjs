@@ -38,10 +38,16 @@ function isAdapterShape(adapter) {
  *   detect?: () => Promise<object> | object,
  * }} [opts]
  */
+function hhmm(epochMs) {
+  const d = new Date(epochMs || Date.now());
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 function createAgentManager({
   adapters = {},
   generateRunId = defaultGenerateRunId,
   detect,
+  emitEvent,
   now = defaultNow,
   historyLimit = 100,
 } = {}) {
@@ -93,16 +99,74 @@ function createAgentManager({
    * adapter via resolveProvider + the injected detect function.
    * @param {{ provider: string } & object} params
    */
+  function trimHistory() {
+    while (history.size > historyLimit) {
+      const oldest = history.keys().next().value;
+      if (oldest === undefined) break;
+      history.delete(oldest);
+    }
+  }
+
   async function startRun(params) {
     if (!params || typeof params !== 'object') {
       throw new TypeError('agentManager.startRun: params is required');
     }
-    const { provider: requestedProvider, ...rest } = params;
+    const { provider: requestedProvider, approvalMode, ...rest } = params;
     const provider = requestedProvider === 'auto'
       ? await resolveAuto()
       : requestedProvider;
     const adapter = getProvider(provider);
-    const adapterRun = await adapter.startTask(rest);
+
+    // Approval boundary (BUG-004): for approvalMode 'ask' the run must be
+    // explicitly approved before the adapter spawns a file-changing CLI. We
+    // pre-assign the runId, register an awaiting-approval placeholder so the
+    // renderer can re-sync via listPendingApprovals, emit a needsApproval
+    // event, and block on requestApproval until the renderer answers. The
+    // adapter is only invoked on approval, with the pre-assigned runId so the
+    // approve/stream/cancel channels all key to the same id.
+    let preRunId = null;
+    if (approvalMode === 'ask') {
+      preRunId = generateRunId();
+      const placeholder = {
+        runId: preRunId,
+        questId: rest.questId,
+        adventurerId: rest.adventurerId,
+        status: 'awaiting-approval',
+        contextUsed: 0,
+        maxContext: 0,
+        branch: rest.branch,
+      };
+      inFlight.set(preRunId, { provider, adapter, run: placeholder });
+      history.set(preRunId, { run: { ...placeholder }, provider, startedAt: now() });
+      trimHistory();
+      const promptText = typeof rest.promptContext === 'string' ? rest.promptContext.slice(0, 240) : '';
+      const summary = {
+        skill: rest.skill,
+        branch: rest.branch,
+        // `text` is what ApprovalModal renders as the human-readable prompt.
+        text: promptText,
+      };
+      if (typeof emitEvent === 'function') {
+        emitEvent({
+          runId: preRunId,
+          event: { runId: preRunId, t: hhmm(now()), kind: 'plan', text: 'awaiting approval to run', payload: { needsApproval: true, summary } },
+        });
+      }
+      const verdict = await requestApproval(preRunId, summary);
+      if (verdict !== 'approved') {
+        inFlight.delete(preRunId);
+        const h = history.get(preRunId);
+        if (h) h.run = { ...h.run, status: 'cancelled' };
+        const err = new Error('run rejected by user');
+        err.code = 'REJECTED';
+        throw err;
+      }
+      // Drop the placeholder so the normal registration below (collision
+      // check included) can re-add the real run under the same id.
+      inFlight.delete(preRunId);
+    }
+
+    const adapterRun = await adapter.startTask(preRunId ? { ...rest, runId: preRunId } : rest);
     const run = adapterRun && typeof adapterRun === 'object'
       ? { ...adapterRun, runId: adapterRun.runId || generateRunId() }
       : null;
@@ -117,11 +181,7 @@ function createAgentManager({
     // the record. Trim to historyLimit (FIFO) to keep memory bounded
     // on long-lived sessions.
     history.set(run.runId, { run: { ...run }, provider, startedAt: now() });
-    while (history.size > historyLimit) {
-      const oldest = history.keys().next().value;
-      if (oldest === undefined) break;
-      history.delete(oldest);
-    }
+    trimHistory();
     return run;
   }
 

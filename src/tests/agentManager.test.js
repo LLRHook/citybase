@@ -400,3 +400,58 @@ describe('createAgentManager — approval flow', () => {
     expect(mgr.listPendingApprovals()).toEqual([]);
   });
 });
+
+describe('createAgentManager — pre-flight approval gate (BUG-004)', () => {
+  // Adapter that echoes the manager-assigned runId, like the real CLI adapters.
+  const echoAdapter = (over = {}) => makeAdapter({
+    startTask: vi.fn(async (p) => ({
+      runId: p.runId || 'gen', questId: p.questId, adventurerId: p.adventurerId,
+      status: 'done', contextUsed: 0, maxContext: 200000, branch: p.branch,
+    })),
+    ...over,
+  });
+
+  it('emits needsApproval and does not spawn until approveRun', async () => {
+    const emitEvent = vi.fn();
+    const adapter = echoAdapter();
+    const mgr = createAgentManager({ adapters: { fake: adapter }, emitEvent });
+    const promise = mgr.startRun({ ...startParams, approvalMode: 'ask' });
+    await Promise.resolve();
+    // Gate is open: the CLI has NOT been spawned yet.
+    expect(adapter.startTask).not.toHaveBeenCalled();
+    expect(emitEvent).toHaveBeenCalledTimes(1);
+    const evt = emitEvent.mock.calls[0][0];
+    expect(evt.event.payload.needsApproval).toBe(true);
+    expect(evt.event.payload.summary.text).toBe('do the thing');
+    const pendId = evt.runId;
+    expect(mgr.listPendingApprovals().map((x) => x.runId)).toContain(pendId);
+
+    mgr.approveRun(pendId);
+    const run = await promise;
+    expect(adapter.startTask).toHaveBeenCalledTimes(1);
+    expect(adapter.startTask.mock.calls[0][0].runId).toBe(pendId);
+    expect(run.runId).toBe(pendId);
+    expect(mgr.listPendingApprovals()).toEqual([]);
+  });
+
+  it('rejecting the run prevents the CLI from ever spawning', async () => {
+    const adapter = echoAdapter();
+    const mgr = createAgentManager({ adapters: { fake: adapter }, emitEvent: vi.fn() });
+    const promise = mgr.startRun({ ...startParams, approvalMode: 'ask' });
+    await Promise.resolve();
+    const pendId = mgr.listPendingApprovals()[0].runId;
+    mgr.rejectRun(pendId);
+    await expect(promise).rejects.toThrow(/rejected/i);
+    expect(adapter.startTask).not.toHaveBeenCalled();
+    expect(mgr.listPendingApprovals()).toEqual([]);
+  });
+
+  it('does not gate when approvalMode is absent (back-compat)', async () => {
+    const adapter = echoAdapter();
+    const emitEvent = vi.fn();
+    const mgr = createAgentManager({ adapters: { fake: adapter }, emitEvent });
+    await mgr.startRun({ ...startParams });
+    expect(adapter.startTask).toHaveBeenCalledTimes(1);
+    expect(emitEvent).not.toHaveBeenCalled();
+  });
+});

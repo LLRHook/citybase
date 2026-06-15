@@ -133,6 +133,9 @@ function CitybaseApp() {
         repoUrl: workspace.workspace.rootPath,
         branch: workspace.snapshot?.branch || 'main',
         promptContext,
+        // Every dispatch can change files (bypassPermissions), so gate it
+        // behind explicit approval — the product's safety contract (BUG-004).
+        approvalMode: 'ask',
         ...(model ? { model } : {}),
       });
       if (run?.runId) {

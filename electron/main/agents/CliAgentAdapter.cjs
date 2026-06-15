@@ -146,7 +146,11 @@ class CliAgentAdapter extends AgentAdapter {
       throw new TypeError(`${this._binaryName}Adapter: buildArgv must return a string array or { args, stdin }`);
     }
 
-    const runId = crypto.randomUUID();
+    // Honor a manager-assigned runId (the approval flow pre-allocates one so
+    // the approve/stream/cancel channels key to the same id); otherwise mint one.
+    const runId = (typeof params.runId === 'string' && params.runId.length > 0)
+      ? params.runId
+      : crypto.randomUUID();
     const cwd = params.repoUrl;
     const result = await this._processService.run(binary, args, {
       cwd,
