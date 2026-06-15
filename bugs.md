@@ -425,6 +425,52 @@ ids (WS) reference that document._
   added unit coverage for the untracked path.
 - **Status:** fixed-pending-migration
 
+### [BUG-022] RunDetail Events panel empty after a run (no event replay)
+- [x] **Severity:** high
+- **Area:** agents, renderer
+- **File(s):** electron/main/agents/agentManager.cjs, electron/main/ipcHandlers.cjs, electron/preload/preload.cjs, src/views/RunDetail.jsx
+- **Observation:** runs complete synchronously, so `pumpAgentEvents` fans the
+  event stream out before RunDetail mounts and subscribes via `useRunEvents` —
+  and there is no replay, so the Events panel always showed "no events" for a
+  finished run (the agent's response never appeared, only the diff). Caught by
+  the GUI integration test (`scripts/gui-claude-e2e.mjs`).
+- **Expected:** a finished run shows its event trail / the agent's response.
+- **Repro / Notes:** dispatch any run; RunDetail Events panel stays empty.
+- **Fix:** added `agentManager.getEvents(runId)` (collects the adapter stream),
+  exposed it over IPC + preload, and RunDetail loads it on terminal as a
+  backstop (live stream still wins when present). Verified: the real Claude
+  response now renders in Events.
+- **Status:** fixed-pending-migration
+
+### [BUG-023] 'auto' provider resolved to codex, not the documented claude default
+- [x] **Severity:** med
+- **Area:** agents
+- **File(s):** electron/main/agents/resolveProvider.cjs, src/tests/resolveProvider.test.js
+- **Observation:** `PREFERRED_ORDER` was `['codex', 'claude']`, so with both CLIs
+  installed `provider: 'auto'` picked codex — contradicting the v1 ship gate and
+  `docs/agent-runtime.md`, which name Claude Code the default first-run provider.
+- **Expected:** `auto` prefers claude when installed.
+- **Repro / Notes:** found via the GUI test (auto runs went to codex).
+- **Fix:** `PREFERRED_ORDER = ['claude', 'codex']`; updated tests.
+- **Status:** fixed-pending-migration
+
+### [BUG-024] Agent install indicator stuck on "not installed" while runs succeed
+- [x] **Severity:** med
+- **Area:** renderer
+- **File(s):** src/app/useAgentDetect.js, src/tests/useAgentDetect.test.jsx, src/tests/AppAutoBoot.test.jsx
+- **Observation:** `useAgentDetect` trusted the boot payload's detect result and
+  skipped the live probe entirely when seeded. The boot payload (built once at
+  did-finish-load) was observed reporting "not installed" while a fresh detect —
+  and actual runs — found the CLIs, leaving the top-bar indicator wrong with no
+  way to self-correct. Caught by the GUI test (top bar said not-installed after
+  a successful claude run).
+- **Expected:** the indicator reflects reality.
+- **Repro / Notes:** GUI test top bar vs a successful run.
+- **Fix:** seed first paint from the boot payload (keeps the v1 auto-boot
+  instant render) but always confirm with a non-blocking live probe that
+  self-heals a stale/empty seed; a transient null/error never wipes a good seed.
+- **Status:** fixed-pending-migration
+
 ---
 
 ## Migrated to changelog

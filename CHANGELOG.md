@@ -44,6 +44,14 @@ sections under each release/date heading.
   intent-to-add, so the RunDetail diff surfaces new files instead of showing
   "no file changes" — verified against the real `claude` CLI by
   `scripts/claude-e2e.mjs`.
+- BUG-022 RunDetail now backfills a finished run's event trail via
+  `agents.getEvents`, so the agent's response shows even though synchronous runs
+  fan out their events before the view subscribes.
+- BUG-023 `auto` provider resolution now prefers Claude (the documented v1
+  default) over Codex when both are installed.
+- BUG-024 The agent install indicator self-heals: it seeds from the boot payload
+  for an instant paint but confirms with a live probe, so a stale "not installed"
+  seed no longer sticks while runs succeed.
 
 ### Removed
 
