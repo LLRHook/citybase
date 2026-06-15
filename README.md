@@ -4,9 +4,11 @@
 
 ## What is this?
 
-Citybase is a local-first desktop app: open one Git repository from disk, see it as a city, dispatch a Claude Code run from the UI, and review the result without staring at raw diffs.
+Citybase is a local-first desktop app: open one Git repository from disk, **see it as a living isometric city**, dispatch a Claude Code run from the UI, and watch the agent work the city in real time — then review the result without staring at raw diffs.
 
-The v1 path runs Claude Code inside the IDE end-to-end. Codex CLI is wired through the same provider contract as a fallback adapter.
+**v2.0 — "The Living City."** The signature view renders your repo as an isometric city: top-level folders are districts on raised slabs, files are extruded buildings (signature files stand taller), and Git status lights the skyline — staged changes glow green, unstaged amber. Dispatch an agent and the buildings it edits light up live as the working tree changes, with an "agent at work" banner tracking the run. A City / Work toggle in the top bar switches between the map and the run/commit workflow.
+
+Claude Code runs inside the IDE end-to-end; Codex CLI is wired through the same provider contract as a fallback adapter.
 
 ## Prerequisites
 
@@ -31,17 +33,18 @@ npm run build:desktop && npm run start:desktop
 
 **There is no standalone-browser path.** The renderer always runs inside Electron — `citybaseApi.js` throws on import when `window.citybase` is missing instead of silently degrading to a stub. The browser-only `dev` and `preview` scripts were removed on 2026-05-10.
 
-## What v1 does
+## What v2 does
 
 A normal session looks like this — every step is real activity, not seeded data:
 
 1. **Launch.** The main process restores the most recent workspace and runs `detectAgentBinaries()`. Both results are pushed to the renderer over the `BOOT_PAYLOAD_CHANNEL` before App.jsx mounts, so the UI lands populated with no extra clicks.
 2. **Open a workspace** if one isn't already restored: `File → Open Workspace…`. The Git service reads branch, status, file tree, and recent commits via `git status --porcelain=v2` / `git log` / `git ls-files`.
-3. **Pick a branch** in the top-bar selector. CHECKOUT runs when the workspace is clean; if it's dirty the selector shows a "commit first" pill instead.
-4. **Dispatch an agent.** The IPC handler resolves the right `AgentProvider` adapter (`auto` prefers Claude when installed) and starts a real `claude` process inside the workspace cwd. `streamEvents` yields the parsed JSON envelope as a real `AgentEvent`.
-5. **Review on the Analysis screen.** The right column shows real CI checks, a real diff (parsed from `git diff --unified=3`), and a Run History panel listing every agent run started in the current session. The empty state says "no runs yet · dispatch an agent" — no seeded reports.
-6. **Commit.** With dirty files, the COMMIT RESULT card opens. Type a message; the action runs `git add -A && git commit -m`, then `git rev-parse HEAD` for the new hash.
-7. **Open a PR** by pushing the branch yourself, then calling `agents.openPR` from the UI. The adapter shells out to `gh pr create --title --body --base --head` from the run cwd and parses the URL out of stdout.
+3. **See the city.** The City view projects the tracked file tree into districts (folders) and buildings (files); dirty files glow green/amber by stage. Pan with drag, zoom with the wheel, hover for a path, click to inspect.
+4. **Pick a branch** in the top-bar selector. CHECKOUT runs when the workspace is clean; if it's dirty the selector shows a "commit first" pill instead.
+5. **Dispatch an agent** (switch to Work). The IPC handler resolves the right `AgentProvider` adapter (`auto` prefers Claude when installed) and starts a real `claude` process inside the workspace cwd. While it runs, the City view auto-refreshes and lights up the buildings being changed.
+6. **Review** the run detail: real CI checks, a real diff (parsed from `git diff --unified=3`), and the live event stream. A Run History sidebar lists every run started this session.
+7. **Commit.** With dirty files, the commit card opens. Type a message; the action runs `git add -A && git commit -m`, then `git rev-parse HEAD` for the new hash.
+8. **Open a PR** by pushing the branch yourself, then calling `agents.openPR` from the UI. The adapter shells out to `gh pr create --title --body --base --head` from the run cwd and parses the URL out of stdout.
 
 ## Available scripts
 

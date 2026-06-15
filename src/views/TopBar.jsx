@@ -38,7 +38,7 @@ export function TopBar({
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 8 }}>
         <Title size={13} weight={700} style={{ letterSpacing: 1 }}>CITYBASE</Title>
-        <Mono size={9} color="ink3">v0.2</Mono>
+        <Mono size={9} color="cyan">v2.0</Mono>
       </div>
 
       <Pill color={wsLinked ? 'green' : 'red'}>
