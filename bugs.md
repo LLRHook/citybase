@@ -113,7 +113,7 @@ ids (WS) reference that document._
 - **Status:** open
 
 ### [BUG-004] Approval boundary never invoked — write-mode runs execute unapproved
-- [ ] **Severity:** crit
+- [x] **Severity:** crit
 - **Area:** agents, renderer
 - **File(s):** electron/main/agents/agentManager.cjs, electron/main/agents/CliAgentAdapter.cjs, src/app/useApprovalRequests.js, src/game/modals.jsx, docs/agent-runtime.md
 - **Observation:** no production code calls `requestApproval` or emits
@@ -133,7 +133,17 @@ ids (WS) reference that document._
   agent-runtime.md. Test: an edit-skill run does not invoke the CLI until `approveRun`
   fires; the reject path never spawns. Soft dependency on FEAT-004. Hard gate before
   demoing any write-capable run (SRS §8).
-- **Status:** open
+- **Fix:** implemented a manager-level pre-flight gate. For `approvalMode: 'ask'`
+  (the renderer now sends it on every dispatch) `agentManager.startRun` pre-assigns
+  the runId, registers an awaiting-approval placeholder, emits a `needsApproval`
+  event, and blocks on `requestApproval` — the adapter's CLI is invoked only on
+  approve, with the pre-assigned runId (adapters now honor `params.runId`); reject
+  throws and never spawns. `emitEvent` is injected via `ipc.cjs`. Unit-tested
+  (emits/waits/approves/rejects/no-gate paths) and verified end-to-end with the
+  real `claude` CLI by `scripts/gui-claude-e2e.mjs` (5/5): the modal gates the run,
+  Approve lets it proceed, the response renders. R3/R8 renderer hardening already
+  landed upstream; full streaming approval remains future (FEAT-004).
+- **Status:** fixed-pending-migration
 
 ### [BUG-005] `agent.startRun` spawns in arbitrary renderer-supplied cwd
 - [ ] **Severity:** high

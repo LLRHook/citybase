@@ -37,6 +37,11 @@ sections under each release/date heading.
 
 ### Fixed
 
+- BUG-004 Wired the approval boundary: write-capable agent runs now pause for
+  explicit user approval before the CLI spawns. A manager-level pre-flight gate
+  emits a `needsApproval` event and blocks on `requestApproval`; the adapter is
+  invoked only on approve (rejecting never spawns). Verified end-to-end against
+  the real `claude` CLI.
 - BUG-020 Living-city overlay now activates during an in-flight dispatch
   (runs complete synchronously, so no history record was ever observably
   `running`); the banner and live snapshot refresh fire while the agent works.
