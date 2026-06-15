@@ -48,52 +48,6 @@ _Filed 2026-06-11 from [docs/srs-and-plan-of-action.md](./docs/srs-and-plan-of-a
 (SRS v0.1, baseline `main` @ `1356437`). Finding ids (M/R/T-series) and workstream
 ids (WS) reference that document._
 
-### [BUG-001] Preload bridge dead under `sandbox: true` — desktop degrades to browser stub
-- [x] **Severity:** high
-- **Area:** ipc, electron
-- **File(s):** electron/preload/preload.cjs, electron/main/agents/constants.cjs
-- **Observation:** `preload.cjs:5` requires `../main/agents/constants.cjs`; sandboxed
-  preloads cannot `require` local CJS files, so the bridge throws at load and the
-  renderer silently falls back to the browser stub — every desktop feature dead with
-  no visible error (SRS M2).
-- **Expected:** `window.citybase` is defined in a desktop launch (ROADMAP Phase 1 DoD;
-  ship gate FR-V1/FR-V2).
-- **Repro / Notes:** launch the desktop app, DevTools console: `window.citybase` →
-  undefined. Fix per WS0.1: inline the channel constant in preload.cjs (no local
-  requires) + a unit test asserting it equals the `constants.cjs` export. FEAT-001's
-  smoke test (`app.getVersion()` resolves) is the permanent guard. Land bundled with
-  BUG-002 + FEAT-001.
-- **Fix:** fixed upstream in the v1 wave (`preload.cjs` inlines the channel
-  literals; drift guarded by `src/tests/preload.contract.test.js`). An equivalent
-  local fix was superseded and dropped at merge time. Verified live by the
-  FEAT-001 smoke test: the pre-wave baseline launch had `window.citybase` absent;
-  current `main` launches with a live bridge (`app.getVersion()` resolves over
-  real IPC).
-- **Status:** fixed-pending-migration
-
-### [BUG-002] Agent detection always reports "not installed"; `auto` provider always throws
-- [x] **Severity:** high
-- **Area:** agents
-- **File(s):** electron/main/agents/detect.cjs, electron/main/ipcHandlers.cjs, electron/main/ipc.cjs, src/App.jsx
-- **Observation:** `detect.cjs:67` defaults `fsExists` to `() => false` and both
-  production call sites (`ipcHandlers.cjs:100`, `ipc.cjs:24`) pass no args — settings
-  always shows both CLIs "not installed" and `provider: 'auto'` always throws (SRS M3).
-  Tests inject stubs, so the glue bug is invisible to the suite. A detect *error*
-  renders identically to "not installed" (R17).
-- **Expected:** with `claude` on PATH, settings shows "installed" without injected
-  stubs (ship gate FR-V6).
-- **Repro / Notes:** call `detectAgentBinaries()` with zero args → both not found
-  regardless of PATH. Fix per WS0.2: default `fsExists` to a real `fs.existsSync`
-  wrapper; add a glue-level zero-arg test; render the detect-error state distinctly.
-- **Fix:** the fs default fixed upstream in the v1 wave (`detect.cjs`
-  `defaultFsExists` + real-filesystem glue tests + Windows codex-shim
-  preference); verified at merge time — a zero-arg `detectAgentBinaries()` finds
-  both real CLIs on this machine. The R17 remainder landed here: EmptyHome rows
-  and TopBar chips render `detect failed: <message>` distinctly from
-  "not installed" (suppressing the misleading install hint), with view tests in
-  `src/tests/AgentDetectError.test.jsx`.
-- **Status:** fixed-pending-migration
-
 ### [BUG-003] Agent runs block until exit, fabricate events, cancel unreachable, killed at 15 s
 - [ ] **Severity:** high
 - **Area:** agents
@@ -111,39 +65,6 @@ ids (WS) reference that document._
   Acceptance per WS0.3: a long-running fake CLI cancels within seconds; events reflect
   the actual exit state; checks tolerate slow test suites.
 - **Status:** open
-
-### [BUG-004] Approval boundary never invoked — write-mode runs execute unapproved
-- [x] **Severity:** crit
-- **Area:** agents, renderer
-- **File(s):** electron/main/agents/agentManager.cjs, electron/main/agents/CliAgentAdapter.cjs, src/app/useApprovalRequests.js, src/game/modals.jsx, docs/agent-runtime.md
-- **Observation:** no production code calls `requestApproval` or emits
-  `payload.needsApproval` (`agentManager.cjs:145`, `CliAgentAdapter.cjs:105`,
-  `useApprovalRequests.js:27`) — write-mode runs execute immediately with no approval
-  (SRS M1; producers exist only in tests). The renderer dequeues an approval even when
-  the approve/reject IPC call fails, orphaning the main-process promise (R3,
-  `useApprovalRequests.js:61-77`); the modal backdrop click silently rejects and
-  approve-then-backdrop double-fires (R8, `modals.jsx:283`).
-- **Expected:** every file-changing agent action passes an explicit approval boundary
-  before execution — a hard product constraint (ROADMAP, AGENTS.md, NFR-1;
-  VERIFICATION.md Stage 5.4).
-- **Repro / Notes:** WS0.4 — for write-mode skills emit `{needsApproval, summary}` and
-  `await requestApproval(runId, summary)` before spawning; renderer dequeues only on
-  IPC success, re-hydrates from `listPendingApprovals` on failure; disable modal
-  buttons after first action; backdrop becomes a no-op; document the payload in
-  agent-runtime.md. Test: an edit-skill run does not invoke the CLI until `approveRun`
-  fires; the reject path never spawns. Soft dependency on FEAT-004. Hard gate before
-  demoing any write-capable run (SRS §8).
-- **Fix:** implemented a manager-level pre-flight gate. For `approvalMode: 'ask'`
-  (the renderer now sends it on every dispatch) `agentManager.startRun` pre-assigns
-  the runId, registers an awaiting-approval placeholder, emits a `needsApproval`
-  event, and blocks on `requestApproval` — the adapter's CLI is invoked only on
-  approve, with the pre-assigned runId (adapters now honor `params.runId`); reject
-  throws and never spawns. `emitEvent` is injected via `ipc.cjs`. Unit-tested
-  (emits/waits/approves/rejects/no-gate paths) and verified end-to-end with the
-  real `claude` CLI by `scripts/gui-claude-e2e.mjs` (5/5): the modal gates the run,
-  Approve lets it proceed, the response renders. R3/R8 renderer hardening already
-  landed upstream; full streaming approval remains future (FEAT-004).
-- **Status:** fixed-pending-migration
 
 ### [BUG-005] `agent.startRun` spawns in arbitrary renderer-supplied cwd
 - [ ] **Severity:** high
@@ -397,6 +318,92 @@ ids (WS) reference that document._
   implementing them as filed.
 - **Status:** open
 
+---
+
+## Migrated to changelog
+
+Entries below have been ticked off and copied as a one-liner into `CHANGELOG.md`.
+They are kept here so each `BUG-NNN` stays resolvable.
+
+### [BUG-001] Preload bridge dead under `sandbox: true` — desktop degrades to browser stub
+- [x] **Severity:** high
+- **Area:** ipc, electron
+- **File(s):** electron/preload/preload.cjs, electron/main/agents/constants.cjs
+- **Observation:** `preload.cjs:5` requires `../main/agents/constants.cjs`; sandboxed
+  preloads cannot `require` local CJS files, so the bridge throws at load and the
+  renderer silently falls back to the browser stub — every desktop feature dead with
+  no visible error (SRS M2).
+- **Expected:** `window.citybase` is defined in a desktop launch (ROADMAP Phase 1 DoD;
+  ship gate FR-V1/FR-V2).
+- **Repro / Notes:** launch the desktop app, DevTools console: `window.citybase` →
+  undefined. Fix per WS0.1: inline the channel constant in preload.cjs (no local
+  requires) + a unit test asserting it equals the `constants.cjs` export. FEAT-001's
+  smoke test (`app.getVersion()` resolves) is the permanent guard. Land bundled with
+  BUG-002 + FEAT-001.
+- **Fix:** fixed upstream in the v1 wave (`preload.cjs` inlines the channel
+  literals; drift guarded by `src/tests/preload.contract.test.js`). An equivalent
+  local fix was superseded and dropped at merge time. Verified live by the
+  FEAT-001 smoke test: the pre-wave baseline launch had `window.citybase` absent;
+  current `main` launches with a live bridge (`app.getVersion()` resolves over
+  real IPC).
+- **Status:** fixed-pending-migration
+
+### [BUG-002] Agent detection always reports "not installed"; `auto` provider always throws
+- [x] **Severity:** high
+- **Area:** agents
+- **File(s):** electron/main/agents/detect.cjs, electron/main/ipcHandlers.cjs, electron/main/ipc.cjs, src/App.jsx
+- **Observation:** `detect.cjs:67` defaults `fsExists` to `() => false` and both
+  production call sites (`ipcHandlers.cjs:100`, `ipc.cjs:24`) pass no args — settings
+  always shows both CLIs "not installed" and `provider: 'auto'` always throws (SRS M3).
+  Tests inject stubs, so the glue bug is invisible to the suite. A detect *error*
+  renders identically to "not installed" (R17).
+- **Expected:** with `claude` on PATH, settings shows "installed" without injected
+  stubs (ship gate FR-V6).
+- **Repro / Notes:** call `detectAgentBinaries()` with zero args → both not found
+  regardless of PATH. Fix per WS0.2: default `fsExists` to a real `fs.existsSync`
+  wrapper; add a glue-level zero-arg test; render the detect-error state distinctly.
+- **Fix:** the fs default fixed upstream in the v1 wave (`detect.cjs`
+  `defaultFsExists` + real-filesystem glue tests + Windows codex-shim
+  preference); verified at merge time — a zero-arg `detectAgentBinaries()` finds
+  both real CLIs on this machine. The R17 remainder landed here: EmptyHome rows
+  and TopBar chips render `detect failed: <message>` distinctly from
+  "not installed" (suppressing the misleading install hint), with view tests in
+  `src/tests/AgentDetectError.test.jsx`.
+- **Status:** fixed-pending-migration
+
+### [BUG-004] Approval boundary never invoked — write-mode runs execute unapproved
+- [x] **Severity:** crit
+- **Area:** agents, renderer
+- **File(s):** electron/main/agents/agentManager.cjs, electron/main/agents/CliAgentAdapter.cjs, src/app/useApprovalRequests.js, src/game/modals.jsx, docs/agent-runtime.md
+- **Observation:** no production code calls `requestApproval` or emits
+  `payload.needsApproval` (`agentManager.cjs:145`, `CliAgentAdapter.cjs:105`,
+  `useApprovalRequests.js:27`) — write-mode runs execute immediately with no approval
+  (SRS M1; producers exist only in tests). The renderer dequeues an approval even when
+  the approve/reject IPC call fails, orphaning the main-process promise (R3,
+  `useApprovalRequests.js:61-77`); the modal backdrop click silently rejects and
+  approve-then-backdrop double-fires (R8, `modals.jsx:283`).
+- **Expected:** every file-changing agent action passes an explicit approval boundary
+  before execution — a hard product constraint (ROADMAP, AGENTS.md, NFR-1;
+  VERIFICATION.md Stage 5.4).
+- **Repro / Notes:** WS0.4 — for write-mode skills emit `{needsApproval, summary}` and
+  `await requestApproval(runId, summary)` before spawning; renderer dequeues only on
+  IPC success, re-hydrates from `listPendingApprovals` on failure; disable modal
+  buttons after first action; backdrop becomes a no-op; document the payload in
+  agent-runtime.md. Test: an edit-skill run does not invoke the CLI until `approveRun`
+  fires; the reject path never spawns. Soft dependency on FEAT-004. Hard gate before
+  demoing any write-capable run (SRS §8).
+- **Fix:** implemented a manager-level pre-flight gate. For `approvalMode: 'ask'`
+  (the renderer now sends it on every dispatch) `agentManager.startRun` pre-assigns
+  the runId, registers an awaiting-approval placeholder, emits a `needsApproval`
+  event, and blocks on `requestApproval` — the adapter's CLI is invoked only on
+  approve, with the pre-assigned runId (adapters now honor `params.runId`); reject
+  throws and never spawns. `emitEvent` is injected via `ipc.cjs`. Unit-tested
+  (emits/waits/approves/rejects/no-gate paths) and verified end-to-end with the
+  real `claude` CLI by `scripts/gui-claude-e2e.mjs` (5/5): the modal gates the run,
+  Approve lets it proceed, the response renders. R3/R8 renderer hardening already
+  landed upstream; full streaming approval remains future (FEAT-004).
+- **Status:** fixed-pending-migration
+
 ### [BUG-020] Living-city overlay never activated (runs complete synchronously)
 - [x] **Severity:** med
 - **Area:** renderer
@@ -480,10 +487,3 @@ ids (WS) reference that document._
   instant render) but always confirm with a non-blocking live probe that
   self-heals a stale/empty seed; a transient null/error never wipes a good seed.
 - **Status:** fixed-pending-migration
-
----
-
-## Migrated to changelog
-
-Entries below have been ticked off and copied as a one-liner into `CHANGELOG.md`.
-They are kept here so each `BUG-NNN` stays resolvable.
