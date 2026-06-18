@@ -60,32 +60,6 @@ Priority guide: crit / high / med / low.
 - **Out of scope (now):** everything — this is a tracked deferral, not ready work.
 - **Status:** open
 
-### [FEAT-005] Real CLI integration: correct `claude` / `codex` argv + event normalization
-- [x] **Priority:** high
-- **Area:** agents
-- **File(s):** electron/main/agents/ClaudeAdapter.cjs, electron/main/agents/CodexAdapter.cjs, electron/main/agents/CliAgentAdapter.cjs, src/tests/ClaudeAdapter.test.js, src/tests/CodexAdapter.test.js
-- **Why:** the current argv shapes match neither real CLI — `claude` wants
-  `--print --output-format stream-json`, `codex` wants the `exec` subcommand — so
-  every real run exits non-zero (SRS M18, acknowledged in-code). Ship gate FR-V6/FR-V7
-  cannot be met without it.
-- **Approach:** resolve open question Q1 (drive the installed CLIs vs the Claude Agent
-  SDK) against current CLI docs at plan time — SRS §8 recommends deciding when the
-  streaming runner lands, since event normalization depends on the chosen output
-  format. Then implement per-adapter argv builders and normalize the real stream into
-  `AgentEvent`s.
-- **Library / dependency notes:** driving installed CLIs adds no runtime deps (AGENTS.md
-  rule); the Agent SDK alternative would add one and needs PR justification. Verify
-  current CLI flags against vendor docs before implementing — do not trust memory.
-- **Acceptance criteria:**
-  - With `claude` installed, a read-only run streams real events and completes.
-  - `codex` equivalent works where installed (not a hard ship gate per ROADMAP).
-  - Missing binary / auth needed / timeout surface as contract failure events.
-- **Test plan:** unit tests against recorded stream fixtures per CLI; manual
-  VERIFICATION.md Stage 3.6 walkthrough.
-- **Out of scope:** approval flow (BUG-004), runner internals (FEAT-004).
-- **Implementation:** ClaudeAdapter switched to `--output-format stream-json --verbose`; NDJSON parsed incrementally into live AgentEvents (assistant text + tool-use `file_path`), drained live by streamEvents; codex keeps its trail. Verified with the real CLI (claude-e2e 13/13, gui shows live events while RUNNING). The streamed touched paths light the exact city buildings.
-- **Status:** shipped-pending-migration
-
 ### [FEAT-006] Navigation guards, CSP, and self-hosted fonts
 - [ ] **Priority:** med
 - **Area:** electron, build
@@ -252,6 +226,32 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
 ---
 
 ## Shipped
+
+### [FEAT-005] Real CLI integration: correct `claude` / `codex` argv + event normalization
+- [x] **Priority:** high
+- **Area:** agents
+- **File(s):** electron/main/agents/ClaudeAdapter.cjs, electron/main/agents/CodexAdapter.cjs, electron/main/agents/CliAgentAdapter.cjs, src/tests/ClaudeAdapter.test.js, src/tests/CodexAdapter.test.js
+- **Why:** the current argv shapes match neither real CLI — `claude` wants
+  `--print --output-format stream-json`, `codex` wants the `exec` subcommand — so
+  every real run exits non-zero (SRS M18, acknowledged in-code). Ship gate FR-V6/FR-V7
+  cannot be met without it.
+- **Approach:** resolve open question Q1 (drive the installed CLIs vs the Claude Agent
+  SDK) against current CLI docs at plan time — SRS §8 recommends deciding when the
+  streaming runner lands, since event normalization depends on the chosen output
+  format. Then implement per-adapter argv builders and normalize the real stream into
+  `AgentEvent`s.
+- **Library / dependency notes:** driving installed CLIs adds no runtime deps (AGENTS.md
+  rule); the Agent SDK alternative would add one and needs PR justification. Verify
+  current CLI flags against vendor docs before implementing — do not trust memory.
+- **Acceptance criteria:**
+  - With `claude` installed, a read-only run streams real events and completes.
+  - `codex` equivalent works where installed (not a hard ship gate per ROADMAP).
+  - Missing binary / auth needed / timeout surface as contract failure events.
+- **Test plan:** unit tests against recorded stream fixtures per CLI; manual
+  VERIFICATION.md Stage 3.6 walkthrough.
+- **Out of scope:** approval flow (BUG-004), runner internals (FEAT-004).
+- **Implementation:** ClaudeAdapter switched to `--output-format stream-json --verbose`; NDJSON parsed incrementally into live AgentEvents (assistant text + tool-use `file_path`), drained live by streamEvents; codex keeps its trail. Verified with the real CLI (claude-e2e 13/13, gui shows live events while RUNNING). The streamed touched paths light the exact city buildings.
+- **Status:** shipped-pending-migration
 
 ### [FEAT-001] Desktop-mode E2E smoke test that opens the app window
 - [x] **Priority:** high

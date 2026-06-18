@@ -49,6 +49,13 @@ function createRunStore({ userDataDir, readFile, writeFile, mkdir, rename } = {}
   const write = writeFile || fs.writeFile;
   const ensureDir = mkdir || fs.mkdir;
   const moveInto = rename || fs.rename;
+  // Serialize writes: each run settling fires its own best-effort save() with
+  // the FULL history, so two near-simultaneous settles would otherwise race on
+  // the shared `${file}.tmp` and could interleave into corrupt JSON. Chain them
+  // so only one write touches the temp file at a time. `queue` always resolves
+  // (errors are swallowed for sequencing only) so a failed write never stalls
+  // the chain; the caller still sees its own write's real outcome via `result`.
+  let queue = Promise.resolve();
 
   async function load() {
     try {
@@ -63,17 +70,26 @@ function createRunStore({ userDataDir, readFile, writeFile, mkdir, rename } = {}
     }
   }
 
-  async function save(runs) {
+  async function writeOnce(runs) {
     const records = (Array.isArray(runs) ? runs : [])
       .map(sanitizeRun)
       .filter(Boolean)
       .slice(-MAX_RUNS);
     await ensureDir(userDataDir, { recursive: true });
     // Temp-file + rename for an atomic write that can't truncate on crash.
+    // (Node's fs.rename uses MoveFileEx/MOVEFILE_REPLACE_EXISTING on Windows,
+    // so it overwrites the destination — no unlink dance needed.)
     const tmp = `${file}.tmp`;
     await write(tmp, JSON.stringify(records, null, 2), 'utf8');
     await moveInto(tmp, file);
     return records;
+  }
+
+  function save(runs) {
+    const result = queue.then(() => writeOnce(runs));
+    // Keep the chain alive even if this write rejects, so the next save runs.
+    queue = result.catch(() => {});
+    return result;
   }
 
   // Synchronous load for the boot path (the manager wants seed runs at

@@ -487,3 +487,84 @@ They are kept here so each `BUG-NNN` stays resolvable.
   instant render) but always confirm with a non-blocking live probe that
   self-heals a stale/empty seed; a transient null/error never wipes a good seed.
 - **Status:** fixed-pending-migration
+
+### [BUG-025] City fails to light streamed files when the drive-letter case differs (Windows)
+- [x] **Severity:** med
+- **Area:** renderer, city
+- **File(s):** src/app/runCity.js, src/tests/runCity.test.js
+- **Observation:** `toRepoRelative` stripped the workspace root with a
+  case-sensitive prefix match. On Windows the agent can emit `C:\...` while the
+  stored root is `c:\...` (drive-letter case drifts between Node and git), so the
+  match failed and the path stayed absolute — never matching a city building, so
+  the exact-file glow (FEAT-005) silently fell back to the 2.5s dirty-file scan.
+- **Expected:** the streamed path relativizes regardless of drive-letter case.
+- **Repro / Notes:** surfaced by the v3 adversarial review; the suffix must keep
+  its real case (city building paths come from git).
+- **Fix:** match the root case-insensitively, slicing the original (cased) path
+  so the suffix is preserved.
+- **Status:** fixed-pending-migration
+
+### [BUG-026] runStore concurrent saves race on the shared temp file — corrupt runs.json
+- [x] **Severity:** high
+- **Area:** electron, persistence
+- **File(s):** electron/main/services/runStore.cjs, electron/main/ipc.cjs, src/tests/runStore.test.js
+- **Observation:** every run settling fires a best-effort `save()` that writes the
+  full history to `${file}.tmp` then renames. Two near-simultaneous settles
+  (common when runs end together) both wrote the same temp path; the interleaved
+  writes could rename a half-written file into place, corrupting `runs.json`
+  (recoverable only by the load-path's catch → start empty, i.e. silent history
+  loss). The persist failure was also swallowed (`.catch(() => {})`).
+- **Expected:** concurrent saves never interleave; persist failures are visible.
+- **Repro / Notes:** surfaced by the v3 adversarial review. (The review's "Windows
+  rename fails on an existing target" premise was wrong — Node's `fs.rename` uses
+  MOVEFILE_REPLACE_EXISTING — but the shared-temp race is real.)
+- **Fix:** serialize writes through a promise chain in `runStore` (the chain
+  stays alive across a failed write); surface persist errors via `console.error`.
+- **Status:** fixed-pending-migration
+
+### [BUG-027] ClaudeAdapter final-event correctness: raw NDJSON dump + mislabeled timeout
+- [x] **Severity:** med
+- **Area:** agents
+- **File(s):** electron/main/agents/ClaudeAdapter.cjs, src/tests/ClaudeAdapter.test.js
+- **Observation:** two defects in `_finalize`. (1) A run that passes having surfaced
+  no events (e.g. claude emits only a success `result` line) re-parsed the *whole*
+  multi-line NDJSON stdout with `JSON.parse`, which fails, so the raw NDJSON stream
+  was dumped into the panel as the "output". (2) A run killed by timeout that had
+  already streamed events was labelled with the generic "non-zero status" message
+  instead of a timeout-specific one.
+- **Expected:** prefer the parsed `result` text; name a timeout a timeout.
+- **Repro / Notes:** surfaced by the v3 adversarial review.
+- **Fix:** in the zero-events success path prefer `entry.claudeResult.result`
+  over re-parsing stdout; in the events-present failure path emit the
+  timeout-specific message when `exitState === 'timeout'`.
+- **Status:** fixed-pending-migration
+
+### [BUG-028] Rejected approval run not persisted — cancelled record vanishes on restart
+- [x] **Severity:** low
+- **Area:** agents, persistence
+- **File(s):** electron/main/agents/agentManager.cjs, src/tests/agentManager.test.js
+- **Observation:** rejecting an approval set the history entry's status to
+  `cancelled` but never called `doPersist()` (the run throws before reaching
+  `captureWhenDone`). The in-session Run History showed the cancelled run, but it
+  disappeared on the next launch — inconsistent with every other terminal run.
+- **Expected:** the cancelled record survives a restart like any terminal run.
+- **Repro / Notes:** surfaced by the v3 adversarial review.
+- **Fix:** call `doPersist()` in the rejection branch of `startRun`.
+- **Status:** fixed-pending-migration
+
+### [BUG-029] Agent-run robustness hardening (timeout, line buffer, swallowed errors)
+- [x] **Severity:** low
+- **Area:** agents, electron
+- **File(s):** electron/main/agents/CliAgentAdapter.cjs, electron/main/agents/ClaudeAdapter.cjs
+- **Observation:** a cluster of robustness gaps surfaced by the v3 adversarial
+  review: (1) the default task timeout was 10 min, short enough to kill a
+  legitimate long agent run mid-flight; (2) `spawnStream` forwards every chunk to
+  the NDJSON line buffer uncapped (its 16MB cap only bounds the buffered stdout),
+  so a pathological no-newline stream could grow the buffer without bound; (3) a
+  throw in the stdout-parse hook was swallowed silently, hiding real adapter bugs.
+- **Expected:** generous-but-bounded timeout; bounded line buffer; visible errors.
+- **Repro / Notes:** none are routinely hit; defence-in-depth hardening.
+- **Fix:** raise the default timeout 10→30 min (cancel still works as the escape
+  hatch); bound the partial-line buffer at 32MB with a truncation event; log
+  swallowed stdout-parse errors via `console.error`.
+- **Status:** fixed-pending-migration

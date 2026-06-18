@@ -27,7 +27,7 @@ function buildAgentManager(emitEvent) {
     detect: () => detectAgentBinaries(),
     emitEvent,
     initialRuns: runStore.loadSync(),
-    persist: (runs) => { runStore.save(runs).catch(() => {}); },
+    persist: (runs) => { runStore.save(runs).catch((err) => { console.error('[runStore] persist failed', err); }); },
   });
 }
 

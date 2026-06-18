@@ -92,8 +92,14 @@ export function toRepoRelative(p, rootPath) {
   const norm = p.replace(/\\/g, '/');
   if (rootPath) {
     const root = rootPath.replace(/\\/g, '/').replace(/\/+$/, '');
-    if (norm === root) return '';
-    if (norm.startsWith(`${root}/`)) return norm.slice(root.length + 1);
+    // Match the root case-insensitively: on Windows the agent and git can
+    // disagree on drive-letter case (C:\ vs c:\), which would otherwise leave
+    // the path absolute and unmatched to the city's buildings. We slice the
+    // ORIGINAL `norm` by the root's length so the suffix keeps its real case.
+    const low = norm.toLowerCase();
+    const lowRoot = root.toLowerCase();
+    if (low === lowRoot) return '';
+    if (low.startsWith(`${lowRoot}/`)) return norm.slice(root.length + 1);
   }
   return norm;
 }

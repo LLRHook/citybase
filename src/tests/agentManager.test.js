@@ -446,6 +446,20 @@ describe('createAgentManager — pre-flight approval gate (BUG-004)', () => {
     expect(mgr.listPendingApprovals()).toEqual([]);
   });
 
+  it('persists the rejected run so the cancelled record survives a restart (FEAT-008)', async () => {
+    const persist = vi.fn();
+    const adapter = echoAdapter();
+    const mgr = createAgentManager({ adapters: { fake: adapter }, emitEvent: vi.fn(), persist });
+    const promise = mgr.startRun({ ...startParams, approvalMode: 'ask' });
+    await Promise.resolve();
+    const pendId = mgr.listPendingApprovals()[0].runId;
+    mgr.rejectRun(pendId);
+    await expect(promise).rejects.toThrow(/rejected/i);
+    expect(persist).toHaveBeenCalled();
+    const persisted = persist.mock.calls.at(-1)[0];
+    expect(persisted.find((r) => r.runId === pendId)).toMatchObject({ status: 'cancelled' });
+  });
+
   it('does not gate when approvalMode is absent (back-compat)', async () => {
     const adapter = echoAdapter();
     const emitEvent = vi.fn();
