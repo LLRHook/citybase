@@ -92,4 +92,10 @@ describe('toRepoRelative', () => {
   it('falls back to a normalized path when not under the root', () => {
     expect(toRepoRelative(String.raw`D:\other\x.js`, String.raw`C:\repo`)).toBe('D:/other/x.js');
   });
+  it('matches the root case-insensitively (Windows drive-letter case drift)', () => {
+    // The agent can emit `C:\` while the workspace root is stored `c:\` (or vice
+    // versa). The prefix must still strip — and the suffix keeps its real case.
+    expect(toRepoRelative(String.raw`C:\Repo\src\App.jsx`, String.raw`c:\repo`)).toBe('src/App.jsx');
+    expect(toRepoRelative('/Home/U/Repo/src/a.js', '/home/u/repo')).toBe('src/a.js');
+  });
 });

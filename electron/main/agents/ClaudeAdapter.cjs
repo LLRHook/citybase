@@ -16,6 +16,12 @@ const { CliAgentAdapter } = require('./CliAgentAdapter.cjs');
 
 const NOT_FOUND_MESSAGE = 'claude CLI not found on PATH';
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
+// Cap the partial-line buffer. stream-json is newline-delimited, and
+// spawnStream forwards every chunk to _onStdout uncapped (its 16MB cap only
+// bounds the buffered stdout it accumulates for result parsing). A single line
+// that grows past this without a newline is pathological — drop it rather than
+// let the buffer grow without bound. 32MB is far beyond any real Claude line.
+const MAX_LINE_BUF = 32 * 1024 * 1024;
 
 function buildClaudeArgv({ params }) {
   return [
@@ -85,6 +91,11 @@ class ClaudeAdapter extends CliAgentAdapter {
       entry.lineBuf = entry.lineBuf.slice(idx + 1);
       this._handleLine(entry, line);
     }
+    // Guard against an unbounded partial line (no newline in tens of MB).
+    if (entry.lineBuf.length > MAX_LINE_BUF) {
+      this._ev(entry, 'error', 'claude: output line exceeded buffer; truncated');
+      entry.lineBuf = '';
+    }
   }
 
   _handleLine(entry, line) {
@@ -142,12 +153,24 @@ class ClaudeAdapter extends CliAgentAdapter {
         const reason = (entry.stderr || '').trim() || 'claude exited with a non-zero status';
         this._ev(entry, 'error', `claude: ${reason}`);
       } else {
-        const parsed = parseClaudeJsonResult(entry.stdout);
-        this._ev(entry, 'edit', `claude: ${parsed.text || '(no output)'}`);
+        // A run can pass with no streamed events (claude emits only a `result`
+        // line, which we record but don't surface as its own event). Prefer
+        // that parsed result over re-parsing the full NDJSON stdout —
+        // JSON.parse on the whole multi-line stream fails and would otherwise
+        // dump the raw NDJSON as the "output" text.
+        const text = (entry.claudeResult && typeof entry.claudeResult.result === 'string')
+          ? entry.claudeResult.result
+          : parseClaudeJsonResult(entry.stdout).text;
+        this._ev(entry, 'edit', `claude: ${text || '(no output)'}`);
       }
     } else if (entry.exitState !== 'pass' && !entry.cancelled
       && !entry.events.some((e) => e.kind === 'error')) {
-      const reason = (entry.stderr || '').trim() || 'claude exited with a non-zero status';
+      // Events streamed, but the run ended non-pass with no explicit error
+      // event. Prefer the timeout-specific message so a killed-on-timeout run
+      // isn't mislabelled as a generic non-zero exit.
+      const reason = entry.exitState === 'timeout'
+        ? 'timed out before completing'
+        : (entry.stderr || '').trim() || 'claude exited with a non-zero status';
       this._ev(entry, 'error', `claude: ${reason}`);
     }
   }

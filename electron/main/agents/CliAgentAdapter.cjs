@@ -53,7 +53,9 @@ function parsePrNumberFromUrl(url) {
   return Number.isFinite(n) ? n : null;
 }
 
-const DEFAULT_TASK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const DEFAULT_TASK_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes — real agent runs
+// on a non-trivial task can exceed 10 min; killing a legit run mid-flight is
+// worse UX than a generous backstop, and the user can always cancel().
 const DEFAULT_TASK_MAX_BUFFER = 16 * 1024 * 1024; // 16 MB
 
 function defaultBuildArgv({ params }) {
@@ -182,7 +184,11 @@ class CliAgentAdapter extends AgentAdapter {
       timeoutMs: this._taskTimeoutMs,
       maxBuffer: this._taskMaxBuffer,
       stdin,
-      onStdout: (chunk) => { try { this._onStdout(entry, chunk); } catch { /* ignore */ } },
+      onStdout: (chunk) => {
+        // A parse hiccup must never crash the stream pump, but swallowing it
+        // silently hides real adapter bugs — log it for diagnosis.
+        try { this._onStdout(entry, chunk); } catch (err) { console.error('[agent] stdout parse error', err); }
+      },
     });
     entry.handle = handle;
     entry.donePromise = Promise.resolve(handle.done).then(

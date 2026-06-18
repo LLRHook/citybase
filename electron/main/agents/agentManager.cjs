@@ -194,6 +194,10 @@ function createAgentManager({
         inFlight.delete(preRunId);
         const h = history.get(preRunId);
         if (h) h.run = { ...h.run, status: 'cancelled' };
+        // Persist the rejection: the run never spawns (so captureWhenDone is
+        // never reached), but the cancelled record should survive a restart to
+        // match the in-session history rather than vanishing.
+        doPersist();
         const err = new Error('run rejected by user');
         err.code = 'REJECTED';
         throw err;

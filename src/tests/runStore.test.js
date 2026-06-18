@@ -58,6 +58,45 @@ describe('createRunStore', () => {
     expect(to.endsWith('.tmp')).toBe(false);
   });
 
+  it('serializes concurrent saves so writes never interleave on the temp file', async () => {
+    const order = [];
+    let releaseFirst;
+    const firstGate = new Promise((r) => { releaseFirst = r; });
+    let writes = 0;
+    const writeFile = vi.fn(async () => {
+      writes += 1;
+      const n = writes;
+      order.push(`start${n}`);
+      if (n === 1) await firstGate; // park the first write mid-flight
+      order.push(`end${n}`);
+    });
+    const store = createRunStore({
+      userDataDir: '/ud', readFile: vi.fn(), writeFile, mkdir: vi.fn(async () => {}), rename: vi.fn(async () => {}),
+    });
+    const p1 = store.save([terminal({ runId: 'a' })]);
+    const p2 = store.save([terminal({ runId: 'b' })]);
+    // Flush microtasks: the first write should be in flight, the second queued.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(order).toEqual(['start1']);
+    releaseFirst();
+    await Promise.all([p1, p2]);
+    expect(order).toEqual(['start1', 'end1', 'start2', 'end2']);
+  });
+
+  it('keeps the chain alive when a save rejects (next save still runs)', async () => {
+    let writes = 0;
+    const writeFile = vi.fn(async () => {
+      writes += 1;
+      if (writes === 1) throw new Error('disk full');
+    });
+    const store = createRunStore({
+      userDataDir: '/ud', readFile: vi.fn(), writeFile, mkdir: vi.fn(async () => {}), rename: vi.fn(async () => {}),
+    });
+    await expect(store.save([terminal({ runId: 'a' })])).rejects.toThrow(/disk full/);
+    await expect(store.save([terminal({ runId: 'b' })])).resolves.toBeTruthy();
+    expect(writes).toBe(2);
+  });
+
   it('returns [] when the file is missing or corrupt', async () => {
     const { store, files } = memStore();
     expect(await store.load()).toEqual([]);

@@ -280,6 +280,45 @@ describe('ClaudeAdapter — streamEvents (real CLI output, no synthetic trail)',
     expect(events.at(-1).text).toMatch(/timed out/);
   });
 
+  it('falls back to the parsed result line, not raw NDJSON, when a passing run surfaced no events', async () => {
+    // A success `result` line is recorded but not surfaced as its own event, so
+    // a run that emits ONLY that line settles with an empty event queue. The
+    // buffered stdout is multi-line NDJSON (JSON.parse of the whole thing fails),
+    // so the fallback must use the parsed result, never dump the raw stream.
+    const multiLineStdout = [L.init, L.tool('Read', 'src/x.js'), L.result(false, 'Reviewed the file.')].join('\n');
+    const ps = makeProcessService({
+      lines: [L.result(false, 'Reviewed the file.')],
+      streamResult: {
+        ok: true, code: 0, signal: null, stdout: multiLineStdout, stderr: '',
+        timedOut: false, killed: false, truncated: false, durationMs: 5, error: null,
+      },
+    });
+    const adapter = makeAdapter({ processService: ps });
+    const run = await adapter.startTask(VALID_PARAMS);
+    const events = await collect(adapter.streamEvents(run.runId));
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('edit');
+    expect(events[0].text).toBe('claude: Reviewed the file.');
+    expect(events[0].text).not.toMatch(/"type"/); // not a raw NDJSON dump
+  });
+
+  it('appends a timeout-specific error even when events already streamed', async () => {
+    const ps = makeProcessService({
+      lines: [L.init, L.text('working on it')],
+      streamResult: {
+        ok: false, code: null, signal: 'SIGTERM', stdout: '', stderr: '',
+        timedOut: true, killed: true, truncated: false, durationMs: 30_000, error: { message: 'timed out', code: 'ETIMEDOUT' },
+      },
+    });
+    const adapter = makeAdapter({ processService: ps });
+    const run = await adapter.startTask(VALID_PARAMS);
+    const events = await collect(adapter.streamEvents(run.runId));
+    expect(events.some((e) => e.kind === 'plan')).toBe(true); // streamed before the kill
+    expect(events.at(-1).kind).toBe('error');
+    expect(events.at(-1).text).toMatch(/timed out/);
+    expect(run.status).toBe('failed');
+  });
+
   it('yields a cancelled-error event for cancelled runs', async () => {
     // Deferred done so cancel lands before the run settles.
     let resolveDone;
