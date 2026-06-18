@@ -26,6 +26,13 @@ sections under each release/date heading.
 
 ### Fixed
 
+- BUG-008 Verified resolved by the v2.0 city rebuild (FEAT-014) and closed during the
+  2026-06-18 re-groom: districts seat at 6.2 world units against a ≤4.7 footprint (no
+  overlap, proven by enumerating adjacent seats) and buildings use a center-tile-free
+  Cartesian grid. The old `src/game/map.jsx` defect sites are deleted.
+- BUG-012 Closed as obsolete: the quest/adventurer surface it described
+  (`src/app/activity.js`, QuestDetailModal, seed `DISTRICTS`) was removed in the v2.0
+  City/Work rebuild; no carrier of any sub-defect survives.
 - BUG-025 City exact-file glow now relativizes streamed agent paths
   case-insensitively, so a Windows drive-letter case mismatch (`C:\` vs `c:\`)
   no longer leaves the path absolute and unmatched to a building.

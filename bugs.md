@@ -48,6 +48,35 @@ _Filed 2026-06-11 from [docs/srs-and-plan-of-action.md](./docs/srs-and-plan-of-a
 (SRS v0.1, baseline `main` @ `1356437`). Finding ids (M/R/T-series) and workstream
 ids (WS) reference that document._
 
+### Re-groom 2026-06-18 — disposition (verified against `main` @ `31c4014`)
+
+A 15-agent adversarial re-verification of this backlog against current `main`
+(post v1-wave / v2.0 / v3.0 / BUG-025..029). Every "resolved/obsolete" verdict was
+independently challenged before acting — the challenge **overturned BUG-003** from
+resolved to partial (CodexAdapter still synthesizes a fabricated event trail). Most
+tickets predate the rebuilds; several premises reference files that no longer exist.
+
+| Ticket | Disposition | Residual to implement |
+|--------|-------------|------------------------|
+| BUG-003 | partial (was high → med) | CodexAdapter inherits the base synthesized trail — emits "edits applied" at fabricated +60s timestamps on non-pass runs; make Codex derive events from real output (ClaudeAdapter already does) |
+| BUG-005 | **current** (high) | `agent.startRun` spawns in a renderer-supplied `repoUrl`, unvalidated; resolve a `workspaceId`→rootPath and reject unknown ids (mirror the git handlers) |
+| BUG-006 | partial (was high → med) | `.cmd` shim wrap shipped; bare `npm`/`gh` in `workspaceChecks.cjs:67` still fail on Windows (no `.exe`); resolve the launcher to `.cmd` on win32 |
+| BUG-007 | partial (high) | workspace/snapshot error-state rendering still unimplemented; `refresh()`'s un-try/caught `getCurrent()` can strand `loading`. (dead `git.refresh()` strand: fixed; update stale `src/game/map.jsx` file ref) |
+| BUG-008 | **resolved → migrated** | — old `src/game/map.jsx` deleted; v2.0 FEAT-014 seats districts at spacing 6.2 > 4.7 footprint (no overlap) and uses a Cartesian grid (no center-tile wrap); guarded by `iso.test.js` |
+| BUG-009 | **current** (med) | no `-c core.quotePath=false` on git status/diff/log; add it (or C-unquote) + unicode/rename parser fixtures |
+| BUG-010 | partial (was med → low) | ENOENT/timeout→`0` misclassification fixed; residual = no `kind` taxonomy on buffered `run()` envelope + dead `ETIMEDOUT` branch |
+| BUG-011 | **current** (med) | `src/game/branchSelector.jsx` still wired via TopBar; add a request-token guard, reset list on workspace switch, clear `selectedBranch` on switch |
+| BUG-012 | **obsolete → closed** | — quest/adventurer surface (`src/app/activity.js`, QuestDetailModal, seed `DISTRICTS`) all deleted in the v2.0 rebuild |
+| BUG-013 | **current** (med) | `workspaceService.writeState` still non-atomic/racy/untested — apply the runStore serialize + temp-rename pattern just shipped for BUG-026, + first unit tests |
+| BUG-014 | partial (med) | runId delegation + real child kill shipped; residual = adapter `_runs` Map never pruned (leak); add a release hook on cancel/evict (collision-after-spawn is low) |
+| BUG-015 | **current** (high) | `electron/` in `globalIgnores` + `.cjs` absent from the files glob → main tier unlinted; lint it + add `dist-electron` to ignores |
+| BUG-016 | partial (med) | subject-newline truncation added; residual = greedy sed still grabs the LAST `-m` (validates the body — reproduced); add Merge/Revert/fixup! allowlist; anchor the hook path to `$CLAUDE_PROJECT_DIR` |
+| BUG-017 | partial → docs-only (low) | `command.jsx`/`seed.js` deleted (inert-controls/SYSTEM_STATS obsolete); residual = reconcile the two documented AgentEvent shapes + fix the stale "pull_request trigger only" CI claim in ROADMAP |
+| BUG-018 | partial (low) | R11/R18/R19 obsolete (deleted files); residual = R12 toast-timer leak, R20 bare `HH:MM`, R21 `wrapperRef` TDZ ordering, M17 live-overlay `getEvents` backstop |
+| BUG-019 | partial (med) | V&V (baseline 380→393) + this re-groom satisfy the core ask; residual = AGENTS.md "npm run dev" + README `src/game/data.js` doc drift |
+
+Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win — lints the tier just changed), **BUG-005** (security), **BUG-013** (reuses the BUG-026 pattern), **BUG-007** (ship-gate FR-V9), **BUG-009**.
+
 ### [BUG-003] Agent runs block until exit, fabricate events, cancel unreachable, killed at 15 s
 - [ ] **Severity:** high
 - **Area:** agents
@@ -117,24 +146,6 @@ ids (WS) reference that document._
   folder, missing git, failed refresh.
 - **Status:** open
 
-### [BUG-008] District footprints overlap on real repos; building 12 wraps onto center tile
-- [ ] **Severity:** high
-- **Area:** renderer
-- **File(s):** src/app/cityModel.js, src/game/map.jsx, src/tests/cityModel.test.js
-- **Observation:** district seats are 1 hex apart (`cityModel.js:18-28`) but each
-  district draws a tile cluster of radius ≤2 (`map.jsx:9-15`) — adjacent footprints
-  overlap and buildings from different districts land on identical tiles; core's tile
-  `[1,0]` *is* the first ring seat (SRS R2). Off-by-one `tiles[(i + 1) % tiles.length]`
-  wraps the 12th building onto the district's center/label tile (R9, `map.jsx:39`,
-  `cityModel.js:149`). Invisible with seed data, guaranteed with real repos.
-- **Expected:** city view generated from the real repository with distinct district
-  footprints (ship gate FR-V4).
-- **Repro / Notes:** open any repo with many top-level folders. WS1.1 — share one
-  footprint constant between projector and renderer; scale ring seats to the cluster
-  radius (or shrink clusters); cap buildings at `tiles.length - 1`. Layout test: no two
-  districts share a tile, no building on a center tile.
-- **Status:** open
-
 ### [BUG-009] Git C-quoted (unicode) paths corrupt the status and diff parsers
 - [ ] **Severity:** med
 - **Area:** git
@@ -178,22 +189,6 @@ ids (WS) reference that document._
 - **Repro / Notes:** switch between two workspaces, open the selector. WS1.4 — reset
   list/status on `workspaceId` change, guard with a request token, clear
   `selectedBranch` on switch.
-- **Status:** open
-
-### [BUG-012] Modal and feed hygiene: stale picked adventurer, frozen times, mock leftovers, seed districts
-- [ ] **Severity:** med
-- **Area:** renderer
-- **File(s):** src/game/modals.jsx, src/App.jsx, src/app/activity.js
-- **Observation:** `QuestDetailModal` keeps a stale `picked` adventurer when
-  `selectedQuest` changes while mounted (SRS R6, `modals.jsx:30`); relative commit
-  times are computed once per snapshot and freeze until manual refresh (R7,
-  `App.jsx:137`, `activity.js:26`); live handlers contain mock leftovers — hardcoded
-  `t: '24:18'`, hardcoded author, fake ETA, collision-prone id arithmetic (R13,
-  `App.jsx:257-266`); quest modals use seed `DISTRICTS`, so quests posted against a
-  real workspace target districts that don't exist in the projected city (R14).
-- **Expected:** live UI driven by live data.
-- **Repro / Notes:** WS1.5 — `key={selectedQuest.id}`; coarse clock tick for relative
-  times; real timestamps in activity handlers; pass live districts into quest modals.
 - **Status:** open
 
 ### [BUG-013] `workspaces.json` writes are racy and non-atomic
@@ -567,4 +562,38 @@ They are kept here so each `BUG-NNN` stays resolvable.
 - **Fix:** raise the default timeout 10→30 min (cancel still works as the escape
   hatch); bound the partial-line buffer at 32MB with a truncation event; log
   swallowed stdout-parse errors via `console.error`.
+- **Status:** fixed-pending-migration
+
+### [BUG-008] District footprints overlap on real repos; building 12 wraps onto center tile
+- [x] **Severity:** high
+- **Area:** renderer
+- **File(s):** (historical) src/app/cityModel.js, src/game/map.jsx, src/tests/cityModel.test.js
+- **Observation:** district seats 1 hex apart but each district drew a radius-≤2 tile
+  cluster, so adjacent footprints overlapped and buildings landed on identical tiles;
+  an off-by-one wrapped the 12th building onto the center/label tile. Both defect sites
+  lived in `src/game/map.jsx`.
+- **Resolution:** obsoleted-then-resolved by the v2.0 "Living City" rebuild (FEAT-014):
+  `src/game/map.jsx` was deleted and the renderer replaced by `src/views/CityView.jsx`
+  + `src/app/cityModel.js`. The 2026-06-18 adversarial re-groom verified — by
+  enumerating every adjacent seat pair — that districts seat at spacing 6.2 world units
+  against a ≤4.7 platform footprint (tightest single-axis gap 5.369 > 4.7, no overlap),
+  core is a distinct origin platform, and buildings use a centered Cartesian grid with
+  no center tile and no modular wrap. Guarded by `iso.test.js` (BUG-008 separation
+  guard) + `CityView.test.jsx`.
+- **Status:** fixed-pending-migration
+
+### [BUG-012] Modal and feed hygiene: stale picked adventurer, frozen times, mock leftovers, seed districts
+- [x] **Severity:** med
+- **Area:** renderer
+- **File(s):** (historical) src/game/modals.jsx, src/App.jsx, src/app/activity.js
+- **Observation:** stale picked adventurer in `QuestDetailModal`, frozen relative
+  commit times, mock leftovers in the activity handlers, and quest modals targeting
+  seed `DISTRICTS` that don't exist in the projected city.
+- **Resolution:** obsolete — every symptom was bound to the quest/adventurer metaphor
+  UI, which the v2.0 City/Work rebuild removed wholesale: `src/app/activity.js` deleted,
+  `QuestDetailModal`/`PostQuestModal` removed from `modals.jsx` (now only `ApprovalModal`
+  + `Toasts`), and the city is projected from real Git state rather than seed
+  `DISTRICTS`. The 2026-06-18 re-groom confirmed the premise was genuine at baseline
+  (`git show 1356437:src/app/activity.js` exists) and that no carrier of any sub-defect
+  survives. Closed as obsolete by removal.
 - **Status:** fixed-pending-migration
