@@ -147,29 +147,29 @@ A failure in this stage is a hard block.
   ```bash
   npm test -- --run
   ```
-  Expected: `Test Files  30 passed (30)`, `Tests  380 passed (380)`, exit 0.
+  Expected: `Test Files  30 passed (30)`, `Tests  393 passed (393)`, exit 0.
 - [ ] 2.3 Test-count baseline matches the collector:
   ```bash
-  npx vitest list | wc -l   # expect: 380
+  npx vitest list | wc -l   # expect: 393
   ```
   A mismatch with the table below means tests appeared or disappeared without
   a deliberate decision — investigate before ticking, then update the table
   in the same change as the run.
 
-**Baseline (2026-06-15, SHA `0e20a02`, v3.0.0): 30 test files / 380 test cases — all Vitest (jsdom). The desktop launch path is covered by the Playwright smoke (2.4); the real-`claude` agent path (incl. non-blocking streaming dispatch + persistence) by the integration harnesses (Appendix F).**
+**Baseline (2026-06-18, SHA `31c4014`, v3.0.0 + post-cut hardening): 30 test files / 393 test cases — all Vitest (jsdom). The desktop launch path is covered by the Playwright smoke (2.4); the real-`claude` agent path (incl. non-blocking streaming dispatch + persistence) by the integration harnesses (Appendix F).**
 
 | Test file | Cases | | Test file | Cases |
 |---|---|---|---|---|
 | `AgentDetectError.test.jsx` | 5 | | `iso.test.js` | 8 |
 | `agentAdapter.test.js` | 13 | | `menuTemplate.test.js` | 8 |
-| `agentManager.test.js` | 42 | | `parseBranchList.test.js` | 8 |
+| `agentManager.test.js` | 43 | | `parseBranchList.test.js` | 8 |
 | `AppAutoBoot.test.jsx` | 9 | | `parseFiles.test.js` | 12 |
 | `ApprovalModal.test.jsx` | 10 | | `parseUnifiedDiff.test.js` | 10 |
 | `bootPayload.test.js` | 8 | | `preload.contract.test.js` | 3 |
 | `BranchSelector.test.jsx` | 12 | | `processService.test.js` | 13 |
-| `ClaudeAdapter.test.js` | 28 | | `resolveProvider.test.js` | 7 |
-| `CliAgentAdapter.test.js` | 19 | | `runCity.test.js` | 10 |
-| `cityModel.test.js` | 9 | | `runStore.test.js` | 7 |
+| `ClaudeAdapter.test.js` | 31 | | `resolveProvider.test.js` | 7 |
+| `CliAgentAdapter.test.js` | 19 | | `runCity.test.js` | 17 |
+| `cityModel.test.js` | 9 | | `runStore.test.js` | 9 |
 | `CityView.test.jsx` | 8 | | `useAgentDetect.test.jsx` | 8 |
 | `citybaseApi.test.js` | 2 | | `useRunHistory.test.jsx` | 6 |
 | `CodexAdapter.test.js` | 25 | | `windowConfig.test.js` | 10 |

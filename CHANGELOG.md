@@ -12,6 +12,35 @@ sections under each release/date heading.
 
 ## Unreleased
 
+### Verified
+
+- 2026-06-18 V&V pass (SHA `31c4014`, v3.0.0 + post-cut hardening): Stages 0–5
+  green. 393 Vitest cases across 30 files, 1 Playwright desktop smoke, lint +
+  build clean, renderer isolation / IPC allow-list / single-spawn-site /
+  no-telemetry invariants re-confirmed. Real-`claude` harnesses green:
+  `claude-e2e` 13/13 (detect → non-blocking dispatch → live stream → diff →
+  checks), `gui-claude-e2e` 5/5 (approval gate + live stream in RunDetail + diff
+  + city glow). Baseline bumped 380 → 393 (FEAT-005 streaming-event tests +7,
+  BUG-025..029 regression tests +6). Five defects found by an adversarial
+  multi-agent review of the v3 changes and fixed this cycle (BUG-025..029).
+
+### Fixed
+
+- BUG-025 City exact-file glow now relativizes streamed agent paths
+  case-insensitively, so a Windows drive-letter case mismatch (`C:\` vs `c:\`)
+  no longer leaves the path absolute and unmatched to a building.
+- BUG-026 `runStore` serializes concurrent saves through a promise chain, so two
+  runs settling together can no longer interleave writes to the shared temp file
+  and corrupt `runs.json`; persist failures are now logged, not swallowed.
+- BUG-027 ClaudeAdapter `_finalize` prefers the parsed `result` text over
+  re-parsing the full NDJSON stream (no more raw-stream dump on a zero-event
+  success), and names a timeout a timeout when events had already streamed.
+- BUG-028 A rejected approval run now persists its `cancelled` record, so it
+  survives a restart instead of vanishing from the Run History panel.
+- BUG-029 Agent-run robustness: default task timeout raised 10→30 min, the NDJSON
+  line buffer is bounded at 32MB, and a throw in the stdout-parse hook is logged
+  rather than silently swallowed.
+
 ## 3.0.0 — "Real-Time City"
 
 The workbench goes real-time and durable. Agent dispatch is non-blocking and
