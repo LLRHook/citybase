@@ -210,7 +210,7 @@ backlog: **FEAT-004** (streaming runner), **FEAT-005** (real streaming events in
 codex), **FEAT-008** (run persistence). New visual + release tickets below.
 
 ### [FEAT-020] Streaming run detail
-- [ ] **Priority:** high
+- [x] **Priority:** high
 - **Area:** renderer
 - **File(s):** src/views/RunDetail.jsx
 - **Why:** events should append live with progress, not appear all at once when
@@ -221,7 +221,15 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
   diff/checks; backstop (`getEvents`) still covers re-mounts.
 - **Test plan:** component test with an incremental event stream.
 - **Out of scope:** changing the event protocol.
-- **Status:** open
+- **Implementation:** running runs render a "Live Activity" panel — the
+  `useRunEvents` stream appends incrementally, the container follows the tail
+  (auto-scroll), and a pulsing "agent working" indicator (reduced-motion-safe)
+  makes in-flight state unambiguous. Terminal state swaps to the Phase 4
+  review surface and loads diff/checks; `getEvents` remains the re-mount
+  backstop. The `reportUsage` progress bar was skipped — the adapter's
+  `reportUsage` is still a placeholder envelope, so there is nothing real to
+  render. Covered by `src/tests/RunDetail.test.jsx` (incremental stream case).
+- **Status:** shipped-pending-migration
 
 ---
 

@@ -236,6 +236,7 @@ export function CityView({ snapshot, activePaths, activeRun, phase, onOpenRun })
   return (
     <div
       ref={wrapRef}
+      data-testid="city-view"
       onWheel={onWheel}
       onMouseDown={onDown}
       onMouseMove={onMove}

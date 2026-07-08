@@ -6,7 +6,7 @@
 // Usage: node scripts/dev-capture.mjs [outDir]
 // Requires a fresh `npm run build` (loads dist/index.html from disk).
 import { _electron as electron } from '@playwright/test';
-import { mkdirSync, readFileSync, writeFileSync, existsSync, copyFileSync, realpathSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, copyFileSync, realpathSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
@@ -18,7 +18,14 @@ mkdirSync(outDir, { recursive: true });
 
 // Point the app at the repo's own workspace so the city renders from real git
 // state. Non-destructive: back up the user's workspaces.json and restore it.
-const userData = path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Citybase');
+// Electron's userData root differs per OS — writing the Windows path on macOS
+// seeds a file the app never reads.
+const userDataRoot = process.platform === 'darwin'
+  ? path.join(os.homedir(), 'Library', 'Application Support')
+  : process.platform === 'win32'
+    ? (process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'))
+    : (process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'));
+const userData = path.join(userDataRoot, 'Citybase');
 const stateFile = path.join(userData, 'workspaces.json');
 const backup = stateFile + '.devcapture.bak';
 const repoId = createHash('sha1').update(repoRoot).digest('hex').slice(0, 16);

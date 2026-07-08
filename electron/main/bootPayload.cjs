@@ -29,7 +29,7 @@ async function buildBootPayload({ detect, getCurrentWorkspace }) {
   // Detection is sync (PATH probe) but we shield with a try so a probe
   // failure can't take the boot payload down — the renderer will just
   // see the empty fallback and can re-detect on demand.
-  let detectResult = EMPTY_DETECT;
+  let detectResult;
   try {
     const r = detect();
     detectResult = r && typeof r === 'object' ? r : EMPTY_DETECT;
@@ -37,7 +37,7 @@ async function buildBootPayload({ detect, getCurrentWorkspace }) {
     detectResult = EMPTY_DETECT;
   }
 
-  let workspace = null;
+  let workspace;
   try {
     const ws = await getCurrentWorkspace();
     workspace = ws || null;
