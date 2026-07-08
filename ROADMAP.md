@@ -292,6 +292,22 @@ The structural plumbing for the v1 ship gate is in place. Each gate item below i
 - Push-to-remote action (commit lands locally; the user finishes in their normal Git tool).
 - Any remaining seed/mock data the renderer still imports (`EMPTY_*` stubs in `App.jsx`, `ADV_REPORTS` in `src/data/seed.js`). The renderer already ignores these in production paths thanks to slice 5's run-history surface, but the imports themselves should be deleted in a v1.1 cleanup.
 
+## v4.0 — "The Game" (next major)
+
+Decision 2026-07-08: v4 rebuilds the presentation tier in **Godot 4.7** so
+Citybase can carry the full original vision — the living command-center city
+(ambient life, agent avatars, quest board, vitals, XP) — with every fictional
+system from the founding prototype rebuilt as a real one. The agent harness
+does **not** move: it extracts into a headless Node daemon (`citybase-core`)
+that the Godot frontend drives over a localhost JSON-RPC WebSocket, keeping
+the adapters, the streaming runner, the approval boundary, and the test suite
+intact. The Electron shell keeps working against the same core and retires
+only at parity.
+
+Architecture, phase plan (A–F), and risks: [docs/v4-game-engine.md](./docs/v4-game-engine.md).
+Tickets: FEAT-022 (core extraction), FEAT-023 (Godot spike gate) in
+[features.md](./features.md); later phases are ticketed when the spike passes.
+
 ## Open Questions
 
 - Do we want macOS-only for the first downloadable build, or macOS + Windows from the start?

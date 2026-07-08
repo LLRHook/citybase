@@ -173,6 +173,79 @@ Priority guide: crit / high / med / low.
 
 ---
 
+## v4.0 — "The Game" epic
+
+Decision 2026-07-08 (see [docs/v4-game-engine.md](./docs/v4-game-engine.md)):
+rebuild the presentation tier in Godot 4.7 on top of the extracted Node core.
+Phases C–F are ticketed only after FEAT-023's gate passes.
+
+### [FEAT-022] Extract `citybase-core`: headless daemon + WS JSON-RPC facade
+- [ ] **Priority:** high
+- **Area:** electron, agents, ipc
+- **File(s):** core/ (new), electron/main/ipc.cjs, electron/main/ipcHandlers.cjs, src/tests/
+- **Why:** v4 Phase A. The Godot frontend needs the agent harness behind a
+  transport it can speak (localhost WebSocket); the Electron shell should
+  become a thin client of the same handler map so both frontends share one
+  brain and one security boundary.
+- **Approach:** new `core/server.cjs` that instantiates the existing services
+  (same injected-deps factories) and exposes `createIpcHandlers`' channel map
+  as JSON-RPC over a `127.0.0.1` WebSocket; `{event: 'agent-event'}` push
+  notifications reuse the `pumpAgentEvents` envelope; session token minted at
+  startup and required on connect; `workspace.pick` becomes a
+  register-validated-path method (native dialog moves frontend-side).
+  Electron keeps its in-proc path this ticket — dual-hosting is proven by a
+  protocol conformance test, not by rewiring the shell yet.
+- **Library / dependency notes:** needs a WS server dep (`ws` is the de facto
+  standard) — verify latest stable + advisory status before install, per
+  AGENTS.md new-dep rule.
+- **Acceptance criteria:**
+  - `node core/server.cjs --workspace <path>` serves the full channel map;
+    a scripted client can pick/validate a workspace, get a snapshot, dispatch
+    a gated run, approve it, and stream its events to completion.
+  - Rejects connections without the session token; binds loopback only.
+  - Protocol conformance test asserts the WS method set === the preload
+    surface (FEAT-010's manifest idea, upgraded).
+  - Entire existing suite stays green; Electron app behavior unchanged.
+- **Test plan:** unit tests for the server glue (injected fake services);
+  integration test driving a real core instance over WS against a fixture
+  repo; conformance test.
+- **Out of scope:** Godot anything (FEAT-023); retiring Electron IPC.
+- **Status:** open
+
+### [FEAT-023] Godot 4.7 spike — go/no-go gate for the engine frontend
+- [ ] **Priority:** high
+- **Area:** build, renderer
+- **File(s):** godot/ (new project dir), docs/v4-game-engine.md (gate results)
+- **Why:** v4 Phase B. Proves the engine can carry the product before any
+  city/workbench investment: WS client to the core, JSON throughput, 3D
+  render from a real snapshot, live event-driven animation, text UI
+  viability, mac export.
+- **Approach:** minimal Godot 4.7 project (GDScript): spawn `citybase-core`
+  via `OS.create_process` (env-passed token), connect `WebSocketPeer`,
+  render each district of a real repo snapshot as a lit 3D block cluster,
+  dispatch one read-only run and glow the touched building within 1s of the
+  streamed event, plus one `RichTextLabel` panel rendering a run's event
+  trail. Export a signed-nothing `.app` and run it outside the editor.
+  Time-box: if the gate can't pass, record why in docs/v4-game-engine.md and
+  fall back to the WebGL-in-Electron path with Phase A already banked.
+- **Library / dependency notes:** Godot 4.7 stable (editor + export
+  templates) as a dev-machine prerequisite, not an npm dep; no addons for
+  the spike — the sidecar removes the need for process/pipe addons.
+- **Acceptance criteria:**
+  - Spike app on macOS: boots core, authenticates, renders the real city
+    blocks, streams a live run into a building glow, event panel readable.
+  - Frame rate ≥ 60fps with the citybase repo's own tree loaded.
+  - Export runs outside the editor on macOS (Windows export attempted,
+    result recorded).
+  - Go/no-go verdict + measurements appended to docs/v4-game-engine.md.
+- **Test plan:** the gate checklist is the test; core-side interactions
+  covered by FEAT-022's integration test.
+- **Out of scope:** full city visuals (Phase C), workbench panels (Phase D),
+  packaging polish (Phase F).
+- **Status:** open
+
+---
+
 ## v2.0 — "The Living City" epic
 
 The v1 wave shipped a solid but plain agent-dispatch shell and **deleted** the
