@@ -1,0 +1,20 @@
+; Citybase v4 spike (FEAT-023). Minimal Godot 4.7 project: proves the engine
+; can host the product — spawns citybase-core, speaks the WS JSON-RPC
+; protocol, renders a real repo as a lit 3D city, reacts to live run events.
+
+config_version=5
+
+[application]
+
+config/name="Citybase Spike"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.7")
+
+[display]
+
+window/size/viewport_width=1480
+window/size/viewport_height=960
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
