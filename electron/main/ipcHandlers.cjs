@@ -123,7 +123,7 @@ function createIpcHandlers({
       // resolved main-side from the known-workspace registry so a
       // compromised renderer can't point the CLI (and the later git/npm
       // calls) at an arbitrary directory.
-      const { workspaceId, repoUrl: _rendererSupplied, ...rest } = params || {};
+      const { workspaceId, repoUrl, ...rest } = params || {};
       const ws = await workspaceService.getWorkspaceById(workspaceId);
       if (!ws) throw new Error(`unknown workspace id: ${workspaceId}`);
       const run = await agentManager.startRun({ ...rest, repoUrl: ws.rootPath });
