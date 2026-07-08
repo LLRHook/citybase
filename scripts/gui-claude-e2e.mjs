@@ -4,6 +4,7 @@
 // then renders RunDetail and the city. Proves the whole chain in one session.
 // NOT in CI (needs an authenticated claude + spends tokens). Modifies only a
 // throwaway git repo. Usage: node scripts/gui-claude-e2e.mjs
+/* global window, document -- used inside page.evaluate callbacks, which run in the renderer */
 import { _electron as electron } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import {

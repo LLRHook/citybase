@@ -10,6 +10,7 @@ import { ApprovalModal, Toasts } from './game/modals.jsx';
 import { TopBar } from './views/TopBar.jsx';
 import { RunHistorySidebar } from './views/RunHistorySidebar.jsx';
 import { EmptyHome } from './views/EmptyHome.jsx';
+import { WorkspaceStatusPanel } from './views/WorkspaceStatusPanel.jsx';
 import { NewRunForm } from './views/NewRunForm.jsx';
 import { RunDetail } from './views/RunDetail.jsx';
 import { CityView } from './views/CityView.jsx';
@@ -135,7 +136,7 @@ function CitybaseApp() {
         questId: `run-${Date.now()}`,
         adventurerId: 'local',
         skill: 'refactor',
-        repoUrl: workspace.workspace.rootPath,
+        workspaceId: workspace.workspace.id,
         branch: workspace.snapshot?.branch || 'main',
         promptContext,
         // Every dispatch can change files (bypassPermissions), so gate it
@@ -231,13 +232,37 @@ function CitybaseApp() {
       />
 
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        {!workspace.workspace && (
+        {workspace.status === 'error' && (
+          <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <WorkspaceStatusPanel
+              kind="workspace"
+              error={workspace.error}
+              workspace={workspace.workspace}
+              onRetry={workspace.refresh}
+              onPickWorkspace={workspace.pick}
+            />
+          </main>
+        )}
+
+        {workspace.status !== 'error' && !workspace.workspace && (
           <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <EmptyHome onPickWorkspace={workspace.pick} agentDetect={agentDetect} />
           </main>
         )}
 
-        {workspace.workspace && view === 'city' && (
+        {workspace.status !== 'error' && workspace.workspace && workspace.snapshot?.error && (
+          <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <WorkspaceStatusPanel
+              kind="snapshot"
+              error={workspace.snapshot.error}
+              workspace={workspace.workspace}
+              onRetry={workspace.refresh}
+              onPickWorkspace={workspace.pick}
+            />
+          </main>
+        )}
+
+        {workspace.status !== 'error' && workspace.workspace && !workspace.snapshot?.error && view === 'city' && (
           <CityView
             snapshot={workspace.snapshot}
             activePaths={activePaths}
@@ -247,7 +272,7 @@ function CitybaseApp() {
           />
         )}
 
-        {workspace.workspace && view === 'work' && (
+        {workspace.status !== 'error' && workspace.workspace && !workspace.snapshot?.error && view === 'work' && (
           <>
             <RunHistorySidebar
               runs={runHistory}

@@ -209,23 +209,28 @@ Work items:
 - Store runs locally with timestamps, provider, prompt, and final result.
 - Add failure states for missing binary, auth needed, cancelled run, and timeout.
 
-## Phase 4 - No-Code Work Review
+## Phase 4 - No-Code Work Review (complete)
 
 Goal: make the result screen match the product promise: visual first, no raw source by default.
 
 Definition of done:
 
-- Analysis screen no longer renders raw code hunks as the primary view.
-- Changed files are shown as affected buildings/districts.
-- Results summarize intent, areas changed, tests/checks run, risk level, and next action.
-- A raw log/debug drawer exists only for advanced troubleshooting.
+- [x] Analysis screen no longer renders raw code hunks as the primary view.
+- [x] Changed files are shown as affected buildings/districts.
+- [x] Results summarize intent, areas changed, tests/checks run, risk level, and next action.
+- [x] A raw log/debug drawer exists only for advanced troubleshooting.
 
 Work items:
 
-- Replace "Code Changes" with "Changed Districts" and "Outcome".
-- Add a visual diff summary: files changed, change type, risk, confidence.
-- Add approve/reject/continue controls.
-- Preserve enough hidden run data for debugging.
+- [x] Replace "Code Changes" with "Changed Districts" and "Outcome" — RunDetail's
+  terminal view leads with an Outcome panel (agent summary + explainable risk
+  level + churn totals) and a Changed Districts panel (files grouped by the
+  city's district convention via the pure `src/app/reviewModel.js`).
+- [x] Add a visual diff summary: files changed, change type, risk, confidence.
+- [x] Approve/reject controls — the pre-flight approval gate (BUG-004) covers
+  approve/reject before any write; post-run next actions are Open PR + commit.
+- [x] Preserve enough hidden run data for debugging — the full agent log and
+  raw diff hunks live in collapsed drawers.
 
 ## Phase 5 - Basic Editor Workflows (complete)
 
@@ -273,10 +278,12 @@ The structural plumbing for the v1 ship gate is in place. Each gate item below i
 - ✅ **Claude Code adapter functional end-to-end against the real `claude` CLI.** The adapter now uses the real flags (`--print --output-format json --model … --permission-mode bypassPermissions` + the prompt as a positional arg) and `streamEvents` yields real Claude output instead of a synthesized trail. [#36](https://github.com/LLRHook/citybase/pull/36).
 - ✅ **App auto-boots on launch.** Main process pushes a one-shot boot payload over `BOOT_PAYLOAD_CHANNEL` once `did-finish-load` fires, carrying `{ detect, workspace }`. The renderer's `useAgentDetect` hook accepts the cached payload and skips the IPC roundtrip; `useWorkspace` restores the recent workspace via `getCurrentWorkspace`. No clicks needed before the city renders. [#37](https://github.com/LLRHook/citybase/pull/37).
 - ✅ **Local run history is real.** `agentManager.listRuns()` surfaces every dispatched run from the in-memory history Map (cancel-survives, FIFO-bounded). The renderer's Run History panel renders rows for real runs and an explicit "no runs yet" empty state instead of seed data. [#38](https://github.com/LLRHook/citybase/pull/38).
-- ⏭ **End-to-end manual verification on macOS / Windows packaged builds.** Local browser preview is blocked by Docker holding port 5173 throughout this session, so manual UX verification of the auto-boot flow has not happened in this loop.
-- ⏭ **`openPR` via `gh` CLI.** `CliAgentAdapter.openPR` still throws the deferred placeholder. Without it, the "approved write-capable request" gate item only completes locally — the user still finishes in their normal Git tool, which is consistent with the deferred `push` item below but not with "PR creation as part of the run".
-- ⏭ **Token-by-token streaming.** Currently `streamEvents` yields one event after the CLI exits because `processService` does not surface stdout chunks on a child handle. Real-time streaming is a follow-up.
-- ⏭ **README updates** for setup, packaging, safety model, troubleshooting.
+- ✅ **`openPR` via `gh` CLI** — implemented; `CliAgentAdapter.openPR` shells out to `gh pr create` and RunDetail exposes it on terminal runs.
+- ✅ **Token-by-token streaming** — shipped in v3.0 (FEAT-004 `spawnStream` + FEAT-005 stream-json events); FEAT-020 renders the stream live in RunDetail.
+- ✅ **README updates** for setup, packaging, safety model, troubleshooting (FEAT-002, shipped upstream in the operator-guide rewrite).
+- ✅ **Default review surface shows no raw code** — Phase 4 landed: Outcome + Changed Districts primary, hunks/log in collapsed drawers.
+- ✅ **Error states render** — BUG-007: non-repo / git-missing / IPC-failure states surface as an explicit panel with retry/pick affordances (verified live on macOS via `scripts/dev-capture.mjs`).
+- ⏭ **End-to-end manual verification of packaged builds** (`package:dir` artifacts) on macOS / Windows. The dev-mode app is verified live on macOS; the packaged-artifact walkthrough remains a release-checklist item (VERIFICATION.md).
 
 ### Out of v1 scope (deferred to v1.1+)
 

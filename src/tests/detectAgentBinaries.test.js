@@ -120,13 +120,16 @@ describe('detectAgentBinaries — default fsExists hits the real filesystem', ()
     const root = mkdtempSync(join(tmpdir(), 'citybase-detect-'));
     const binDir = join(root, 'bin');
     mkdirSync(binDir);
-    const ext = process.platform === 'win32' ? '.cmd' : '';
-    const claudeFile = join(binDir, `claude${ext}`);
+    const claudeFile = join(binDir, 'claude');
     writeFileSync(claudeFile, '');
     try {
       // Override env.PATH only — leave fsExists unset so the default kicks in.
+      // Pin the platform so the darwin/win32 well-known install dirs
+      // (/opt/homebrew/bin, %APPDATA%\npm, …) can't surface CLIs that are
+      // genuinely installed on the machine running the suite.
       const out = detectAgentBinaries({
         env: { PATH: binDir },
+        platform: 'linux',
       });
       expect(out.claude.found).toBe(true);
       expect(out.claude.path).toBe(claudeFile);
@@ -142,6 +145,7 @@ describe('detectAgentBinaries — default fsExists hits the real filesystem', ()
     // explode detection.
     const out = detectAgentBinaries({
       env: { PATH: '/nonexistent/path/that/cannot/exist' },
+      platform: 'linux',
     });
     expect(out).toEqual({ codex: { found: false }, claude: { found: false } });
   });

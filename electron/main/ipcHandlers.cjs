@@ -119,7 +119,14 @@ function createIpcHandlers({
     'citybase:agents.list': () => agentManager.listProviders(),
 
     'citybase:agent.startRun': async (_evt, params) => {
-      const run = await agentManager.startRun(params);
+      // The renderer names a workspace, never a path: the spawn cwd is
+      // resolved main-side from the known-workspace registry so a
+      // compromised renderer can't point the CLI (and the later git/npm
+      // calls) at an arbitrary directory.
+      const { workspaceId, repoUrl, ...rest } = params || {};
+      const ws = await workspaceService.getWorkspaceById(workspaceId);
+      if (!ws) throw new Error(`unknown workspace id: ${workspaceId}`);
+      const run = await agentManager.startRun({ ...rest, repoUrl: ws.rootPath });
       // Non-blocking dispatch returns a 'running' run immediately. Tell the
       // renderer right away so it reflects the live run and the city starts
       // animating; the full event trail streams via pumpAgentEvents once the

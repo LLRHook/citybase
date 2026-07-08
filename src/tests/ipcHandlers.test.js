@@ -306,19 +306,43 @@ describe('createIpcHandlers — agents.detect + agents.list', () => {
 });
 
 describe('createIpcHandlers — agent.startRun + event fan-out', () => {
-  it('agent.startRun returns the AgentRun the manager produces', async () => {
+  it('agent.startRun resolves the workspace and passes its rootPath as repoUrl', async () => {
     const stubs = makeStubs();
     const { handlers } = build(stubs);
-    const params = { provider: 'codex', questId: 'TASK-1' };
+    const params = { provider: 'codex', questId: 'TASK-1', workspaceId: 'ws-1' };
     const run = await handlers['citybase:agent.startRun'](null, params);
     expect(run).toMatchObject({ runId: 'run-1', status: 'running' });
-    expect(stubs.agentManager.startRun).toHaveBeenCalledWith(params);
+    expect(stubs.workspaceService.getWorkspaceById).toHaveBeenCalledWith('ws-1');
+    expect(stubs.agentManager.startRun).toHaveBeenCalledWith(
+      { provider: 'codex', questId: 'TASK-1', repoUrl: '/repo' },
+    );
+  });
+
+  it('agent.startRun rejects an unknown workspace id without touching the manager', async () => {
+    const stubs = makeStubs();
+    const { handlers } = build(stubs);
+    await expect(
+      handlers['citybase:agent.startRun'](null, { provider: 'codex', workspaceId: 'nope' }),
+    ).rejects.toThrow(/unknown workspace id: nope/);
+    expect(stubs.agentManager.startRun).not.toHaveBeenCalled();
+    expect(stubs.sendAgentEvent).not.toHaveBeenCalled();
+  });
+
+  it('agent.startRun ignores a renderer-supplied repoUrl (spawn cwd is main-resolved)', async () => {
+    const stubs = makeStubs();
+    const { handlers } = build(stubs);
+    await handlers['citybase:agent.startRun'](null, {
+      provider: 'codex', workspaceId: 'ws-1', repoUrl: '/etc',
+    });
+    expect(stubs.agentManager.startRun).toHaveBeenCalledWith(
+      expect.objectContaining({ repoUrl: '/repo' }),
+    );
   });
 
   it('agent.startRun fires events through sendAgentEvent without awaiting', async () => {
     const stubs = makeStubs();
     const { handlers } = build(stubs);
-    await handlers['citybase:agent.startRun'](null, { provider: 'codex' });
+    await handlers['citybase:agent.startRun'](null, { provider: 'codex', workspaceId: 'ws-1' });
     // Drain microtasks so the fire-and-forget pump finishes.
     await new Promise((resolve) => setImmediate(resolve));
     // 1 immediate "started" event (so the renderer sees the live run) + the
@@ -351,7 +375,7 @@ describe('createIpcHandlers — agent.startRun + event fan-out', () => {
     };
     const stubs = makeStubs({ agentManager });
     const { handlers } = build(stubs);
-    await handlers['citybase:agent.startRun'](null, { provider: 'codex' });
+    await handlers['citybase:agent.startRun'](null, { provider: 'codex', workspaceId: 'ws-1' });
     await new Promise((resolve) => setImmediate(resolve));
     const calls = stubs.sendAgentEvent.mock.calls.map(c => c[0].event);
     expect(calls.at(-1)).toMatchObject({ kind: 'error', text: 'stream blew up' });

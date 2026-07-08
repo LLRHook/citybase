@@ -54,7 +54,7 @@ async function runWorkspaceChecks({
     throw new TypeError('runWorkspaceChecks: processService.run is required');
   }
   const pkgPath = path.join(workspace.rootPath, 'package.json');
-  let pkg = null;
+  let pkg;
   try {
     pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
   } catch {

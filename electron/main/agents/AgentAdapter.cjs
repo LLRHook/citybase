@@ -122,7 +122,7 @@ class AgentAdapter {
    * @param {StartTaskParams} params
    * @returns {Promise<AgentRun>}
    */
-  async startTask(params) {
+  async startTask(_params) {
     throw notImplemented('startTask');
   }
 
@@ -131,7 +131,7 @@ class AgentAdapter {
    * @param {string} runId
    * @returns {AsyncIterable<AgentEvent>}
    */
-  streamEvents(runId) {
+  streamEvents(_runId) {
     throw notImplemented('streamEvents');
   }
 
@@ -140,7 +140,7 @@ class AgentAdapter {
    * @param {string} runId
    * @returns {Promise<{ contextUsed: number, maxContext: number }>}
    */
-  async reportUsage(runId) {
+  async reportUsage(_runId) {
     throw notImplemented('reportUsage');
   }
 
@@ -149,7 +149,7 @@ class AgentAdapter {
    * @param {string} runId
    * @returns {Promise<{ files: DiffFile[] }>}
    */
-  async produceDiff(runId) {
+  async produceDiff(_runId) {
     throw notImplemented('produceDiff');
   }
 
@@ -158,7 +158,7 @@ class AgentAdapter {
    * @param {string} runId
    * @returns {Promise<CheckResult[]>}
    */
-  async runChecks(runId) {
+  async runChecks(_runId) {
     throw notImplemented('runChecks');
   }
 
@@ -168,7 +168,7 @@ class AgentAdapter {
    * @param {OpenPRParams} params
    * @returns {Promise<PullRequest>}
    */
-  async openPR(runId, params) {
+  async openPR(_runId, _params) {
     throw notImplemented('openPR');
   }
 
@@ -178,7 +178,7 @@ class AgentAdapter {
    * @param {string} runId
    * @returns {Promise<void>}
    */
-  async cancel(runId) {
+  async cancel(_runId) {
     throw notImplemented('cancel');
   }
 }
