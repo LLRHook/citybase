@@ -228,7 +228,7 @@ Phases C–F are ticketed only after FEAT-023's gate passes.
 - **Status:** shipped-pending-migration
 
 ### [FEAT-023] Godot 4.7 spike — go/no-go gate for the engine frontend
-- [ ] **Priority:** high
+- [x] **Priority:** high
 - **Area:** build, renderer
 - **File(s):** godot/ (new project dir), docs/v4-game-engine.md (gate results)
 - **Why:** v4 Phase B. Proves the engine can carry the product before any
@@ -257,7 +257,19 @@ Phases C–F are ticketed only after FEAT-023's gate passes.
   covered by FEAT-022's integration test.
 - **Out of scope:** full city visuals (Phase C), workbench panels (Phase D),
   packaging polish (Phase F).
-- **Status:** open
+- **Implementation:** `godot/` project (Godot 4.7 stable, GDScript): spawns
+  `core/server.cjs` with an env-passed session token, connects
+  `WebSocketPeer` with retry-until-boot, renders the real snapshot as lit 3D
+  district platforms + extruded buildings under a bloom environment, streams
+  the live event trail into a `RichTextLabel`, and glows the exact building
+  a claude tool-use touches (verified with a real read-only run: the
+  `Read README.md` event lit the README building within ~1s). 60 fps after
+  warmup. Packaged `--export-release macOS` app ran the full flow with no
+  editor. Self-screenshotting autotest mode (`CITYBASE_SPIKE_OUT`) makes the
+  gate re-runnable. Gate results + gotchas (float JSON ids, ETC2/ASTC for
+  arm64, `CITYBASE_REPO_ROOT` for exported builds) recorded in
+  docs/v4-game-engine.md. **Verdict: GO.**
+- **Status:** shipped-pending-migration
 
 ---
 

@@ -117,6 +117,24 @@ runs against the Godot app. Only at parity does the Electron shell retire
 (kept in-tree one release as `--legacy-shell` fallback). Packaging moves to
 Godot export templates (mac notarization handled in FEAT-003's successor).
 
+## Phase B gate results (2026-07-08, macOS arm64, Godot 4.7.stable.official)
+
+The spike (`godot/`) ran the full gate against the real core and the real
+`claude` CLI in one session:
+
+| Gate item | Result |
+|-----------|--------|
+| Spawn core + env token handoff | ✅ `OS.set_environment` → `OS.create_process`; child inherits; token auth accepted |
+| WS JSON-RPC client | ✅ `WebSocketPeer` + retry-until-boot; one pitfall found: JSON ids arrive as floats — normalize with `int()` before matching pending requests |
+| Real snapshot → 3D city | ✅ 125 tracked files → 10 lit district platforms, 87 extruded buildings, bloom/glow environment, per-district `Label3D` |
+| Live run → building glow | ✅ dispatched a read-only claude run from GDScript; the `Read README.md` tool-use event glowed the README building via tween within ~1s of the stream |
+| Text UI | ✅ `RichTextLabel` event trail with bbcode colors + auto-scroll |
+| Frame rate | ✅ 60 fps after warmup (vsync-capped) with the citybase repo loaded |
+| Editor-independent run | ✅ `--export-release macOS` (universal, ad-hoc signed, testing distribution) produced `CitybaseSpike.app`; the packaged app ran the full boot→core→snapshot→city flow at 60 fps with no editor present. Two export gotchas recorded: arm64 requires `textures/vram_compression/import_etc2_astc=true`, and exported builds must take the repo root from `CITYBASE_REPO_ROOT` (res:// has no filesystem path outside the editor) |
+| Windows export | not attempted (no Windows machine in this loop) — templates are installed; record the result when the repo is next opened on the Windows box |
+
+**Verdict: GO.** Phases C–F may be ticketed.
+
 ## Risks / honest notes
 
 - **Text-heavy UI in an engine is real work.** Godot's Control nodes +
