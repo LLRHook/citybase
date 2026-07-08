@@ -19,7 +19,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['electron/**/*.cjs', 'scripts/**/*.{mjs,cjs}'],
+    files: ['electron/**/*.cjs', 'core/**/*.cjs', 'scripts/**/*.{mjs,cjs}'],
     extends: [js.configs.recommended],
     languageOptions: {
       globals: globals.node,

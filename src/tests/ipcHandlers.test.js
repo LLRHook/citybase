@@ -126,6 +126,7 @@ describe('createIpcHandlers — channel set', () => {
       'citybase:workspace.getCurrent',
       'citybase:workspace.listRecent',
       'citybase:workspace.pick',
+      'citybase:workspace.registerPath',
       'citybase:workspace.setCurrent',
     ]);
   });

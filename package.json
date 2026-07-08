@@ -13,6 +13,7 @@
     "dev:desktop": "concurrently -k -n vite,electron -c blue,magenta \"vite\" \"wait-on http://localhost:5173 && electron . --dev\"",
     "build:desktop": "vite build",
     "start:desktop": "electron .",
+    "core": "node core/server.cjs",
     "package:dir": "npm run build:desktop && electron-builder --dir",
     "package:mac": "npm run build:desktop && electron-builder --mac --config.mac.identity=null",
     "postinstall": "git config core.hooksPath hooks || exit 0"
@@ -45,7 +46,8 @@
   },
   "dependencies": {
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
