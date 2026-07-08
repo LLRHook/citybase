@@ -42,7 +42,12 @@ var _shots_taken := {}
 
 func _ready() -> void:
 	_spike_out = OS.get_environment("CITYBASE_SPIKE_OUT")
-	_repo_root = ProjectSettings.globalize_path("res://").get_base_dir().get_base_dir()
+	# In exported builds res:// lives inside the pck and has no filesystem
+	# path — the repo root must come from the environment there. Editor/CLI
+	# runs fall back to the project's parent directory.
+	_repo_root = OS.get_environment("CITYBASE_REPO_ROOT")
+	if _repo_root == "":
+		_repo_root = ProjectSettings.globalize_path("res://").get_base_dir().get_base_dir()
 	_build_stage()
 	_log("spike boot · repo root: %s" % _repo_root)
 	_spawn_core()
