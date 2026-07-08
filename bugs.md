@@ -132,7 +132,7 @@ Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win â€
 - **Status:** open
 
 ### [BUG-007] Workspace/git error states never rendered; dead `git.refresh()`; hook strands in `loading`
-- [ ] **Severity:** high
+- [x] **Severity:** high
 - **Area:** renderer
 - **File(s):** src/App.jsx, src/app/useWorkspace.js, src/game/map.jsx, electron/main/ipcHandlers.cjs, electron/preload/preload.cjs
 - **Observation:** App reads neither `workspace.status === 'error'`, `workspace.error`,
@@ -149,7 +149,17 @@ Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win â€
   hook bodies in try/catch routing to the error state; delete the dead `git.refresh()`
   call and channel (or make it take the id and use its return value). Tests: non-repo
   folder, missing git, failed refresh.
-- **Status:** open
+- **Fix:** new `WorkspaceStatusPanel` fills the main area for both broken shapes
+  (workspace-op failure and errored snapshot: not-a-repo / git missing /
+  snapshot IPC failure) with Retry + pick-another affordances; city/work render
+  only on a healthy snapshot. TopBar pill goes amber `Â· git error` (not linked
+  green) on an errored snapshot while Refresh/Close stay available. In
+  `useWorkspace`, hydrate/refresh/close bodies are try/caught and route to the
+  error state (no more stranded `loading`), and the dead no-arg
+  `git.refresh()` pre-call was deleted (`getSnapshot` re-reads git state; the
+  `citybase:git.refresh` bridge alias remains, taking a workspaceId). Covered
+  by `src/tests/WorkspaceErrorStates.test.jsx` (6 cases incl. recovery).
+- **Status:** fixed-pending-migration
 
 ### [BUG-009] Git C-quoted (unicode) paths corrupt the status and diff parsers
 - [ ] **Severity:** med

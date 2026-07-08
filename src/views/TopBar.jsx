@@ -19,8 +19,16 @@ export function TopBar({
   view,
   onSetView,
 }) {
-  const wsLinked = !!workspace;
-  const wsName = wsLinked ? `WORKSPACE · ${workspace.name}` : 'NO WORKSPACE · open one';
+  const wsOpen = !!workspace;
+  // An errored snapshot (not a repo, git missing) is not "linked": the pill
+  // must not read green while the city has nothing real behind it (BUG-007).
+  const gitBroken = wsOpen && !!snapshot?.error;
+  const wsLinked = wsOpen && !gitBroken;
+  const wsName = !wsOpen
+    ? 'NO WORKSPACE · open one'
+    : gitBroken
+      ? `WORKSPACE · ${workspace.name} · git error`
+      : `WORKSPACE · ${workspace.name}`;
   const liveBranch = snapshot?.branch || null;
   const liveDirty = !!snapshot?.isDirty;
   const fileCount = snapshot?.files?.length || 0;
@@ -41,12 +49,12 @@ export function TopBar({
         <Mono size={9} color="cyan">v3.0</Mono>
       </div>
 
-      <Pill color={wsLinked ? 'green' : 'red'}>
+      <Pill color={wsLinked ? 'green' : gitBroken ? 'amber' : 'red'}>
         <span
           style={{
             width: 6, height: 6, borderRadius: '50%',
-            background: wsLinked ? NEON.green : NEON.red,
-            boxShadow: `0 0 4px ${wsLinked ? NEON.green : NEON.red}`,
+            background: wsLinked ? NEON.green : gitBroken ? NEON.amber : NEON.red,
+            boxShadow: `0 0 4px ${wsLinked ? NEON.green : gitBroken ? NEON.amber : NEON.red}`,
           }}
         />
         {wsName}
@@ -75,13 +83,13 @@ export function TopBar({
 
       <div style={{ display: 'flex', gap: 6 }}>
         <NButton
-          accent={wsLinked ? 'cyan' : 'amber'}
-          ghost={wsLinked}
-          onClick={wsLinked ? onRefreshWorkspace : onPickWorkspace}
+          accent={wsOpen ? 'cyan' : 'amber'}
+          ghost={wsOpen}
+          onClick={wsOpen ? onRefreshWorkspace : onPickWorkspace}
         >
-          {wsLinked ? '↻ REFRESH' : '＋ OPEN WORKSPACE'}
+          {wsOpen ? '↻ REFRESH' : '＋ OPEN WORKSPACE'}
         </NButton>
-        {wsLinked && (
+        {wsOpen && (
           <NButton accent="ink3" ghost onClick={onCloseWorkspace}>
             ✕ CLOSE
           </NButton>
