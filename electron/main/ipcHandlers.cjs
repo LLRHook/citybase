@@ -77,6 +77,15 @@ function createIpcHandlers({
     'citybase:app.getPlatform': () => process.platform,
 
     'citybase:workspace.pick': async () => workspaceService.pickWorkspace({ window: getMainWindow() }),
+    // Headless-frontend path (FEAT-022): the frontend runs its own folder
+    // chooser and submits the path; the service validates (realpath +
+    // directory check) before persisting, exactly like pick does.
+    'citybase:workspace.registerPath': async (_evt, rootPath) => {
+      if (typeof workspaceService.registerWorkspacePath !== 'function') {
+        throw new Error('workspace.registerPath not supported by this workspace service');
+      }
+      return workspaceService.registerWorkspacePath(rootPath);
+    },
     'citybase:workspace.getCurrent': () => workspaceService.getCurrentWorkspace(),
     'citybase:workspace.setCurrent': (_evt, id) => workspaceService.setCurrentWorkspace(id),
     'citybase:workspace.listRecent': () => workspaceService.listRecentWorkspaces(),

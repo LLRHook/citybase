@@ -180,7 +180,7 @@ rebuild the presentation tier in Godot 4.7 on top of the extracted Node core.
 Phases C–F are ticketed only after FEAT-023's gate passes.
 
 ### [FEAT-022] Extract `citybase-core`: headless daemon + WS JSON-RPC facade
-- [ ] **Priority:** high
+- [x] **Priority:** high
 - **Area:** electron, agents, ipc
 - **File(s):** core/ (new), electron/main/ipc.cjs, electron/main/ipcHandlers.cjs, src/tests/
 - **Why:** v4 Phase A. The Godot frontend needs the agent harness behind a
@@ -210,7 +210,22 @@ Phases C–F are ticketed only after FEAT-023's gate passes.
   integration test driving a real core instance over WS against a fixture
   repo; conformance test.
 - **Out of scope:** Godot anything (FEAT-023); retiring Electron IPC.
-- **Status:** open
+- **Implementation:** `workspaceService` split into the pure
+  `workspaceServiceCore.cjs` factory (injected userData dir / dialog / fs;
+  new `registerWorkspacePath` primitive) with the Electron singleton as thin
+  glue — every importer unchanged. New `core/rpcServer.cjs` (pure: token-gated
+  loopback WS, JSON-RPC dispatch onto the `citybase:*` handler map,
+  agent-event broadcast, boot push), `core/userData.cjs`, and the
+  `core/server.cjs` daemon entry (`npm run core`; env: TOKEN/PORT/USERDATA,
+  `--print-conn` for scripted clients) wiring the real services exactly like
+  `ipc.cjs`. `workspace.registerPath` added to the shared handler map.
+  Conformance test guards preload ⇄ handler-map parity (headless-only
+  whitelist). `ws@8.21` added (justified: the core's transport). Verified
+  live: daemon booted with real services; a scripted WS client registered
+  this repo, pulled a real snapshot (118 files, correct branch), detected the
+  real claude CLI, got the correct headless `pick` error, and received the
+  boot push. 432 tests + desktop E2E green (Electron shell unchanged).
+- **Status:** shipped-pending-migration
 
 ### [FEAT-023] Godot 4.7 spike — go/no-go gate for the engine frontend
 - [ ] **Priority:** high
