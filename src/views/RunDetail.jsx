@@ -3,12 +3,16 @@ import { NEON, alpha } from '../game/palette.js';
 import { Panel, Pill, Mono, Title, NButton } from '../game/theme.jsx';
 import { STATUS_COLOR, formatStartedAt, shortRunId } from './runStatus.js';
 import { useRunEvents } from '../app/useRunEvents.js';
+import { groupDiffByDistrict, assessRisk } from '../app/reviewModel.js';
 
 // RunDetail — main column when a run is selected from the sidebar.
-// Shows status header, prompt summary, the live event stream (filtered
-// to this runId), and lazy-loaded diff + checks panels. PR creation
-// is a single button at the top — it shells out to gh on the main
-// process via citybaseApi.agents.openPR.
+//
+// The review surface is visual-first (ROADMAP Phase 4 / v1 ship gate):
+// while the agent works, a live activity stream is the centerpiece
+// (FEAT-020); once the run is terminal the primary panels are Outcome
+// (summary + risk) and Changed Districts (files grouped the way the
+// city is). Raw diff hunks and the full agent log live in collapsed
+// drawers for advanced troubleshooting only.
 export function RunDetail({
   run,
   citybaseApi,
@@ -55,6 +59,7 @@ export function RunDetail({
   if (!run) return null;
 
   const color = STATUS_COLOR[run.status] || 'ink2';
+  const allEvents = events.length ? events : (fetchedEvents || []);
   const submitPr = async () => {
     if (busy) return;
     setBusy(true);
@@ -121,19 +126,179 @@ export function RunDetail({
         </Panel>
       )}
 
-      <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Panel title="Events" accent={color}>
-          <EventLog events={events.length ? events : (fetchedEvents || [])} runStatus={run.status} />
+      {!isTerminal && (
+        <Panel title="Live Activity" accent={color} style={{ marginTop: 14 }}>
+          <LiveActivity events={allEvents} />
         </Panel>
-        <Panel title="CI Checks" accent="amber">
-          <ChecksList checks={checks} error={checksErr} loading={!isTerminal} />
-        </Panel>
-      </div>
+      )}
 
-      <Panel title="Diff" accent="green" style={{ marginTop: 12 }}>
-        <DiffView diff={diff} error={diffErr} loading={!isTerminal} />
-      </Panel>
+      {isTerminal && (
+        <>
+          <Panel title="Outcome" accent={color} style={{ marginTop: 14 }}>
+            <Outcome run={run} events={allEvents} diff={diff} checks={checks} />
+          </Panel>
+
+          <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Panel title="Changed Districts" accent="green">
+              <ChangedDistricts diff={diff} error={diffErr} />
+            </Panel>
+            <Panel title="CI Checks" accent="amber">
+              <ChecksList checks={checks} error={checksErr} loading={false} />
+            </Panel>
+          </div>
+
+          <Drawer label="Agent log" testid="drawer-agent-log">
+            <EventLog events={allEvents} runStatus={run.status} />
+          </Drawer>
+          <Drawer label="Raw diff (advanced)" testid="drawer-raw-diff">
+            <DiffView diff={diff} error={diffErr} loading={false} />
+          </Drawer>
+        </>
+      )}
     </div>
+  );
+}
+
+// Live streaming view while the run is in flight (FEAT-020): events append
+// as they arrive, the container follows the tail, and a pulsing indicator
+// makes "still working" unambiguous.
+function LiveActivity({ events }) {
+  const scrollRef = React.useRef(null);
+  React.useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [events.length]);
+  return (
+    <div>
+      <div ref={scrollRef} data-testid="live-activity" style={{ maxHeight: 320, overflowY: 'auto' }}>
+        <EventLog events={events} runStatus="running" />
+      </div>
+      <Mono
+        size={10}
+        color="cyan"
+        role="status"
+        style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}
+      >
+        <span
+          className="cb-pulse"
+          style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: NEON.cyan, boxShadow: `0 0 6px ${NEON.cyan}`,
+            animation: 'cbPulse 1.2s ease-in-out infinite',
+          }}
+        />
+        agent working — events stream in live
+      </Mono>
+      <style>{`
+@keyframes cbPulse { 0%,100% { opacity: .35 } 50% { opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .cb-pulse { animation: none !important; } }
+`}</style>
+    </div>
+  );
+}
+
+// Outcome — the no-code summary: what the agent said it did, how big the
+// blast radius is, and an explainable risk level.
+function Outcome({ run, events, diff, checks }) {
+  const summaryEvent = [...(events || [])].reverse().find((e) => e && e.kind !== 'error' && e.text);
+  const errorEvent = [...(events || [])].reverse().find((e) => e && e.kind === 'error' && e.text);
+  const files = diff?.files || [];
+  const districts = groupDiffByDistrict(files);
+  const additions = files.reduce((n, f) => n + (Number(f.additions) || 0), 0);
+  const deletions = files.reduce((n, f) => n + (Number(f.deletions) || 0), 0);
+  const risk = assessRisk({ files, checks });
+  const riskColor = { low: 'green', medium: 'amber', high: 'red' }[risk.level];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {run.status === 'failed' && errorEvent ? (
+        <Mono size={11} color="red" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+          {errorEvent.text}
+        </Mono>
+      ) : summaryEvent ? (
+        <Mono size={11} color="ink" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.55 }}>
+          {summaryEvent.text}
+        </Mono>
+      ) : (
+        <Mono size={10} color="ink3">no summary reported by the agent</Mono>
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <Pill color={riskColor}>risk · {risk.level}</Pill>
+        <Mono size={10} color="ink2">
+          {files.length} file{files.length === 1 ? '' : 's'} · +{additions} / -{deletions}
+          {districts.length > 0 && ` · ${districts.length} district${districts.length === 1 ? '' : 's'}`}
+        </Mono>
+        <Mono size={9} color="ink3">{risk.reasons.join(' · ')}</Mono>
+      </div>
+    </div>
+  );
+}
+
+// ChangedDistricts — affected areas in city terms: files grouped by
+// top-level folder (root files → core), busiest district first. No hunks.
+function ChangedDistricts({ diff, error }) {
+  if (error) return <Mono size={10} color="red">{error}</Mono>;
+  const districts = groupDiffByDistrict(diff?.files);
+  if (districts.length === 0) {
+    return <Mono size={10} color="ink3">no file changes</Mono>;
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {districts.map((d) => (
+        <div key={d.district} style={{ border: `1px solid ${NEON.line}`, padding: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Pill color="cyan">◍ {d.district}</Pill>
+            <Mono size={10} color="ink2">
+              {d.files.length} file{d.files.length === 1 ? '' : 's'}
+            </Mono>
+            <Mono size={9} color="ink3" style={{ marginLeft: 'auto' }}>
+              +{d.additions} / -{d.deletions}
+            </Mono>
+          </div>
+          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {d.files.map((f, i) => {
+              const kindColor = { add: 'green', modify: 'amber', delete: 'red' }[f.kind] || 'cyan';
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Pill color={kindColor}>{f.kind}</Pill>
+                  <Mono size={10} color="ink" style={{ wordBreak: 'break-all' }}>{f.file}</Mono>
+                  <Mono size={9} color="ink3" style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                    +{f.additions} / -{f.deletions}
+                  </Mono>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Drawer — collapsed-by-default disclosure for advanced/debug surfaces.
+function Drawer({ label, children, testid }) {
+  return (
+    <details data-testid={testid} style={{ marginTop: 12 }}>
+      <summary
+        style={{
+          cursor: 'pointer', userSelect: 'none',
+          fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1,
+          color: NEON.ink3, padding: '6px 2px',
+        }}
+      >
+        ▸ {label}
+      </summary>
+      <div
+        style={{
+          marginTop: 6, padding: 10,
+          border: `1px solid ${NEON.line}`,
+          background: alpha(NEON.bg1, 0.6),
+          borderRadius: 4,
+        }}
+      >
+        {children}
+      </div>
+    </details>
   );
 }
 
