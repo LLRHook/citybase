@@ -6,7 +6,7 @@
 // Usage: node scripts/dev-capture.mjs [outDir]
 // Requires a fresh `npm run build` (loads dist/index.html from disk).
 import { _electron as electron } from '@playwright/test';
-import { mkdirSync, readFileSync, writeFileSync, existsSync, copyFileSync, realpathSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, copyFileSync, realpathSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';

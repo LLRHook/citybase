@@ -219,7 +219,7 @@ Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win â€
 - **Status:** open
 
 ### [BUG-015] Entire `electron/` tree is unlinted
-- [ ] **Severity:** high
+- [x] **Severity:** high
 - **Area:** build
 - **File(s):** eslint.config.js
 - **Observation:** `globalIgnores(['dist', 'electron'])` plus no `.cjs` in the files
@@ -231,7 +231,13 @@ Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win â€
 - **Repro / Notes:** WS2.1 â€” remove `'electron'` from ignores, add a
   `.cjs`/commonjs/node-globals config block, add `dist-electron` to ignores; fix
   whatever it flags. Small and high-value â€” good early opportunistic slice.
-- **Status:** open
+- **Fix:** `eslint.config.js` now lints `electron/**/*.cjs` and `scripts/**`
+  (commonjs + node globals, `argsIgnorePattern: '^_'` for abstract signatures);
+  `dist-electron` added to ignores. Fixed the 15 findings it surfaced:
+  underscore-prefixed AgentAdapter abstract args, two useless initial
+  assignments (bootPayload, workspaceChecks), an unused import (dev-capture),
+  and browser globals declared for the `page.evaluate` bodies in gui-claude-e2e.
+- **Status:** fixed-pending-migration
 
 ### [BUG-016] Commit-hook defects: body validated instead of subject, git-generated messages rejected, fail-open hook path
 - [ ] **Severity:** med
