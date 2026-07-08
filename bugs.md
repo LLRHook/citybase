@@ -96,7 +96,7 @@ Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win â€
 - **Status:** open
 
 ### [BUG-005] `agent.startRun` spawns in arbitrary renderer-supplied cwd
-- [ ] **Severity:** high
+- [x] **Severity:** high
 - **Area:** ipc, agents
 - **File(s):** electron/main/ipcHandlers.cjs, electron/main/agents/CliAgentAdapter.cjs
 - **Observation:** `ipcHandlers.cjs:103` accepts an arbitrary `repoUrl` as the spawn
@@ -107,7 +107,12 @@ Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win â€
 - **Repro / Notes:** WS0.5 â€” accept `workspaceId`, resolve via
   `workspaceService.getWorkspaceById`, reject unknown ids. Handler test rejects an
   arbitrary path.
-- **Status:** open
+- **Fix:** the `agent.startRun` handler now takes `workspaceId`, resolves it via
+  `workspaceService.getWorkspaceById` (throws on unknown ids before touching the
+  manager), and overwrites any renderer-supplied `repoUrl` with the resolved
+  `rootPath`; `App.jsx` dispatches with `workspaceId`. Handler tests cover the
+  resolve, unknown-id rejection, and spoofed-`repoUrl` override paths.
+- **Status:** fixed-pending-migration
 
 ### [BUG-006] Windows spawn broken: `.cmd` shims and `npm` cannot spawn via `execFile`
 - [ ] **Severity:** high

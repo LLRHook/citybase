@@ -135,7 +135,7 @@ function CitybaseApp() {
         questId: `run-${Date.now()}`,
         adventurerId: 'local',
         skill: 'refactor',
-        repoUrl: workspace.workspace.rootPath,
+        workspaceId: workspace.workspace.id,
         branch: workspace.snapshot?.branch || 'main',
         promptContext,
         // Every dispatch can change files (bypassPermissions), so gate it
