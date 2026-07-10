@@ -37,6 +37,24 @@ function parseLsFilesZ(stdout) {
   return stdout.split('\0').filter(Boolean);
 }
 
+// `git ls-tree -r -l -z HEAD` entries: "<mode> <type> <sha> <size>\t<path>".
+// Size is '-' for non-blobs. Returns { [path]: bytes } for the city's
+// building-height weighting; malformed entries are skipped, never thrown.
+function parseLsTreeSizes(stdout) {
+  const sizes = {};
+  if (!stdout) return sizes;
+  for (const entry of stdout.split('\0')) {
+    if (!entry) continue;
+    const tab = entry.indexOf('\t');
+    if (tab === -1) continue;
+    const meta = entry.slice(0, tab).trim().split(/\s+/);
+    const size = Number(meta[3]);
+    if (!Number.isFinite(size)) continue;
+    sizes[entry.slice(tab + 1)] = size;
+  }
+  return sizes;
+}
+
 function notARepoSnapshot(workspace, topResult) {
   const stderr = (topResult.stderr || '').trim();
   const message = stderr.includes('not a git repository')
@@ -225,7 +243,7 @@ function createGitService({ processService } = {}) {
 
   async function getSnapshot(workspace) {
     const cwd = workspace.rootPath;
-    const [topResult, statusResult, logResult, treeResult] = await Promise.all([
+    const [topResult, statusResult, logResult, treeResult, sizesResult] = await Promise.all([
       run('git', ['rev-parse', '--show-toplevel'], { cwd }),
       // quotePath=false: git's default C-quoting of non-ASCII paths would
       // feed the parser literal `"src/caf\303\251.js"` strings that never
@@ -239,6 +257,10 @@ function createGitService({ processService } = {}) {
       // ls-files lists tracked files only — fast, no untracked noise, gives the
       // city projector a stable folder/file tree even when the working copy is dirty.
       run('git', ['ls-files', '-z'], { cwd, maxBuffer: 16 * 1024 * 1024 }),
+      // Blob sizes at HEAD (additive, best-effort): the 3D city weights
+      // building height by file size (FEAT-024). Files staged-but-not-yet-
+      // committed simply have no size entry and fall back to a default.
+      run('git', ['-c', 'core.quotePath=false', 'ls-tree', '-r', '-l', '-z', 'HEAD'], { cwd, maxBuffer: 32 * 1024 * 1024 }),
     ]);
 
     if (!topResult.ok) {
@@ -249,6 +271,7 @@ function createGitService({ processService } = {}) {
     const files = parseFiles(statusResult.stdout);
     const recentCommits = parseLog(logResult.ok ? logResult.stdout : '');
     const repoTree = parseLsFilesZ(treeResult.ok ? treeResult.stdout : '');
+    const fileSizes = parseLsTreeSizes(sizesResult && sizesResult.ok ? sizesResult.stdout : '');
 
     return {
       workspaceId: workspace.id,
@@ -260,6 +283,7 @@ function createGitService({ processService } = {}) {
       files,
       recentCommits,
       repoTree,
+      fileSizes,
       error: null,
     };
   }
@@ -360,4 +384,5 @@ module.exports = {
   parseBranchList,
   parseFiles,
   parseHeadHash,
+  parseLsTreeSizes,
 };
