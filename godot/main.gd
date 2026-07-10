@@ -21,6 +21,7 @@ const CORE_PORT := 43117
 const CityBuilder := preload("res://city_builder.gd")
 const AgentAvatar := preload("res://agent_avatar.gd")
 const CameraRig := preload("res://camera_rig.gd")
+const Workbench := preload("res://workbench.gd")
 
 var _core_pid := -1
 var _token := ""
@@ -45,6 +46,8 @@ var _city: CityBuilder
 var _avatar: AgentAvatar
 var _rig: CameraRig
 var _sun: DirectionalLight3D
+var _bench: Workbench
+var _last_snapshot: Dictionary = {}
 
 func _ready() -> void:
 	_spike_out = OS.get_environment("CITYBASE_SPIKE_OUT")
@@ -119,9 +122,11 @@ func _process(delta: float) -> void:
 		_connect_ws()
 		_reconnecting = false
 
-func _call_rpc(method: String, params: Array, on_result: Callable) -> void:
+# on_result receives the result, or null when the call errored (the error is
+# logged); on_error (optional) receives the message.
+func _call_rpc(method: String, params: Array, on_result: Callable, on_error: Callable = Callable()) -> void:
 	_next_id += 1
-	_pending[_next_id] = on_result
+	_pending[_next_id] = { "ok": on_result, "err": on_error }
 	_ws.send_text(JSON.stringify({"id": _next_id, "method": method, "params": params}))
 
 func _on_message(raw: String) -> void:
@@ -141,9 +146,13 @@ func _on_message(raw: String) -> void:
 		return
 	_pending.erase(mid)
 	if msg.has("error"):
-		_log("[color=red]rpc error: %s[/color]" % msg["error"].get("message", "?"))
+		var emsg := String(msg["error"].get("message", "?"))
+		_log("[color=red]rpc error: %s[/color]" % emsg)
+		var err_cb: Callable = (cb as Dictionary).get("err", Callable())
+		if err_cb.is_valid():
+			err_cb.call(emsg)
 	else:
-		(cb as Callable).call(msg.get("result"))
+		((cb as Dictionary)["ok"] as Callable).call(msg.get("result"))
 
 # ── Boot → snapshot → city ──
 
@@ -164,46 +173,102 @@ func _load_snapshot(workspace_id: String) -> void:
 		if not (snap is Dictionary):
 			return
 		var s: Dictionary = snap
+		var snap_error: Variant = s.get("error")
+		if snap_error is Dictionary:
+			_bench.show_error(
+				"NOT A GIT REPOSITORY" if (snap_error as Dictionary).get("kind") == "no-git" else "GIT SNAPSHOT FAILED",
+				String((snap_error as Dictionary).get("message", "")),
+			)
+			return
+		_bench.hide_error()
+		_last_snapshot = s
 		_log("snapshot · %s · %d files · %d dirty" % [
 			str(s.get("branch")), (s.get("repoTree", []) as Array).size(), (s.get("files", []) as Array).size(),
 		])
+		_bench.set_workspace(str(s.get("rootPath", "")).get_file(), str(s.get("branch", "?")), (s.get("files", []) as Array).size())
 		var stats: Dictionary = _city.build(s)
 		_rig.frame_radius(_city.bounds_radius())
 		_log("city built · %d districts · %d buildings" % [stats["districts"], stats["buildings"]])
+		_refresh_quests()
+		_refresh_runs()
 		_shot("city-01-built")
 		if OS.get_environment("CITYBASE_SPIKE_RUN") == "1":
-			_dispatch_run(s)
+			_bench.set_work_visible(true)
+			_dispatch_run("Read the file README.md and reply with its first line only. Do not create, modify, or delete anything.")
 		elif _spike_out != "":
 			_quit_soon(2.0))
 
+func _refresh_quests() -> void:
+	if _workspace_id == "":
+		return
+	_call_rpc("quests.list", [_workspace_id], func(quests: Variant) -> void:
+		if quests is Array:
+			_log("quest board · %d open items" % (quests as Array).size())
+			_bench.set_quests(quests))
+
+func _refresh_runs() -> void:
+	_call_rpc("agent.listRuns", [{}], func(runs: Variant) -> void:
+		if runs is Array:
+			_bench.set_runs(runs))
+
 # ── Live run → avatar + glow ──
 
-func _dispatch_run(snap: Dictionary) -> void:
+func _dispatch_run(prompt: String) -> void:
+	if prompt.strip_edges() == "" or _workspace_id == "":
+		_log("[color=yellow]dispatch skipped: empty prompt or no workspace[/color]")
+		return
 	var params := {
 		"provider": "claude",
-		"questId": "phase-c-%d" % Time.get_ticks_msec(),
+		"questId": "wb-%d" % Time.get_ticks_msec(),
 		"adventurerId": "godot",
-		"skill": "docs",
-		"workspaceId": snap.get("workspaceId"),
-		"branch": snap.get("branch", "main"),
-		"promptContext": "Read the file README.md and reply with its first line only. Do not create, modify, or delete anything.",
+		"skill": "refactor",
+		"workspaceId": _workspace_id,
+		"branch": _last_snapshot.get("branch", "main"),
+		"promptContext": prompt,
+		# Every dispatch can change files — gate it behind explicit approval,
+		# the product's safety contract (BUG-004 parity in the engine).
+		"approvalMode": "ask",
 	}
-	_log("dispatching claude run…")
-	_call_rpc("agent.startRun", [params], func(run: Variant) -> void:
-		if run is Dictionary:
-			_run_id = String(run.get("runId", ""))
-			_avatar.begin_run(Vector3.ZERO)
-			_log("run started · %s" % _run_id.substr(0, 8)))
+	_log("dispatching claude run (gated)…")
+	_call_rpc("agent.startRun", [params],
+		func(run: Variant) -> void:
+			if run is Dictionary:
+				_run_id = String(run.get("runId", ""))
+				_avatar.begin_run(Vector3.ZERO)
+				_bench.run_started(_run_id)
+				_refresh_runs()
+				_log("run started · %s" % _run_id.substr(0, 8)),
+		func(emsg: String) -> void:
+			# Rejected at the gate (or dispatch failure): the run never spawned,
+			# so no settle event will arrive — resolve the UI here.
+			_bench.run_settled("cancelled" if emsg.contains("rejected") else "failed")
+			_refresh_runs()
+			_shot_after("wb-04-rejected", 0.4)
+			if _spike_out != "":
+				_quit_soon(2.0))
 
 func _on_agent_event(payload: Dictionary) -> void:
 	var event: Dictionary = payload.get("event", {})
 	var kind := String(event.get("kind", "?"))
 	var text := String(event.get("text", ""))
 	_log("[color=cyan]%s[/color] %s" % [kind, text.substr(0, 140)])
+	_bench.append_event(kind, text)
 
 	var event_payload: Variant = event.get("payload")
 	if event_payload is Dictionary:
-		var status := String((event_payload as Dictionary).get("status", ""))
+		var ep: Dictionary = event_payload
+		# Approval gate: the manager pre-registers the run and waits for a
+		# verdict before any CLI spawns (BUG-004 contract).
+		if ep.get("needsApproval", false):
+			var pend_id := String(payload.get("runId", ""))
+			_bench.show_approval(pend_id, ep.get("summary", {}))
+			_shot_after("wb-02-approval", 0.4)
+			var decision := OS.get_environment("CITYBASE_AUTOTEST_DECISION")
+			if decision != "":
+				get_tree().create_timer(1.2).timeout.connect(func():
+					_bench._decide(decision == "approve"))
+			return
+		var status := String(ep.get("status", ""))
 		if status in ["done", "failed", "cancelled"] and text.begins_with("agent run settled"):
 			_on_run_settled(status)
 			return
@@ -223,14 +288,41 @@ func _on_agent_event(payload: Dictionary) -> void:
 func _on_run_settled(status: String) -> void:
 	_log("[color=green]run settled · %s[/color]" % status)
 	_avatar.settle(status, _last_touched)
+	_bench.run_settled(status)
+	_refresh_runs()
 	# Dirty state changed on disk — refresh highlighting from a new snapshot.
 	if _workspace_id != "":
 		_call_rpc("git.getSnapshot", [_workspace_id], func(snap: Variant) -> void:
 			if snap is Dictionary:
 				_city.set_dirty((snap as Dictionary).get("files", [])))
+	# The no-code review surface: diff + checks feed the Outcome panel.
+	# Checks run the repo's real npm scripts and can take ~30s+, so the
+	# autotest quits after the outcome lands (with a generous backstop).
 	_shot_after("city-03-resolve", 0.6)
+	if _run_id != "":
+		_call_rpc("agent.produceDiff", [_run_id],
+			func(diff: Variant) -> void:
+				if not (diff is Dictionary):
+					_autotest_done()
+					return
+				_call_rpc("agent.runChecks", [_run_id],
+					func(checks: Variant) -> void:
+						_bench.show_outcome(diff, checks if checks is Array else [])
+						await _shot_after("wb-03-outcome", 0.5)
+						_autotest_done(),
+					func(_e: String) -> void:
+						_bench.show_outcome(diff, [])
+						_autotest_done()),
+			func(_e: String) -> void:
+				_autotest_done())
+	else:
+		_autotest_done()
 	if _spike_out != "":
-		_quit_soon(3.0)
+		get_tree().create_timer(150.0).timeout.connect(func(): _quit_soon(0.5))
+
+func _autotest_done() -> void:
+	if _spike_out != "":
+		_quit_soon(2.5)
 
 func _touched_path(event: Dictionary) -> String:
 	var payload: Variant = event.get("payload")
@@ -312,6 +404,48 @@ func _build_stage() -> void:
 	_fps_label = Label.new()
 	_fps_label.position = Vector2(12, 8)
 	canvas.add_child(_fps_label)
+
+	_bench = Workbench.new()
+	add_child(_bench)
+	_bench.dispatch_requested.connect(_dispatch_run)
+	_bench.toggle_city_requested.connect(func(): _bench.set_work_visible(not _bench.is_work_visible()))
+	_bench.approval_decided.connect(func(run_id: String, approved: bool):
+		_call_rpc("agent.approve" if approved else "agent.reject", [run_id], func(_r: Variant) -> void:
+			_log("approval verdict sent · %s" % ("approved" if approved else "rejected"))))
+	_bench.commit_requested.connect(_on_commit_requested)
+	_bench.open_workspace_requested.connect(_on_open_workspace)
+	_bench.retry_requested.connect(_on_retry)
+
+func _on_commit_requested(message: String) -> void:
+	if message.strip_edges() == "" or _workspace_id == "":
+		_log("[color=yellow]commit skipped: empty message or no workspace[/color]")
+		return
+	_call_rpc("git.commit", [_workspace_id, { "message": message, "addAll": true }], _on_commit_result)
+
+func _on_commit_result(result: Variant) -> void:
+	if result is Dictionary and (result as Dictionary).get("ok", false):
+		_log("[color=green]committed · %s[/color]" % String((result as Dictionary).get("commitHash", "")).substr(0, 8))
+		_load_snapshot(_workspace_id)
+		return
+	var emsg := "commit failed"
+	if result is Dictionary:
+		var err: Variant = (result as Dictionary).get("error")
+		if err is Dictionary:
+			emsg = String((err as Dictionary).get("message", emsg))
+	_log("[color=red]%s[/color]" % emsg)
+
+func _on_open_workspace(dir: String) -> void:
+	_call_rpc("workspace.registerPath", [dir],
+		func(ws: Variant) -> void:
+			if ws is Dictionary:
+				_bench.hide_error()
+				_load_snapshot(String((ws as Dictionary).get("id", ""))),
+		func(emsg: String) -> void:
+			_bench.show_error("WORKSPACE REGISTRATION FAILED", emsg))
+
+func _on_retry() -> void:
+	if _workspace_id != "":
+		_load_snapshot(_workspace_id)
 
 func _log(line: String) -> void:
 	var plain := line
