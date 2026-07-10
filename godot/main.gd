@@ -1,27 +1,26 @@
 extends Node3D
-# Citybase v4 spike (FEAT-023) — the go/no-go gate for the Godot frontend.
+# Citybase v4 frontend — Phase C: the real 3D city (FEAT-024).
 #
-# What it proves, end to end:
-#   1. Spawn the citybase-core daemon with a session token (env-passed;
-#      Godot children inherit OS.set_environment values).
-#   2. Speak the WS JSON-RPC protocol (docs/v4-game-engine.md).
-#   3. Render a REAL repo snapshot as a lit, glowing 3D city.
-#   4. React to the live agent-event stream (touched files glow their
-#      buildings) and show the event trail in a text panel.
+# Composition:
+#   CityBuilder  — districts/buildings from the live snapshot (sizes + dirty)
+#   AgentAvatar  — flies to each touched building; resolve ripple on settle
+#   CameraRig    — orbit/zoom + fly-to-activity
+#   main.gd      — core daemon lifecycle, WS JSON-RPC client, day cycle,
+#                  event log panel, autotest harness
 #
-# Autotest mode (CITYBASE_SPIKE_OUT set): saves screenshots at each gate
-# step and quits — CI/agent-verifiable without a human at the window.
-# Optional CITYBASE_SPIKE_RUN=1 dispatches a real (cheap) claude run.
+# Env:
+#   CITYBASE_REPO_ROOT       repo root override (required in exported builds)
+#   CITYBASE_SPIKE_OUT       autotest: screenshot dir; self-quits when done
+#   CITYBASE_SPIKE_RUN=1     autotest: dispatch a real (cheap) claude run
+#   CITYBASE_REDUCED_MOTION=1  disable tweens/hover/day-cycle animation
 
 const CORE_PORT := 43117
-const DISTRICT_COLORS := [
-	Color(0.36, 0.83, 1.0),  # cyan
-	Color(0.78, 0.56, 1.0),  # violet
-	Color(1.0, 0.72, 0.29),  # amber
-	Color(0.37, 0.89, 0.6),  # green
-	Color(1.0, 0.42, 0.54),  # red
-	Color(0.55, 0.68, 1.0),  # blue
-]
+
+# Preloads (not class_name globals): the global class cache only exists after
+# an editor import pass, which CLI/autotest runs never perform.
+const CityBuilder := preload("res://city_builder.gd")
+const AgentAvatar := preload("res://agent_avatar.gd")
+const CameraRig := preload("res://camera_rig.gd")
 
 var _core_pid := -1
 var _token := ""
@@ -30,26 +29,31 @@ var _ws := WebSocketPeer.new()
 var _ws_connected := false
 var _reconnecting := false
 var _next_id := 0
-var _pending := {}          # id -> Callable
-var _buildings := {}        # repo-relative path -> MeshInstance3D
-var _district_of := {}      # path -> district name
+var _pending := {}
 var _log_label: RichTextLabel
 var _fps_label: Label
 var _spike_out := ""
-var _did_snapshot := false
 var _run_id := ""
+var _workspace_id := ""
+var _last_touched := Vector3.ZERO
 var _shots_taken := {}
+var _quitting := false
+var _reduced_motion := false
+var _day_t := 0.0
+
+var _city: CityBuilder
+var _avatar: AgentAvatar
+var _rig: CameraRig
+var _sun: DirectionalLight3D
 
 func _ready() -> void:
 	_spike_out = OS.get_environment("CITYBASE_SPIKE_OUT")
-	# In exported builds res:// lives inside the pck and has no filesystem
-	# path — the repo root must come from the environment there. Editor/CLI
-	# runs fall back to the project's parent directory.
+	_reduced_motion = OS.get_environment("CITYBASE_REDUCED_MOTION") == "1"
 	_repo_root = OS.get_environment("CITYBASE_REPO_ROOT")
 	if _repo_root == "":
 		_repo_root = ProjectSettings.globalize_path("res://").get_base_dir().get_base_dir()
 	_build_stage()
-	_log("spike boot · repo root: %s" % _repo_root)
+	_log("citybase v4 · repo root: %s" % _repo_root)
 	_spawn_core()
 	_connect_ws()
 
@@ -74,13 +78,12 @@ func _spawn_core() -> void:
 		_log("[color=red]FAIL: no node binary found[/color]")
 		return
 	_core_pid = OS.create_process(node_bin, [server])
-	_log("core spawned · pid %d · %s" % [_core_pid, node_bin])
+	_log("core spawned · pid %d" % _core_pid)
 
 func _find_node() -> String:
 	for candidate in ["/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"]:
 		if FileAccess.file_exists(candidate):
 			return candidate
-	# Fall back to PATH resolution (works when launched from a shell).
 	var out := []
 	if OS.execute("/usr/bin/which", ["node"], out) == 0 and out.size() > 0:
 		return String(out[0]).strip_edges()
@@ -94,9 +97,13 @@ func _connect_ws() -> void:
 	if err != OK:
 		_log("[color=red]ws connect error %d[/color]" % err)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _fps_label:
 		_fps_label.text = "%d fps" % Engine.get_frames_per_second()
+	if not _reduced_motion and _sun:
+		_day_t += delta * 0.02
+		_sun.rotation_degrees.y = -30 + sin(_day_t) * 28.0
+		_sun.light_energy = 0.55 + 0.2 * (0.5 + 0.5 * cos(_day_t))
 	_ws.poll()
 	var state := _ws.get_ready_state()
 	if state == WebSocketPeer.STATE_OPEN:
@@ -106,7 +113,6 @@ func _process(_delta: float) -> void:
 		while _ws.get_available_packet_count() > 0:
 			_on_message(_ws.get_packet().get_string_from_utf8())
 	elif state == WebSocketPeer.STATE_CLOSED and not _ws_connected and not _reconnecting:
-		# Core may still be booting; retry until it accepts.
 		_reconnecting = true
 		await get_tree().create_timer(0.5).timeout
 		_ws = WebSocketPeer.new()
@@ -123,9 +129,12 @@ func _on_message(raw: String) -> void:
 	if msg == null:
 		return
 	if msg.has("event"):
-		_on_event(msg)
+		match msg.get("event"):
+			"boot":
+				_on_boot(msg.get("payload", {}))
+			"agent-event":
+				_on_agent_event(msg.get("payload", {}))
 		return
-	# JSON numbers arrive as floats in Godot; our request ids are ints.
 	var mid := int(msg.get("id", -1))
 	var cb: Variant = _pending.get(mid)
 	if cb == null:
@@ -135,13 +144,6 @@ func _on_message(raw: String) -> void:
 		_log("[color=red]rpc error: %s[/color]" % msg["error"].get("message", "?"))
 	else:
 		(cb as Callable).call(msg.get("result"))
-
-func _on_event(msg: Dictionary) -> void:
-	match msg.get("event"):
-		"boot":
-			_on_boot(msg.get("payload", {}))
-		"agent-event":
-			_on_agent_event(msg.get("payload", {}))
 
 # ── Boot → snapshot → city ──
 
@@ -157,105 +159,30 @@ func _on_boot(payload: Dictionary) -> void:
 				_load_snapshot(ws["id"]))
 
 func _load_snapshot(workspace_id: String) -> void:
+	_workspace_id = workspace_id
 	_call_rpc("git.getSnapshot", [workspace_id], func(snap: Variant) -> void:
 		if not (snap is Dictionary):
 			return
-		_log("snapshot · branch %s · %d tracked files" % [str(snap.get("branch")), (snap.get("repoTree", []) as Array).size()])
-		_build_city(snap)
-		_did_snapshot = true
-		_shot("spike-01-city")
+		var s: Dictionary = snap
+		_log("snapshot · %s · %d files · %d dirty" % [
+			str(s.get("branch")), (s.get("repoTree", []) as Array).size(), (s.get("files", []) as Array).size(),
+		])
+		var stats: Dictionary = _city.build(s)
+		_rig.frame_radius(_city.bounds_radius())
+		_log("city built · %d districts · %d buildings" % [stats["districts"], stats["buildings"]])
+		_shot("city-01-built")
 		if OS.get_environment("CITYBASE_SPIKE_RUN") == "1":
-			_dispatch_run(snap)
+			_dispatch_run(s)
 		elif _spike_out != "":
 			_quit_soon(2.0))
 
-func _build_city(snap: Dictionary) -> void:
-	var tree: Array = snap.get("repoTree", [])
-	var districts := {}
-	for p_variant in tree:
-		var p := String(p_variant)
-		var slash := p.find("/")
-		var district := "core" if slash == -1 else p.substr(0, slash)
-		if not districts.has(district):
-			districts[district] = []
-		(districts[district] as Array).append(p)
-
-	var names := districts.keys()
-	names.sort_custom(func(a, b): return (districts[a] as Array).size() > (districts[b] as Array).size())
-
-	var index := 0
-	for district_name in names:
-		var files: Array = districts[district_name]
-		var color: Color = DISTRICT_COLORS[index % DISTRICT_COLORS.size()]
-		var center := _district_seat(index, names.size())
-		_add_platform(center, color, district_name, files.size())
-		var side := int(ceil(sqrt(float(mini(files.size(), 25)))))
-		for i in range(mini(files.size(), 25)):
-			var gx := (i % side) - side / 2.0 + 0.5
-			var gz := (i / side) - side / 2.0 + 0.5
-			var height := 0.5 + 2.2 * (0.3 + 0.7 * randf_seeded(hash(files[i])))
-			var pos := center + Vector3(gx * 1.1, height / 2.0, gz * 1.1)
-			var building := _add_building(pos, height, color)
-			_buildings[String(files[i])] = building
-			_district_of[String(files[i])] = district_name
-		index += 1
-	_log("city built · %d districts · %d buildings" % [names.size(), _buildings.size()])
-
-func randf_seeded(seed_value: int) -> float:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = seed_value
-	return rng.randf()
-
-func _district_seat(index: int, total: int) -> Vector3:
-	if index == 0:
-		return Vector3.ZERO
-	var ring_angle := TAU * float(index - 1) / float(maxi(total - 1, 1))
-	return Vector3(cos(ring_angle), 0, sin(ring_angle)) * 9.5
-
-func _add_platform(center: Vector3, color: Color, district_name: String, file_count: int) -> void:
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(6.5, 0.25, 6.5)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.06, 0.08, 0.14)
-	mat.emission_enabled = true
-	mat.emission = color
-	mat.emission_energy_multiplier = 0.25
-	mesh.material = mat
-	var inst := MeshInstance3D.new()
-	inst.mesh = mesh
-	inst.position = center + Vector3(0, -0.125, 0)
-	add_child(inst)
-
-	var label := Label3D.new()
-	label.text = "%s · %d" % [district_name, file_count]
-	label.font_size = 64
-	label.modulate = color
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.position = center + Vector3(0, 0.4, 4.0)
-	add_child(label)
-
-func _add_building(pos: Vector3, height: float, color: Color) -> MeshInstance3D:
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(0.85, height, 0.85)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color.darkened(0.65)
-	mat.emission_enabled = true
-	mat.emission = color
-	mat.emission_energy_multiplier = 0.55
-	mesh.material = mat
-	var inst := MeshInstance3D.new()
-	inst.mesh = mesh
-	inst.position = pos
-	add_child(inst)
-	return inst
-
-# ── Live run → glow ──
+# ── Live run → avatar + glow ──
 
 func _dispatch_run(snap: Dictionary) -> void:
 	var params := {
 		"provider": "claude",
-		"questId": "spike-%d" % (Time.get_ticks_msec()),
-		"adventurerId": "godot-spike",
+		"questId": "phase-c-%d" % Time.get_ticks_msec(),
+		"adventurerId": "godot",
 		"skill": "docs",
 		"workspaceId": snap.get("workspaceId"),
 		"branch": snap.get("branch", "main"),
@@ -265,20 +192,44 @@ func _dispatch_run(snap: Dictionary) -> void:
 	_call_rpc("agent.startRun", [params], func(run: Variant) -> void:
 		if run is Dictionary:
 			_run_id = String(run.get("runId", ""))
+			_avatar.begin_run(Vector3.ZERO)
 			_log("run started · %s" % _run_id.substr(0, 8)))
 
 func _on_agent_event(payload: Dictionary) -> void:
 	var event: Dictionary = payload.get("event", {})
 	var kind := String(event.get("kind", "?"))
 	var text := String(event.get("text", ""))
-	_log("[color=cyan]%s[/color] %s" % [kind, text.substr(0, 160)])
+	_log("[color=cyan]%s[/color] %s" % [kind, text.substr(0, 140)])
+
+	var event_payload: Variant = event.get("payload")
+	if event_payload is Dictionary:
+		var status := String((event_payload as Dictionary).get("status", ""))
+		if status in ["done", "failed", "cancelled"] and text.begins_with("agent run settled"):
+			_on_run_settled(status)
+			return
+
 	var touched := _touched_path(event)
 	if touched != "":
-		_glow(touched)
-		_shot("spike-02-glow")
-	# Autotest exit: once a glow was captured, any further event means the
-	# stream is flowing — grab the final frame and quit.
-	if _spike_out != "" and _shots_taken.has("spike-02-glow"):
+		var known: bool = _city.has_building(touched)
+		var pos: Vector3 = _city.building_position(touched) if known else _city.district_center(touched)
+		_last_touched = pos
+		_avatar.move_to_building(pos)
+		_rig.fly_to(pos)
+		if known:
+			_city.glow(touched)
+		_log("[color=green]touch: %s[/color]" % touched)
+		_shot_after("city-02-avatar", 0.85)
+
+func _on_run_settled(status: String) -> void:
+	_log("[color=green]run settled · %s[/color]" % status)
+	_avatar.settle(status, _last_touched)
+	# Dirty state changed on disk — refresh highlighting from a new snapshot.
+	if _workspace_id != "":
+		_call_rpc("git.getSnapshot", [_workspace_id], func(snap: Variant) -> void:
+			if snap is Dictionary:
+				_city.set_dirty((snap as Dictionary).get("files", [])))
+	_shot_after("city-03-resolve", 0.6)
+	if _spike_out != "":
 		_quit_soon(3.0)
 
 func _touched_path(event: Dictionary) -> String:
@@ -299,51 +250,59 @@ func _to_repo_relative(p: String) -> String:
 		return norm.substr(root.length()).trim_prefix("/")
 	return norm
 
-func _glow(path: String) -> void:
-	var building: Variant = _buildings.get(path)
-	if building == null:
-		# Unknown file (e.g. newly created): glow the district platform via log only.
-		_log("[color=yellow]touched (new): %s[/color]" % path)
-		return
-	var mesh_instance := building as MeshInstance3D
-	var mat := (mesh_instance.mesh as BoxMesh).material as StandardMaterial3D
-	mat.emission_energy_multiplier = 3.5
-	var tween := create_tween()
-	tween.tween_property(mat, "emission_energy_multiplier", 0.9, 2.0)
-	_log("[color=green]glow: %s[/color]" % path)
-
 # ── Stage, UI, evidence ──
 
 func _build_stage() -> void:
-	var camera := Camera3D.new()
-	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	camera.size = 26.0
-	camera.position = Vector3(18, 18, 18)
-	camera.look_at_from_position(camera.position, Vector3.ZERO, Vector3.UP)
-	add_child(camera)
+	_rig = CameraRig.new()
+	_rig.reduced_motion = _reduced_motion
+	add_child(_rig)
 
-	var light := DirectionalLight3D.new()
-	light.rotation_degrees = Vector3(-55, -30, 0)
-	light.light_energy = 0.7
-	add_child(light)
+	_sun = DirectionalLight3D.new()
+	_sun.rotation_degrees = Vector3(-52, -30, 0)
+	_sun.light_energy = 0.65
+	_sun.shadow_enabled = true
+	add_child(_sun)
 
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.02, 0.03, 0.06)
+	env.background_color = Color(0.015, 0.025, 0.05)
 	env.glow_enabled = true
 	env.glow_intensity = 0.9
-	env.glow_bloom = 0.15
+	env.glow_bloom = 0.12
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(0.25, 0.32, 0.5)
+	env.ambient_light_energy = 0.5
 	var world_env := WorldEnvironment.new()
 	world_env.environment = env
 	add_child(world_env)
+
+	var ground := MeshInstance3D.new()
+	var gmesh := PlaneMesh.new()
+	gmesh.size = Vector2(240, 240)
+	var gmat := StandardMaterial3D.new()
+	gmat.albedo_color = Color(0.02, 0.03, 0.06)
+	gmat.metallic = 0.1
+	gmat.roughness = 0.85
+	gmesh.material = gmat
+	ground.mesh = gmesh
+	ground.position = Vector3(0, -0.42, 0)
+	add_child(ground)
+
+	_city = CityBuilder.new()
+	_city.reduced_motion = _reduced_motion
+	add_child(_city)
+
+	_avatar = AgentAvatar.new()
+	_avatar.reduced_motion = _reduced_motion
+	add_child(_avatar)
 
 	var canvas := CanvasLayer.new()
 	add_child(canvas)
 	var panel := PanelContainer.new()
 	panel.anchor_left = 0.0
-	panel.anchor_top = 0.62
-	panel.anchor_right = 0.34
+	panel.anchor_top = 0.66
+	panel.anchor_right = 0.32
 	panel.anchor_bottom = 1.0
 	canvas.add_child(panel)
 	_log_label = RichTextLabel.new()
@@ -355,28 +314,43 @@ func _build_stage() -> void:
 	canvas.add_child(_fps_label)
 
 func _log(line: String) -> void:
-	print("[spike] " + line.replace("[color=red]", "").replace("[color=green]", "").replace("[color=cyan]", "").replace("[color=yellow]", "").replace("[/color]", ""))
+	var plain := line
+	for tag in ["[color=red]", "[color=green]", "[color=cyan]", "[color=yellow]", "[/color]"]:
+		plain = plain.replace(tag, "")
+	print("[city] " + plain)
 	if _log_label:
 		_log_label.append_text(line + "\n")
+
+func _shot_after(name: String, delay: float) -> void:
+	if _spike_out == "" or _shots_taken.has(name):
+		return
+	await get_tree().create_timer(delay).timeout
+	_shot(name)
 
 func _shot(name: String) -> void:
 	if _spike_out == "" or _shots_taken.has(name):
 		return
 	_shots_taken[name] = true
-	await RenderingServer.frame_post_draw
+	# Wait for a fresh draw but never hang: macOS pauses drawing for occluded
+	# windows while processing continues, so frame_post_draw may never fire.
+	var drawn := [false]
+	RenderingServer.frame_post_draw.connect(func(): drawn[0] = true, CONNECT_ONE_SHOT)
+	var waited := 0.0
+	while not drawn[0] and waited < 1.5:
+		await get_tree().process_frame
+		waited += get_process_delta_time()
 	var img := get_viewport().get_texture().get_image()
 	var out := _spike_out.path_join(name + ".png")
 	img.save_png(out)
 	_log("screenshot → " + out)
 
-var _quitting := false
 func _quit_soon(delay: float) -> void:
 	if _quitting:
 		return
 	_quitting = true
 	await get_tree().create_timer(delay).timeout
 	_log("fps after warmup: %d" % Engine.get_frames_per_second())
-	await _shot("spike-99-final")
+	await _shot("city-99-final")
 	if _core_pid > 0:
 		OS.kill(_core_pid)
 	get_tree().quit()
