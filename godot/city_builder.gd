@@ -49,6 +49,12 @@ func building_position(path: String) -> Vector3:
 		return Vector3.ZERO
 	return (b["node"] as Node3D).global_position
 
+func building_paths() -> Array:
+	return _buildings.keys()
+
+func district_centers() -> Array:
+	return _district_centers.values()
+
 func district_center(path: String) -> Vector3:
 	var slash := path.find("/")
 	var district := "core" if slash == -1 else path.substr(0, slash)

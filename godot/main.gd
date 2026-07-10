@@ -22,6 +22,7 @@ const CityBuilder := preload("res://city_builder.gd")
 const AgentAvatar := preload("res://agent_avatar.gd")
 const CameraRig := preload("res://camera_rig.gd")
 const Workbench := preload("res://workbench.gd")
+const LivingLayer := preload("res://living_layer.gd")
 
 var _core_pid := -1
 var _token := ""
@@ -47,6 +48,7 @@ var _avatar: AgentAvatar
 var _rig: CameraRig
 var _sun: DirectionalLight3D
 var _bench: Workbench
+var _living: LivingLayer
 var _last_snapshot: Dictionary = {}
 
 func _ready() -> void:
@@ -191,12 +193,17 @@ func _load_snapshot(workspace_id: String) -> void:
 		_log("city built · %d districts · %d buildings" % [stats["districts"], stats["buildings"]])
 		_refresh_quests()
 		_refresh_runs()
+		_call_rpc("agent.listRuns", [{}], func(runs: Variant) -> void:
+			_living.update_snapshot(s, runs if runs is Array else []))
 		_shot("city-01-built")
+		_shot_after("city-04-living", 2.5)
 		if OS.get_environment("CITYBASE_SPIKE_RUN") == "1":
 			_bench.set_work_visible(true)
 			_dispatch_run("Read the file README.md and reply with its first line only. Do not create, modify, or delete anything.")
 		elif _spike_out != "":
-			_quit_soon(2.0))
+			# Give the living layer (ambient motes, flicker, vitals) time to
+			# appear in the city-04 shot before the idle autotest exits.
+			_quit_soon(4.5))
 
 func _refresh_quests() -> void:
 	if _workspace_id == "":
@@ -253,6 +260,7 @@ func _on_agent_event(payload: Dictionary) -> void:
 	var text := String(event.get("text", ""))
 	_log("[color=cyan]%s[/color] %s" % [kind, text.substr(0, 140)])
 	_bench.append_event(kind, text)
+	_living.note_run_event(kind, text)
 
 	var event_payload: Variant = event.get("payload")
 	if event_payload is Dictionary:
@@ -404,6 +412,12 @@ func _build_stage() -> void:
 	_fps_label = Label.new()
 	_fps_label.position = Vector2(12, 8)
 	canvas.add_child(_fps_label)
+
+	_living = LivingLayer.new()
+	_living.reduced_motion = _reduced_motion
+	add_child(_living)
+	_living.build_hud(canvas, self)
+	_living.attach_city(_city)
 
 	_bench = Workbench.new()
 	add_child(_bench)
