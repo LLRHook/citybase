@@ -41,10 +41,26 @@ function createWorkspaceService({
     }
   }
 
+  // Atomic write: temp file + rename so a crash mid-write can never leave a
+  // half-written workspaces.json (BUG-013). The shared temp path is safe
+  // because every mutation is serialized through the queue below.
   async function writeState(state) {
     const file = statePath();
     await fs.mkdir(path.dirname(file), { recursive: true });
-    await fs.writeFile(file, JSON.stringify(state, null, 2), 'utf8');
+    const tmp = file + '.tmp';
+    await fs.writeFile(tmp, JSON.stringify(state, null, 2), 'utf8');
+    await fs.rename(tmp, file);
+  }
+
+  // Serialize every read-modify-write as a unit: concurrent IPC calls
+  // (register + forget, two registers) would otherwise interleave their
+  // reads and silently drop one mutation (BUG-013). Errors are swallowed
+  // for sequencing only — callers still see their own outcome.
+  let mutationQueue = Promise.resolve();
+  function enqueueMutation(fn) {
+    const result = mutationQueue.then(fn);
+    mutationQueue = result.catch(() => {});
+    return result;
   }
 
   // Validate + persist a filesystem path as the current workspace. This is
@@ -60,22 +76,24 @@ function createWorkspaceService({
     if (!stat.isDirectory()) {
       throw new Error(`not a directory: ${real}`);
     }
-    const state = await readState();
-    const id = workspaceIdFor(real);
-    const stamp = now();
-    const existing = state.workspaces.find(w => w.id === id);
-    const ws = {
-      id,
-      name: nameFor(real),
-      rootPath: real,
-      openedAt: existing ? existing.openedAt : stamp,
-      lastOpenedAt: stamp,
-    };
-    const others = state.workspaces.filter(w => w.id !== id);
-    state.workspaces = [ws, ...others].slice(0, MAX_RECENT);
-    state.currentId = id;
-    await writeState(state);
-    return ws;
+    return enqueueMutation(async () => {
+      const state = await readState();
+      const id = workspaceIdFor(real);
+      const stamp = now();
+      const existing = state.workspaces.find(w => w.id === id);
+      const ws = {
+        id,
+        name: nameFor(real),
+        rootPath: real,
+        openedAt: existing ? existing.openedAt : stamp,
+        lastOpenedAt: stamp,
+      };
+      const others = state.workspaces.filter(w => w.id !== id);
+      state.workspaces = [ws, ...others].slice(0, MAX_RECENT);
+      state.currentId = id;
+      await writeState(state);
+      return ws;
+    });
   }
 
   async function pickWorkspace({ window } = {}) {
@@ -94,14 +112,16 @@ function createWorkspaceService({
   }
 
   async function setCurrentWorkspace(id) {
-    const state = await readState();
-    const found = state.workspaces.find(w => w.id === id);
-    if (!found) throw new Error(`unknown workspace id: ${id}`);
-    state.currentId = id;
-    found.lastOpenedAt = now();
-    state.workspaces = [found, ...state.workspaces.filter(w => w.id !== id)];
-    await writeState(state);
-    return found;
+    return enqueueMutation(async () => {
+      const state = await readState();
+      const found = state.workspaces.find(w => w.id === id);
+      if (!found) throw new Error(`unknown workspace id: ${id}`);
+      state.currentId = id;
+      found.lastOpenedAt = now();
+      state.workspaces = [found, ...state.workspaces.filter(w => w.id !== id)];
+      await writeState(state);
+      return found;
+    });
   }
 
   async function listRecentWorkspaces() {
@@ -110,10 +130,12 @@ function createWorkspaceService({
   }
 
   async function forgetWorkspace(id) {
-    const state = await readState();
-    state.workspaces = state.workspaces.filter(w => w.id !== id);
-    if (state.currentId === id) state.currentId = null;
-    await writeState(state);
+    return enqueueMutation(async () => {
+      const state = await readState();
+      state.workspaces = state.workspaces.filter(w => w.id !== id);
+      if (state.currentId === id) state.currentId = null;
+      await writeState(state);
+    });
   }
 
   async function getWorkspaceById(id) {
