@@ -513,4 +513,21 @@ describe('createAgentManager — run persistence (FEAT-008)', () => {
     expect(Array.isArray(lastArg)).toBe(true);
     expect(lastArg[0]).toHaveProperty('events');
   });
+
+  it('announces the terminal transition with a settle event (BUG-031)', async () => {
+    const emitEvent = vi.fn();
+    const adapter = makeAdapter({
+      startTask: vi.fn(async (p) => ({ runId: p.runId || 'gen', questId: p.questId, adventurerId: p.adventurerId, status: 'done', contextUsed: 0, maxContext: 1 })),
+      streamEvents: vi.fn(() => (async function* () { yield { runId: 'x', t: '00:00', kind: 'edit', text: 'work' }; })()),
+    });
+    const mgr = createAgentManager({ adapters: { fake: adapter }, emitEvent });
+    const run = await mgr.startRun({ ...startParams });
+    await new Promise((r) => setImmediate(r));
+    const settle = emitEvent.mock.calls.map((c) => c[0]).find(
+      (e) => e.runId === run.runId && e.event?.payload?.status,
+    );
+    expect(settle).toBeTruthy();
+    expect(settle.event.text).toMatch(/settled · done/);
+    expect(settle.event.payload.status).toBe('done');
+  });
 });

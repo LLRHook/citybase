@@ -22,14 +22,16 @@ if echo "$COMMAND" | grep -qE '\bcommit\b.*--amend' && ! echo "$COMMAND" | grep 
   exit 0
 fi
 
-# Extract the first -m / --message argument. Handles double or single quotes.
-SUBJECT=$(echo "$COMMAND" | sed -nE \
-  -e 's/.*-m[[:space:]]+"([^"]*)".*/\1/p' \
-  -e "s/.*-m[[:space:]]+'([^']*)'.*/\\1/p" \
-  -e 's/.*--message[[:space:]]+"([^"]*)".*/\1/p' \
-  -e "s/.*--message[[:space:]]+'([^']*)'.*/\\1/p" \
-  -e 's/.*--message=([^[:space:]]+).*/\1/p' \
-  | head -1)
+# Extract the FIRST -m / --message argument (the subject). A greedy
+# `s/.*-m .../` would capture the LAST -m — i.e. the body of a
+# multi-paragraph commit — and wrongly validate that (BUG-016). grep -o
+# emits every match on its own line, so head -1 is genuinely the first.
+first_match() {
+  printf '%s\n' "$COMMAND" | grep -oE -e "$1" | head -1 | sed -E "$2"
+}
+SUBJECT=$(first_match '(-m|--message)[[:space:]]+"[^"]*"' 's/^[^"]*"//; s/"$//')
+[ -z "$SUBJECT" ] && SUBJECT=$(first_match "(-m|--message)[[:space:]]+'[^']*'" "s/^[^']*'//; s/'\$//")
+[ -z "$SUBJECT" ] && SUBJECT=$(first_match '--message=[^[:space:]]+' 's/^--message=//')
 
 # Truncate to first newline (subject is the first line only)
 SUBJECT="${SUBJECT%%$'\n'*}"

@@ -235,11 +235,23 @@ function createAgentManager({
 
   // When a non-blocking run settles, record its event trail on the history
   // entry and persist the run history so it survives a restart (FEAT-008).
+  // Also announce the terminal transition: the renderer refreshes run status
+  // on incoming events, and without a settle event the last streamed event
+  // can leave the UI showing `running` forever (BUG-031).
   function captureWhenDone(runId) {
     getEvents(runId).then(
-      (events) => { const h = history.get(runId); if (h) h.events = events; doPersist(); },
-      () => { doPersist(); },
+      (events) => { const h = history.get(runId); if (h) h.events = events; doPersist(); announceSettled(runId); },
+      () => { doPersist(); announceSettled(runId); },
     );
+  }
+
+  function announceSettled(runId) {
+    if (typeof emitEvent !== 'function') return;
+    const status = history.get(runId)?.run?.status || 'done';
+    emitEvent({
+      runId,
+      event: { runId, t: hhmm(now()), kind: 'plan', text: `agent run settled · ${status}`, payload: { status } },
+    });
   }
 
   function getRun(runId) {

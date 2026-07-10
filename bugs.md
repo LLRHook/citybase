@@ -77,6 +77,32 @@ tickets predate the rebuilds; several premises reference files that no longer ex
 
 Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win — lints the tier just changed), **BUG-005** (security), **BUG-013** (reuses the BUG-026 pattern), **BUG-007** (ship-gate FR-V9), **BUG-009**.
 
+### Groom 2026-07-10 — disposition (with the V&V pass, post v1-gate closure + v4 A/B)
+
+BUG-005/007/015/017/019 fixed and migrated this cycle; BUG-030/031 found by
+the V&V run, fixed in-pass, migrated. What remains, re-verified and ordered:
+
+| Ticket | Disposition | Priority order | Notes |
+|--------|-------------|----------------|-------|
+| BUG-013 | current (med) | **1 — this batch** | now easier: the registry lives in the pure `workspaceServiceCore` factory with tests; apply the runStore serialize + temp-rename pattern |
+| BUG-009 | current (med) | **2 — this batch** | `-c core.quotePath=false` on status/diff/log + unicode/rename fixtures |
+| BUG-016 | partial (med) | **3 — this batch** | first-`-m` anchor, Merge/Revert/fixup! allowlist, `$CLAUDE_PROJECT_DIR` hook path |
+| FEAT-024 | new (high) | **4 — next PR(s)** | v4 Phase C: the real 3D city (the epic centerpiece) |
+| BUG-011 | current (med) | 5 | branch-selector request token + reset on workspace switch |
+| BUG-014 | partial (med) | 6 | prune the adapter `_runs` map on cancel/evict |
+| BUG-018 | partial (low) | 7 | residual = R12 toast timers, R20 bare `HH:MM`, R21 TDZ; M17 is resolved (the `getEvents` replay + BUG-031 settle event) |
+| FEAT-007 | open (med) | 8 | CI Node 22 + `engines` pin |
+| FEAT-011 | open (med) | 9 | Vitest env split + coverage + non-watch default |
+| FEAT-006 | open (med) | 10 — before any distributed build | nav guards, CSP, self-hosted fonts |
+| FEAT-025/026/027 | new | after FEAT-024 | v4 Phases D/E/F |
+| BUG-003 | partial (med) | capacity | codex synthesized trail (codex is not ship-critical) |
+| BUG-006 | partial (med) | needs the Windows box | bare `npm`/`gh` in checks on win32 |
+| BUG-010 | partial (low) | capacity | `kind` taxonomy on the buffered envelope |
+| FEAT-009 | open (med, shrunk) | capacity | `WorkspaceErrorStates.test.jsx` now covers the R4/R5 regressions; residual = token-race cases |
+| FEAT-010 | **resolved → close** | — | realized by `src/tests/coreProtocol.test.js` (preload ⇄ handler-map parity; the browser stub it wanted to check no longer exists) |
+| FEAT-017 | deferred | — | Electron-city design polish is superseded by the v4 Godot direction; revisit only if v4 stalls |
+| FEAT-003 / FEAT-012 | tracked deferrals (low) | — | packaging + CI ergonomics |
+
 ### [BUG-003] Agent runs block until exit, fabricate events, cancel unreachable, killed at 15 s
 - [ ] **Severity:** high
 - **Area:** agents
@@ -95,24 +121,6 @@ Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win �
   the actual exit state; checks tolerate slow test suites.
 - **Status:** open
 
-### [BUG-005] `agent.startRun` spawns in arbitrary renderer-supplied cwd
-- [x] **Severity:** high
-- **Area:** ipc, agents
-- **File(s):** electron/main/ipcHandlers.cjs, electron/main/agents/CliAgentAdapter.cjs
-- **Observation:** `ipcHandlers.cjs:103` accepts an arbitrary `repoUrl` as the spawn
-  cwd for the CLI (and later `git diff` / `npm run`) — not validated against known
-  workspaces, contradicting the IPC contract comment in `ipc.cjs:3-6` (SRS M6).
-- **Expected:** IPC inputs validated against known workspace ids, symmetric with the
-  git handlers (NFR-1).
-- **Repro / Notes:** WS0.5 — accept `workspaceId`, resolve via
-  `workspaceService.getWorkspaceById`, reject unknown ids. Handler test rejects an
-  arbitrary path.
-- **Fix:** the `agent.startRun` handler now takes `workspaceId`, resolves it via
-  `workspaceService.getWorkspaceById` (throws on unknown ids before touching the
-  manager), and overwrites any renderer-supplied `repoUrl` with the resolved
-  `rootPath`; `App.jsx` dispatches with `workspaceId`. Handler tests cover the
-  resolve, unknown-id rejection, and spoofed-`repoUrl` override paths.
-- **Status:** fixed-pending-migration
 
 ### [BUG-006] Windows spawn broken: `.cmd` shims and `npm` cannot spawn via `execFile`
 - [ ] **Severity:** high
@@ -131,49 +139,7 @@ Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win �
   dependency on FEAT-004.
 - **Status:** open
 
-### [BUG-007] Workspace/git error states never rendered; dead `git.refresh()`; hook strands in `loading`
-- [x] **Severity:** high
-- **Area:** renderer
-- **File(s):** src/App.jsx, src/app/useWorkspace.js, src/game/map.jsx, electron/main/ipcHandlers.cjs, electron/preload/preload.cjs
-- **Observation:** App reads neither `workspace.status === 'error'`, `workspace.error`,
-  nor `snapshot.error` — a non-repo folder shows a connected, empty city (SRS R1).
-  `useWorkspace.refresh()` calls `git.refresh()` with no workspaceId → always throws in
-  main, swallowed; the channel shares the `getSnapshot` handler, so the freshness logic
-  is dead code (R4, `useWorkspace.js:66`). `refresh`/hydrate/`close` have no try/catch
-  around `getCurrent`/`forget` — an IPC failure strands `status: 'loading'` forever
-  (R5).
-- **Expected:** Phase 2 DoD: empty states for no workspace, invalid repo, and missing
-  Git; ship gate FR-V9.
-- **Repro / Notes:** WS0.7 — add a `WorkspaceStatusBanner` driven by error states with
-  retry/pick affordances; exclude errored snapshots from the "linked" pill; wrap the
-  hook bodies in try/catch routing to the error state; delete the dead `git.refresh()`
-  call and channel (or make it take the id and use its return value). Tests: non-repo
-  folder, missing git, failed refresh.
-- **Fix:** new `WorkspaceStatusPanel` fills the main area for both broken shapes
-  (workspace-op failure and errored snapshot: not-a-repo / git missing /
-  snapshot IPC failure) with Retry + pick-another affordances; city/work render
-  only on a healthy snapshot. TopBar pill goes amber `· git error` (not linked
-  green) on an errored snapshot while Refresh/Close stay available. In
-  `useWorkspace`, hydrate/refresh/close bodies are try/caught and route to the
-  error state (no more stranded `loading`), and the dead no-arg
-  `git.refresh()` pre-call was deleted (`getSnapshot` re-reads git state; the
-  `citybase:git.refresh` bridge alias remains, taking a workspaceId). Covered
-  by `src/tests/WorkspaceErrorStates.test.jsx` (6 cases incl. recovery).
-- **Status:** fixed-pending-migration
 
-### [BUG-009] Git C-quoted (unicode) paths corrupt the status and diff parsers
-- [ ] **Severity:** med
-- **Area:** git
-- **File(s):** electron/main/services/gitService.cjs, electron/main/agents/parseUnifiedDiff.cjs, src/tests/parseFiles.test.js, src/tests/parseUnifiedDiff.test.js
-- **Observation:** with git's default `core.quotePath=true`, quoted paths are not
-  unquoted: the diff parser silently merges one file's hunks into the previous file
-  (`parseUnifiedDiff.cjs:33`) and the status parser emits literal quoted strings that
-  mismatch `ls-files` (`gitService.cjs:120-170`) (SRS M12).
-- **Expected:** locale- and unicode-safe path handling (NFR-2; FR-V5).
-- **Repro / Notes:** repo with accented or space-containing filenames. WS1.2 — run git
-  with `-c core.quotePath=false` (and `-z` where applicable) or implement C-unquoting;
-  add unicode fixtures to both parser suites; add a rename-only-diff fixture.
-- **Status:** open
 
 ### [BUG-010] `processService` error envelope misclassifies failures as "exited 0"
 - [ ] **Severity:** med
@@ -206,17 +172,6 @@ Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win �
   `selectedBranch` on switch.
 - **Status:** open
 
-### [BUG-013] `workspaces.json` writes are racy and non-atomic
-- [ ] **Severity:** med
-- **Area:** git
-- **File(s):** electron/main/services/workspaceService.cjs
-- **Observation:** read-modify-write races across concurrent IPC calls; the write is
-  non-atomic; corrupt JSON silently resets all recents (SRS M14,
-  `workspaceService.cjs:43-47`). The service is entirely untested (§6.5).
-- **Expected:** persisted state writes are atomic and serialized (NFR-3).
-- **Repro / Notes:** WS1.6 — serialize mutations through a promise queue; temp-file +
-  rename writes; first unit tests for the service (injected fs).
-- **Status:** open
 
 ### [BUG-014] Run registry unbounded; manager-assigned runId never reaches the adapter
 - [ ] **Severity:** med
@@ -233,64 +188,7 @@ Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win �
   FEAT-008 (run persistence) can double as the eviction store.
 - **Status:** open
 
-### [BUG-015] Entire `electron/` tree is unlinted
-- [x] **Severity:** high
-- **Area:** build
-- **File(s):** eslint.config.js
-- **Observation:** `globalIgnores(['dist', 'electron'])` plus no `.cjs` in the files
-  glob (`eslint.config.js:8,10`) — the security-sensitive half of the app has zero
-  lint coverage (SRS T1). `dist-electron/` is missing from ignores, so `eslint .`
-  crawls packaging output after a local `package:dir` (T12).
-- **Expected:** "ESLint over the project; zero errors and zero warnings" covers both
-  tiers (README/CLAUDE.md; ship gate FR-V10; NFR-1).
-- **Repro / Notes:** WS2.1 — remove `'electron'` from ignores, add a
-  `.cjs`/commonjs/node-globals config block, add `dist-electron` to ignores; fix
-  whatever it flags. Small and high-value — good early opportunistic slice.
-- **Fix:** `eslint.config.js` now lints `electron/**/*.cjs` and `scripts/**`
-  (commonjs + node globals, `argsIgnorePattern: '^_'` for abstract signatures);
-  `dist-electron` added to ignores. Fixed the 15 findings it surfaced:
-  underscore-prefixed AgentAdapter abstract args, two useless initial
-  assignments (bootPayload, workspaceChecks), an unused import (dev-capture),
-  and browser globals declared for the `page.evaluate` bodies in gui-claude-e2e.
-- **Status:** fixed-pending-migration
 
-### [BUG-016] Commit-hook defects: body validated instead of subject, git-generated messages rejected, fail-open hook path
-- [ ] **Severity:** med
-- **Area:** build
-- **File(s):** .claude/hooks/validate-commit-msg.sh, hooks/commit-msg, .claude/settings.json
-- **Observation:** the Claude PreToolUse hook's greedy sed captures the **last** `-m`
-  argument, so multi-paragraph commits (`-m subject -m body`) are validated against
-  the body and wrongly blocked (SRS T2, `validate-commit-msg.sh:26-32`); the canonical
-  hook rejects git-generated messages — `Merge branch …`, default `Revert "…"`,
-  `fixup!` (T5, `hooks/commit-msg:29-36`); `.claude/settings.json:25` uses a
-  cwd-relative hook path that silently fails open from another cwd (T10).
-- **Expected:** hooks validate the subject only and accept legitimate git-generated
-  messages.
-- **Repro / Notes:** `git commit -m "feat: x" -m "body."` → blocked by the Claude
-  hook. WS2.4 — anchor sed to the first `-m`; early-exit for `Merge`/`Revert "`/
-  `fixup!`; use `$CLAUDE_PROJECT_DIR` in the settings hook.
-- **Status:** open
-
-### [BUG-017] Docs/UI truth reconciliation: conflicting AgentEvent shapes, stale CI claim, inert controls
-- [ ] **Severity:** low
-- **Area:** docs, renderer
-- **File(s):** docs/agent-runtime.md, ROADMAP.md, src/game/command.jsx, src/data/seed.js, src/App.jsx, src/game/analysis.jsx
-- **Observation:** two incompatible documented `AgentEvent` shapes (`ROADMAP.md:96` vs
-  `docs/agent-runtime.md:34`) while code implements a third convention for approvals
-  documented nowhere (SRS M19); stale ROADMAP claim "pull_request trigger only" — the
-  workflow also triggers on push to main (T7, `ROADMAP.md:114`); `SYSTEM_STATS` inline
-  mock array inside a component file violates the AGENTS.md seed rule, and seed's
-  `OBJECTIVES`/`ALERTS` exports are unused (R15, `command.jsx:458`); dead/inert UI
-  presented as live — ⚙, minimap zoom, transport, "Open run log", ACTION tiles that
-  toast "dispatched" without doing anything (R16).
-- **Expected:** one documented event contract; UI affordances either work or are
-  visibly disabled; docs match the workflow.
-- **Repro / Notes:** WS2.5. BUG-004 documents the `needsApproval` payload as part of
-  its fix; this ticket reconciles the rest (single AgentEvent shape in
-  agent-runtime.md, ROADMAP marked superseded; fix the CI-trigger sentence;
-  move/delete `SYSTEM_STATS`; remove or visibly disable inert controls; wire or delete
-  seed `OBJECTIVES`/`ALERTS`).
-- **Status:** open
 
 ### [BUG-018] Low-severity latent batch (unscheduled in SRS plan)
 - [ ] **Severity:** low
@@ -309,30 +207,8 @@ Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win �
   when picked up; none blocks the v1 ship gate.
 - **Status:** open
 
-### [BUG-019] Docs and backlog drift after the upstream v1 wave
-- [ ] **Severity:** med
-- **Area:** docs
-- **File(s):** AGENTS.md, README.md, VERIFICATION.md, docs/srs-and-plan-of-action.md, bugs.md, features.md
-- **Observation:** eleven upstream commits (`62f67b0..4f7f45e`, the "v1 wave")
-  landed between the SRS baseline (`1356437`) and this merge, shipping large parts
-  of the SRS plan independently: real `claude` CLI flags + real-output
-  `streamEvents` (8c6043e ≈ parts of BUG-003/FEAT-005), Windows shim wrap
-  (4f7f45e ≈ BUG-006), a preload contract test (≈ FEAT-010), run history panel
-  (02aad50 ≈ parts of FEAT-008), README safety model + troubleshooting
-  (a6a31bd = FEAT-002), boot-payload detection (b461642), browser-path removal
-  (035490d), Electron 42 (344f4aa). Residual drift: AGENTS.md "Running the app"
-  still quotes the deleted `npm run dev` script; README/AGENTS reference the
-  deleted `src/game/data.js` shim; VERIFICATION.md Stage 2 baseline counts
-  (26 files / 313 cases) and several SRS findings predate the wave; README notes
-  Claude runs still use `--permission-mode bypassPermissions` (BUG-004's approval
-  boundary remains open).
-- **Expected:** docs describe reality; every open ticket's premise re-checked
-  against current `main`.
-- **Repro / Notes:** run `/protocol-v-and-v` (its freshness audit reconciles
-  counts and commands), then re-groom the open backlog against current `main` —
-  at minimum re-verify BUG-003/004/005/006 and FEAT-005/008/010 before
-  implementing them as filed.
-- **Status:** open
+
+
 
 ---
 
@@ -617,4 +493,227 @@ They are kept here so each `BUG-NNN` stays resolvable.
   `DISTRICTS`. The 2026-06-18 re-groom confirmed the premise was genuine at baseline
   (`git show 1356437:src/app/activity.js` exists) and that no carrier of any sub-defect
   survives. Closed as obsolete by removal.
+- **Status:** fixed-pending-migration
+
+### [BUG-005] `agent.startRun` spawns in arbitrary renderer-supplied cwd
+- [x] **Severity:** high
+- **Area:** ipc, agents
+- **File(s):** electron/main/ipcHandlers.cjs, electron/main/agents/CliAgentAdapter.cjs
+- **Observation:** `ipcHandlers.cjs:103` accepts an arbitrary `repoUrl` as the spawn
+  cwd for the CLI (and later `git diff` / `npm run`) — not validated against known
+  workspaces, contradicting the IPC contract comment in `ipc.cjs:3-6` (SRS M6).
+- **Expected:** IPC inputs validated against known workspace ids, symmetric with the
+  git handlers (NFR-1).
+- **Repro / Notes:** WS0.5 — accept `workspaceId`, resolve via
+  `workspaceService.getWorkspaceById`, reject unknown ids. Handler test rejects an
+  arbitrary path.
+- **Fix:** the `agent.startRun` handler now takes `workspaceId`, resolves it via
+  `workspaceService.getWorkspaceById` (throws on unknown ids before touching the
+  manager), and overwrites any renderer-supplied `repoUrl` with the resolved
+  `rootPath`; `App.jsx` dispatches with `workspaceId`. Handler tests cover the
+  resolve, unknown-id rejection, and spoofed-`repoUrl` override paths.
+- **Status:** fixed-pending-migration
+
+### [BUG-007] Workspace/git error states never rendered; dead `git.refresh()`; hook strands in `loading`
+- [x] **Severity:** high
+- **Area:** renderer
+- **File(s):** src/App.jsx, src/app/useWorkspace.js, src/game/map.jsx, electron/main/ipcHandlers.cjs, electron/preload/preload.cjs
+- **Observation:** App reads neither `workspace.status === 'error'`, `workspace.error`,
+  nor `snapshot.error` — a non-repo folder shows a connected, empty city (SRS R1).
+  `useWorkspace.refresh()` calls `git.refresh()` with no workspaceId → always throws in
+  main, swallowed; the channel shares the `getSnapshot` handler, so the freshness logic
+  is dead code (R4, `useWorkspace.js:66`). `refresh`/hydrate/`close` have no try/catch
+  around `getCurrent`/`forget` — an IPC failure strands `status: 'loading'` forever
+  (R5).
+- **Expected:** Phase 2 DoD: empty states for no workspace, invalid repo, and missing
+  Git; ship gate FR-V9.
+- **Repro / Notes:** WS0.7 — add a `WorkspaceStatusBanner` driven by error states with
+  retry/pick affordances; exclude errored snapshots from the "linked" pill; wrap the
+  hook bodies in try/catch routing to the error state; delete the dead `git.refresh()`
+  call and channel (or make it take the id and use its return value). Tests: non-repo
+  folder, missing git, failed refresh.
+- **Fix:** new `WorkspaceStatusPanel` fills the main area for both broken shapes
+  (workspace-op failure and errored snapshot: not-a-repo / git missing /
+  snapshot IPC failure) with Retry + pick-another affordances; city/work render
+  only on a healthy snapshot. TopBar pill goes amber `· git error` (not linked
+  green) on an errored snapshot while Refresh/Close stay available. In
+  `useWorkspace`, hydrate/refresh/close bodies are try/caught and route to the
+  error state (no more stranded `loading`), and the dead no-arg
+  `git.refresh()` pre-call was deleted (`getSnapshot` re-reads git state; the
+  `citybase:git.refresh` bridge alias remains, taking a workspaceId). Covered
+  by `src/tests/WorkspaceErrorStates.test.jsx` (6 cases incl. recovery).
+- **Status:** fixed-pending-migration
+
+### [BUG-015] Entire `electron/` tree is unlinted
+- [x] **Severity:** high
+- **Area:** build
+- **File(s):** eslint.config.js
+- **Observation:** `globalIgnores(['dist', 'electron'])` plus no `.cjs` in the files
+  glob (`eslint.config.js:8,10`) — the security-sensitive half of the app has zero
+  lint coverage (SRS T1). `dist-electron/` is missing from ignores, so `eslint .`
+  crawls packaging output after a local `package:dir` (T12).
+- **Expected:** "ESLint over the project; zero errors and zero warnings" covers both
+  tiers (README/CLAUDE.md; ship gate FR-V10; NFR-1).
+- **Repro / Notes:** WS2.1 — remove `'electron'` from ignores, add a
+  `.cjs`/commonjs/node-globals config block, add `dist-electron` to ignores; fix
+  whatever it flags. Small and high-value — good early opportunistic slice.
+- **Fix:** `eslint.config.js` now lints `electron/**/*.cjs` and `scripts/**`
+  (commonjs + node globals, `argsIgnorePattern: '^_'` for abstract signatures);
+  `dist-electron` added to ignores. Fixed the 15 findings it surfaced:
+  underscore-prefixed AgentAdapter abstract args, two useless initial
+  assignments (bootPayload, workspaceChecks), an unused import (dev-capture),
+  and browser globals declared for the `page.evaluate` bodies in gui-claude-e2e.
+- **Status:** fixed-pending-migration
+
+### [BUG-017] Docs/UI truth reconciliation: conflicting AgentEvent shapes, stale CI claim, inert controls
+- [x] **Severity:** low
+- **Area:** docs, renderer
+- **File(s):** docs/agent-runtime.md, ROADMAP.md, src/game/command.jsx, src/data/seed.js, src/App.jsx, src/game/analysis.jsx
+- **Observation:** two incompatible documented `AgentEvent` shapes (`ROADMAP.md:96` vs
+  `docs/agent-runtime.md:34`) while code implements a third convention for approvals
+  documented nowhere (SRS M19); stale ROADMAP claim "pull_request trigger only" — the
+  workflow also triggers on push to main (T7, `ROADMAP.md:114`); `SYSTEM_STATS` inline
+  mock array inside a component file violates the AGENTS.md seed rule, and seed's
+  `OBJECTIVES`/`ALERTS` exports are unused (R15, `command.jsx:458`); dead/inert UI
+  presented as live — ⚙, minimap zoom, transport, "Open run log", ACTION tiles that
+  toast "dispatched" without doing anything (R16).
+- **Expected:** one documented event contract; UI affordances either work or are
+  visibly disabled; docs match the workflow.
+- **Repro / Notes:** WS2.5. BUG-004 documents the `needsApproval` payload as part of
+  its fix; this ticket reconciles the rest (single AgentEvent shape in
+  agent-runtime.md, ROADMAP marked superseded; fix the CI-trigger sentence;
+  move/delete `SYSTEM_STATS`; remove or visibly disable inert controls; wire or delete
+  seed `OBJECTIVES`/`ALERTS`).
+- **Fix:** residuals closed in the 2026-07-10 V&V doc pass: ROADMAP's Adapter
+  Contract sketch now carries an explicit "superseded — agent-runtime.md wins"
+  note (one canonical AgentEvent shape); the stale "pull_request trigger only"
+  sentence no longer exists in ROADMAP. The inert-controls / SYSTEM_STATS /
+  seed-exports carriers were already deleted by the v2.0 rebuild.
+- **Status:** fixed-pending-migration
+
+### [BUG-019] Docs and backlog drift after the upstream v1 wave
+- [x] **Severity:** med
+- **Area:** docs
+- **File(s):** AGENTS.md, README.md, VERIFICATION.md, docs/srs-and-plan-of-action.md, bugs.md, features.md
+- **Observation:** eleven upstream commits (`62f67b0..4f7f45e`, the "v1 wave")
+  landed between the SRS baseline (`1356437`) and this merge, shipping large parts
+  of the SRS plan independently: real `claude` CLI flags + real-output
+  `streamEvents` (8c6043e ≈ parts of BUG-003/FEAT-005), Windows shim wrap
+  (4f7f45e ≈ BUG-006), a preload contract test (≈ FEAT-010), run history panel
+  (02aad50 ≈ parts of FEAT-008), README safety model + troubleshooting
+  (a6a31bd = FEAT-002), boot-payload detection (b461642), browser-path removal
+  (035490d), Electron 42 (344f4aa). Residual drift: AGENTS.md "Running the app"
+  still quotes the deleted `npm run dev` script; README/AGENTS reference the
+  deleted `src/game/data.js` shim; VERIFICATION.md Stage 2 baseline counts
+  (26 files / 313 cases) and several SRS findings predate the wave; README notes
+  Claude runs still use `--permission-mode bypassPermissions` (BUG-004's approval
+  boundary remains open).
+- **Expected:** docs describe reality; every open ticket's premise re-checked
+  against current `main`.
+- **Repro / Notes:** run `/protocol-v-and-v` (its freshness audit reconciles
+  counts and commands), then re-groom the open backlog against current `main` —
+  at minimum re-verify BUG-003/004/005/006 and FEAT-005/008/010 before
+  implementing them as filed.
+- **Fix:** closed by the 2026-07-10 V&V pass: AGENTS.md "Running the app" now
+  quotes the real scripts (`dev:desktop`, `core`; the browser `dev` script is
+  gone), the seed/data.js sections in AGENTS.md + CLAUDE.md describe the
+  deleted-seed reality, state/views sections match `CitybaseApp` +
+  `'city'/'work'`, and VERIFICATION.md's baselines (36 files / 433 cases),
+  deps rule (react,react-dom,ws), and telemetry-grep expectations were
+  refreshed in the same pass. The 2026-06-18 re-groom already re-verified the
+  ticket list; this pass re-affirmed dispositions (see groom table).
+- **Status:** fixed-pending-migration
+
+### [BUG-030] gui-claude-e2e seeded the Windows userData path — on macOS the run executed in the user's real workspace
+- [x] **Severity:** med
+- **Area:** tests
+- **File(s):** scripts/gui-claude-e2e.mjs
+- **Observation:** the harness wrote its throwaway `workspaces.json` to
+  `%APPDATA%`-style paths only, so on macOS Electron never read it and the
+  GUI run dispatched against the user's real current workspace. The
+  "diff lists the edited file" check also passed vacuously — a bare
+  `getByText('src/a.js')` matches the prompt echoed in the agent's response.
+  Found by the 2026-07-10 V&V run (Stage 3.7 first pass: 4/5).
+- **Expected:** harnesses only ever touch throwaway repos; checks assert the
+  review surface, not incidental text.
+- **Fix:** platform-correct userData root (same fix dev-capture got); the
+  diff check now waits for the terminal `done` pill and asserts `src/a.js`
+  inside the Changed Districts panel. Re-run: 5/5.
+- **Status:** fixed-pending-migration
+
+### [BUG-031] Run status stuck on `running` in the UI after the run settles
+- [x] **Severity:** high
+- **Area:** agents, renderer
+- **File(s):** electron/main/agents/agentManager.cjs, src/tests/agentManager.test.js
+- **Observation:** `useRunHistory` refreshes run status only when an
+  AgentEvent arrives, but the manager emitted nothing at the terminal
+  transition — the status flip (running → done/failed) after the last
+  streamed event was invisible, leaving RunDetail on the Live Activity view
+  and the sidebar pill on `running` indefinitely. Exposed by BUG-030's fix
+  (the GUI harness sat 3 minutes on a run claude had finished).
+- **Expected:** the UI reflects the terminal state within a second of settle.
+- **Fix:** `captureWhenDone` now emits a final
+  `agent run settled · <status>` event (`payload.status`) via `emitEvent`
+  after recording + persisting, so every event consumer (history refresh,
+  RunDetail, city overlay) sees the transition. Unit-tested; GUI harness 5/5.
+- **Status:** fixed-pending-migration
+
+### [BUG-009] Git C-quoted (unicode) paths corrupt the status and diff parsers
+- [x] **Severity:** med
+- **Area:** git
+- **File(s):** electron/main/services/gitService.cjs, electron/main/agents/parseUnifiedDiff.cjs, src/tests/parseFiles.test.js, src/tests/parseUnifiedDiff.test.js
+- **Observation:** with git's default `core.quotePath=true`, quoted paths are not
+  unquoted: the diff parser silently merges one file's hunks into the previous file
+  (`parseUnifiedDiff.cjs:33`) and the status parser emits literal quoted strings that
+  mismatch `ls-files` (`gitService.cjs:120-170`) (SRS M12).
+- **Expected:** locale- and unicode-safe path handling (NFR-2; FR-V5).
+- **Repro / Notes:** repo with accented or space-containing filenames. WS1.2 — run git
+  with `-c core.quotePath=false` (and `-z` where applicable) or implement C-unquoting;
+  add unicode fixtures to both parser suites; add a rename-only-diff fixture.
+- **Fix:** `-c core.quotePath=false` added to the two path-parsing surfaces:
+  `git status --porcelain=v2` (gitService snapshot) and `git diff` (adapter
+  produceDiff); `ls-files` calls already use `-z` (NUL-safe, unquoted).
+  Unicode fixtures added to `parseFiles` (modify + rename) and
+  `parseUnifiedDiff` (two-file unicode boundary, rename-only diff).
+- **Status:** fixed-pending-migration
+
+### [BUG-013] `workspaces.json` writes are racy and non-atomic
+- [x] **Severity:** med
+- **Area:** git
+- **File(s):** electron/main/services/workspaceService.cjs
+- **Observation:** read-modify-write races across concurrent IPC calls; the write is
+  non-atomic; corrupt JSON silently resets all recents (SRS M14,
+  `workspaceService.cjs:43-47`). The service is entirely untested (§6.5).
+- **Expected:** persisted state writes are atomic and serialized (NFR-3).
+- **Repro / Notes:** WS1.6 — serialize mutations through a promise queue; temp-file +
+  rename writes; first unit tests for the service (injected fs).
+- **Fix:** `workspaceServiceCore` now serializes every read-modify-write
+  (register/setCurrent/forget) as a unit through a promise chain (the
+  runStore pattern) and writes via temp-file + rename. Unit tests cover
+  atomic rename, the concurrent-register lost-update race (with a slowed
+  read to force the interleave), and chain survival after a failed write.
+- **Status:** fixed-pending-migration
+
+### [BUG-016] Commit-hook defects: body validated instead of subject, git-generated messages rejected, fail-open hook path
+- [x] **Severity:** med
+- **Area:** build
+- **File(s):** .claude/hooks/validate-commit-msg.sh, hooks/commit-msg, .claude/settings.json
+- **Observation:** the Claude PreToolUse hook's greedy sed captures the **last** `-m`
+  argument, so multi-paragraph commits (`-m subject -m body`) are validated against
+  the body and wrongly blocked (SRS T2, `validate-commit-msg.sh:26-32`); the canonical
+  hook rejects git-generated messages — `Merge branch …`, default `Revert "…"`,
+  `fixup!` (T5, `hooks/commit-msg:29-36`); `.claude/settings.json:25` uses a
+  cwd-relative hook path that silently fails open from another cwd (T10).
+- **Expected:** hooks validate the subject only and accept legitimate git-generated
+  messages.
+- **Repro / Notes:** `git commit -m "feat: x" -m "body."` → blocked by the Claude
+  hook. WS2.4 — anchor sed to the first `-m`; early-exit for `Merge`/`Revert "`/
+  `fixup!`; use `$CLAUDE_PROJECT_DIR` in the settings hook.
+- **Fix:** subject extraction switched to `grep -o | head -1` (genuinely the
+  FIRST `-m`/`--message`, per quoting style); `hooks/commit-msg` early-exits
+  for `Merge `/`Revert "`/`fixup! `/`squash! `; settings hook path anchored
+  to `$CLAUDE_PROJECT_DIR` — verified live: the hook now actually fires from
+  a worktree cwd (it was failing open before) and all six behavior cases
+  pass (multi-message subject-not-body both ways, git-generated accepts,
+  invalid rejects).
 - **Status:** fixed-pending-migration

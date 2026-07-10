@@ -14,6 +14,11 @@ function makeFakeFs({ dirs = [], files = {} } = {}) {
       return store.get(p);
     }),
     writeFile: vi.fn(async (p, data) => { store.set(p, data); }),
+    rename: vi.fn(async (from, to) => {
+      if (!store.has(from)) { const e = new Error('ENOENT'); e.code = 'ENOENT'; throw e; }
+      store.set(to, store.get(from));
+      store.delete(from);
+    }),
     mkdir: vi.fn(async () => {}),
     realpath: vi.fn(async (p) => {
       if (!dirSet.has(p) && !store.has(p)) { const e = new Error('ENOENT'); e.code = 'ENOENT'; throw e; }
@@ -54,6 +59,44 @@ describe('createWorkspaceService — registerWorkspacePath', () => {
     expect(again.lastOpenedAt).toBe('T2');
     const recents = await svc.listRecentWorkspaces();
     expect(recents.map((w) => w.rootPath)).toEqual(['/a', '/b']);
+  });
+});
+
+describe('createWorkspaceService — atomic, serialized writes (BUG-013)', () => {
+  it('writes through a temp file and renames into place', async () => {
+    const fs = makeFakeFs({ dirs: ['/a'] });
+    const svc = createWorkspaceService({ ...OPTS, fs });
+    await svc.registerWorkspacePath('/a');
+    expect(fs.rename).toHaveBeenCalledWith('/data/workspaces.json.tmp', '/data/workspaces.json');
+    expect(fs.store.has('/data/workspaces.json.tmp')).toBe(false);
+    expect(JSON.parse(fs.store.get('/data/workspaces.json')).workspaces).toHaveLength(1);
+  });
+
+  it('concurrent mutations do not lose updates (read-modify-write is serialized)', async () => {
+    // Make reads slow so unserialized mutations would interleave: both would
+    // read the empty state and the second write would drop the first entry.
+    const fs = makeFakeFs({ dirs: ['/a', '/b'] });
+    const realRead = fs.readFile.getMockImplementation();
+    fs.readFile.mockImplementation(async (p) => {
+      await new Promise((r) => setTimeout(r, 5));
+      return realRead(p);
+    });
+    const svc = createWorkspaceService({ ...OPTS, fs });
+    await Promise.all([
+      svc.registerWorkspacePath('/a'),
+      svc.registerWorkspacePath('/b'),
+    ]);
+    const recents = await svc.listRecentWorkspaces();
+    expect(recents.map((w) => w.rootPath).sort()).toEqual(['/a', '/b']);
+  });
+
+  it('a failed write does not stall later mutations', async () => {
+    const fs = makeFakeFs({ dirs: ['/a', '/b'] });
+    fs.writeFile.mockRejectedValueOnce(new Error('disk full'));
+    const svc = createWorkspaceService({ ...OPTS, fs });
+    await expect(svc.registerWorkspacePath('/a')).rejects.toThrow('disk full');
+    const ws = await svc.registerWorkspacePath('/b');
+    expect(ws.rootPath).toBe('/b');
   });
 });
 

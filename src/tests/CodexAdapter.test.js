@@ -229,15 +229,15 @@ describe('CodexAdapter — produceDiff', () => {
       run: vi.fn(async (cmd, args) => ({
         ok: true, code: 0, signal: null,
         // ls-files (untracked probe) returns nothing; diff returns the change.
-        stdout: cmd === 'git' && args[0] === 'diff' ? diffStdout : '',
+        stdout: cmd === 'git' && args.includes('diff') ? diffStdout : '',
         stderr: '', timedOut: false, durationMs: 5, error: null,
       })),
     });
     const adapter = makeAdapter({ processService: ps });
     const run = await adapter.startTask(VALID_PARAMS);
     const out = await adapter.produceDiff(run.runId);
-    const diffCall = ps.run.mock.calls.find(c => c[0] === 'git' && c[1][0] === 'diff');
-    expect(diffCall[1]).toEqual(['diff', '--unified=3', '--no-color']);
+    const diffCall = ps.run.mock.calls.find(c => c[0] === 'git' && c[1].includes('diff'));
+    expect(diffCall[1]).toEqual(['-c', 'core.quotePath=false', 'diff', '--unified=3', '--no-color']);
     expect(diffCall[2]).toEqual({ cwd: '/abs/repo' });
     expect(out.files).toHaveLength(1);
     expect(out.files[0].file).toBe('x.js');

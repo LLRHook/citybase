@@ -25,6 +25,12 @@ if [ -z "$SUBJECT" ]; then
   exit 1
 fi
 
+# Git-generated messages are legitimate as-is: merges, default reverts, and
+# autosquash fixup/squash commits must not be rejected (BUG-016).
+case "$SUBJECT" in
+  "Merge "*|"Revert \""*|"fixup! "*|"squash! "*) exit 0 ;;
+esac
+
 # Allowed types
 TYPES='feat|fix|refactor|docs|test|chore|ci|style|perf|build|revert'
 

@@ -227,7 +227,10 @@ function createGitService({ processService } = {}) {
     const cwd = workspace.rootPath;
     const [topResult, statusResult, logResult, treeResult] = await Promise.all([
       run('git', ['rev-parse', '--show-toplevel'], { cwd }),
-      run('git', ['status', '--porcelain=v2', '--branch'], { cwd }),
+      // quotePath=false: git's default C-quoting of non-ASCII paths would
+      // feed the parser literal `"src/caf\303\251.js"` strings that never
+      // match ls-files output or city buildings (BUG-009).
+      run('git', ['-c', 'core.quotePath=false', 'status', '--porcelain=v2', '--branch'], { cwd }),
       // Tab-delimited so titles can contain anything, including the unit
       // separator we'd otherwise prefer. %h short hash, %cI ISO commit date,
       // %s subject. -z would be cleaner but git log doesn't honor it for

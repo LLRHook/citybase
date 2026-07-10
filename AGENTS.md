@@ -10,33 +10,33 @@ Citybase is an isometric IDE that visualizes a repository as a hex-tile city. Ti
 
 ```bash
 npm install
-npm run dev          # dev server with HMR (http://localhost:5173)
-npm run build        # production build
-npm run lint         # ESLint
+npm run dev:desktop  # Electron shell with HMR (there is no browser-only path)
+npm run build        # production renderer build
+npm run lint         # ESLint (renderer + electron + core + scripts)
 npm test -- --run    # Vitest, single pass
+npm run core         # headless citybase-core daemon (v4 frontends)
 ```
 
 ## Where seed / fixture data lives
 
-**One canonical source:** `src/data/seed.js`. Production paths in the renderer no longer import it — the city is projected from real Git state, run history is read from `agentManager.listRuns()`, and the modals receive `districts` as a prop. seed.js stays as **test fixtures**: `AdventurerAnalysis.test.jsx` is the only consumer.
-
-`src/game/data.js` is a slim shim that re-exports `SKILL_DEFS`, `hpFromContext`, and `fmtTokens` from seed — those are constant enums / pure formatters, not user data.
-
-If you need new test fixtures, put them in `src/data/seed.js`. **Do not import seed.js from production renderer code.**
+There is no seed module anymore: `src/data/seed.js` and the `src/game/data.js`
+shim were deleted when the renderer went fully live-data (the city is projected
+from real Git state; run history comes from `agentManager.listRuns()`). Test
+fixtures live inside the test files (or a shared helper under `src/tests/`)
+and must never be imported from production renderer code.
 
 ## Where state lives
 
-All UI state currently lives in the `CodebaseCity` component in `src/App.jsx`. There is no external store yet — Zustand is planned for Phase 2 once the screen count grows.
+All UI state currently lives in the `CitybaseApp` component in `src/App.jsx`. There is no external store yet — Zustand is planned once the screen count grows.
 
 Children receive state via props. Don't add new top-level `useState` outside `App.jsx` unless the state is genuinely component-local.
 
 ## Views
 
-`src/App.jsx` switches between three views via a single `view` state value:
+`src/App.jsx` switches between two views via a single `view` state value:
 
-- `'city'` — isometric map (default)
-- `'kanban'` — quest board lanes
-- `'analysis'` — adventurer PR analysis
+- `'city'` — the isometric city (default when a workspace is open)
+- `'work'` — run dispatch, run history, and the run review surface
 
 ## The agent rule
 

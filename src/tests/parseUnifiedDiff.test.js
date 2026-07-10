@@ -185,4 +185,37 @@ describe('parseUnifiedDiff', () => {
     expect(files[0].deletions).toBe(1);
     expect(files[0].hunks).toHaveLength(2);
   });
+
+  it('unicode path stays one file with quotePath=false output (BUG-009)', () => {
+    const stdout = [
+      'diff --git a/src/café.js b/src/café.js',
+      '--- a/src/café.js',
+      '+++ b/src/café.js',
+      '@@ -1,1 +1,1 @@',
+      '-x',
+      '+y',
+      'diff --git a/next.js b/next.js',
+      '--- a/next.js',
+      '+++ b/next.js',
+      '@@ -1,1 +1,1 @@',
+      '-a',
+      '+b',
+    ].join('\n');
+    const { files } = parseUnifiedDiff(stdout);
+    expect(files).toHaveLength(2);
+    expect(files[0].file).toBe('src/café.js');
+    expect(files[1].file).toBe('next.js');
+  });
+
+  it('rename-only diff surfaces the new path (BUG-009)', () => {
+    const stdout = [
+      'diff --git a/old/name.js b/new/name.js',
+      'similarity index 100%',
+      'rename from old/name.js',
+      'rename to new/name.js',
+    ].join('\n');
+    const { files } = parseUnifiedDiff(stdout);
+    expect(files).toHaveLength(1);
+    expect(files[0].file).toBe('new/name.js');
+  });
 });
