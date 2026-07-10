@@ -127,4 +127,14 @@ describe('parseFiles — staged / unstaged classification', () => {
     ].join('\n');
     expect(parseFiles(stdout)).toHaveLength(1);
   });
+
+  it('unicode paths pass through raw with quotePath=false (BUG-009)', () => {
+    const out = parseFiles(line1('.M', 'src/café/résumé.js'));
+    expect(out[0].path).toBe('src/café/résumé.js');
+  });
+
+  it('unicode rename keeps both sides raw (BUG-009)', () => {
+    const out = parseFiles(line2('R.', 'docs/über.md', 'docs/uber.md'));
+    expect(out[0].path).toBe('docs/über.md');
+  });
 });
