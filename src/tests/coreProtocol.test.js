@@ -12,6 +12,7 @@ import { createIpcHandlers } from '../../electron/main/ipcHandlers.cjs';
 // deliberately does not expose them (it has the native dialog instead).
 const HEADLESS_ONLY = new Set([
   'citybase:workspace.registerPath',
+  'citybase:quests.list',
 ]);
 
 function handlerChannels() {

@@ -28,6 +28,7 @@ const gitService = require('../electron/main/services/gitService.cjs');
 const processService = require('../electron/main/services/processService.cjs');
 const { runWorkspaceChecks } = require('../electron/main/services/workspaceChecks.cjs');
 const { createRunStore } = require('../electron/main/services/runStore.cjs');
+const { createQuestService } = require('../electron/main/services/questService.cjs');
 const { createAgentManager } = require('../electron/main/agents/agentManager.cjs');
 const { detectAgentBinaries } = require('../electron/main/agents/detect.cjs');
 const { CodexAdapter } = require('../electron/main/agents/CodexAdapter.cjs');
@@ -73,6 +74,7 @@ async function startCore({ token, port = 0, userDataDir = resolveUserDataDir() }
     sendAgentEvent,
     getMainWindow: () => null,
     runWorkspaceChecks: ({ workspace }) => runWorkspaceChecks({ workspace, processService }),
+    questService: createQuestService(),
   });
 
   rpc = createRpcServer({
