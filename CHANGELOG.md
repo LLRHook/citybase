@@ -42,14 +42,14 @@ sections under each release/date heading.
 ### Verified
 
 - 2026-07-10 V&V pass (v1-gate closure + v4 phase A/B waves): Stages 0–5
-  green after two in-pass fixes. 433 Vitest cases across 36 files, Playwright
+  green after two in-pass fixes. 440 Vitest cases across 36 files, Playwright
   desktop smoke, lint zero-error across the renderer/electron/core/scripts
   tiers, build clean; renderer isolation / IPC allow-list / single-spawn-site
   / no-telemetry invariants re-confirmed (telemetry grep rescoped to exclude
   test fixtures — the production surface is exactly the Help-menu link).
   Real-`claude` harnesses: `claude-e2e` 13/13; `gui-claude-e2e` 5/5 after the
   pass caught BUG-030 and BUG-031 — both fixed and regression-tested
-  in-pass. Baseline bumped 393 → 433. Doc drift fixed
+  in-pass. Baseline bumped 393 → 440 (incl. the same-cycle hygiene batch). Doc drift fixed
   (AGENTS.md / CLAUDE.md / ROADMAP / VERIFICATION); runtime-deps rule now
   react + react-dom + ws.
 - 2026-06-18 V&V pass (SHA `31c4014`, v3.0.0 + post-cut hardening): Stages 0–5

@@ -148,24 +148,24 @@ A failure in this stage is a hard block.
   ```bash
   npm test -- --run
   ```
-  Expected: `Test Files  36 passed (36)`, `Tests  433 passed (433)`, exit 0.
+  Expected: `Test Files  36 passed (36)`, `Tests  440 passed (440)`, exit 0.
 - [ ] 2.3 Test-count baseline matches the collector:
   ```bash
-  npx vitest list | wc -l   # expect: 433
+  npx vitest list | wc -l   # expect: 440
   ```
   A mismatch with the table below means tests appeared or disappeared without
   a deliberate decision — investigate before ticking, then update the table
   in the same change as the run.
 
-**Baseline (2026-07-10, v1-gate closure + v4 phase A/B waves): 36 test files / 433 test cases — all Vitest (jsdom). The desktop launch path is covered by the Playwright smoke (2.4); the real-`claude` agent path (incl. non-blocking streaming dispatch + persistence) by the integration harnesses (Appendix F).**
+**Baseline (2026-07-10, v1-gate closure + v4 phase A/B waves): 36 test files / 440 test cases — all Vitest (jsdom). The desktop launch path is covered by the Playwright smoke (2.4); the real-`claude` agent path (incl. non-blocking streaming dispatch + persistence) by the integration harnesses (Appendix F).**
 
 | Test file | Cases | | Test file | Cases |
 |---|---|---|---|---|
 | `AgentDetectError.test.jsx` | 5 | | `iso.test.js` | 8 |
 | `agentAdapter.test.js` | 13 | | `menuTemplate.test.js` | 8 |
 | `agentManager.test.js` | 44 | | `parseBranchList.test.js` | 8 |
-| `AppAutoBoot.test.jsx` | 9 | | `parseFiles.test.js` | 12 |
-| `ApprovalModal.test.jsx` | 10 | | `parseUnifiedDiff.test.js` | 10 |
+| `AppAutoBoot.test.jsx` | 9 | | `parseFiles.test.js` | 14 |
+| `ApprovalModal.test.jsx` | 10 | | `parseUnifiedDiff.test.js` | 12 |
 | `bootPayload.test.js` | 8 | | `preload.contract.test.js` | 3 |
 | `BranchSelector.test.jsx` | 12 | | `processService.test.js` | 13 |
 | `ClaudeAdapter.test.js` | 31 | | `resolveProvider.test.js` | 7 |
@@ -178,7 +178,7 @@ A failure in this stage is a hard block.
 | `coreRpcServer.test.js` | 7 | | `windowConfig.test.js` | 10 |
 | `detectAgentBinaries.test.js` | 19 | | `workspaceChecks.test.js` | 13 |
 | `gitMutations.test.js` | 14 | | `WorkspaceErrorStates.test.jsx` | 6 |
-| `ipcHandlers.test.js` | 36 | | `workspaceServiceCore.test.js` | 6 |
+| `ipcHandlers.test.js` | 36 | | `workspaceServiceCore.test.js` | 9 |
 
 - [ ] 2.4 Desktop E2E smoke (Playwright `_electron`, FEAT-001) — requires a
   fresh `dist/`:
