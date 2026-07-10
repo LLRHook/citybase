@@ -77,13 +77,21 @@ func _spawn_core() -> void:
 	_token = crypto.generate_random_bytes(24).hex_encode()
 	OS.set_environment("CITYBASE_CORE_TOKEN", _token)
 	OS.set_environment("CITYBASE_CORE_PORT", str(CORE_PORT))
+	# Packaged builds ship a self-contained core (Node SEA binary) in the app
+	# bundle — no node install, no repo checkout needed (FEAT-027). Dev runs
+	# fall back to node + the repo's core/server.cjs.
+	var bundled := OS.get_executable_path().get_base_dir().path_join("../Resources/citybase-core")
+	if FileAccess.file_exists(bundled):
+		_core_pid = OS.create_process(bundled, [])
+		_log("core spawned (bundled) · pid %d" % _core_pid)
+		return
 	var server := _repo_root.path_join("core/server.cjs")
 	var node_bin := _find_node()
 	if node_bin == "":
-		_log("[color=red]FAIL: no node binary found[/color]")
+		_log("[color=red]FAIL: no bundled core and no node binary found[/color]")
 		return
 	_core_pid = OS.create_process(node_bin, [server])
-	_log("core spawned · pid %d" % _core_pid)
+	_log("core spawned (dev) · pid %d" % _core_pid)
 
 func _find_node() -> String:
 	for candidate in ["/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"]:
@@ -164,10 +172,14 @@ func _on_boot(payload: Dictionary) -> void:
 	var workspace: Variant = payload.get("workspace")
 	if workspace is Dictionary and workspace.has("id"):
 		_load_snapshot(workspace["id"])
-	else:
+	elif FileAccess.file_exists(_repo_root.path_join("core/server.cjs")):
+		# Dev convenience only: auto-register the checkout we're running from.
 		_call_rpc("workspace.registerPath", [_repo_root], func(ws: Variant) -> void:
 			if ws is Dictionary:
 				_load_snapshot(ws["id"]))
+	else:
+		# Packaged first-run: no remembered workspace — ask for one.
+		_bench.show_error("NO WORKSPACE", "Open a local Git repository to summon the city.")
 
 func _load_snapshot(workspace_id: String) -> void:
 	_workspace_id = workspace_id
