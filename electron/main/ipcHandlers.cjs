@@ -23,6 +23,7 @@ function createIpcHandlers({
   sendAgentEvent,
   getMainWindow,
   runWorkspaceChecks,
+  questService = null,
 } = {}) {
   if (!app || typeof app.getVersion !== 'function') {
     throw new TypeError('createIpcHandlers: app is required');
@@ -123,6 +124,17 @@ function createIpcHandlers({
       }
       return gitService.commit(ws, params);
     },
+
+    // Quest board (FEAT-025, headless frontends): the repo's own trackers
+    // projected as work items. Optional — hosts without a questService
+    // simply don't serve the channel.
+    ...(questService ? {
+      'citybase:quests.list': async (_evt, workspaceId) => {
+        const ws = await workspaceService.getWorkspaceById(workspaceId);
+        if (!ws) throw new Error(`unknown workspace id: ${workspaceId}`);
+        return questService.listQuests(ws.rootPath);
+      },
+    } : {}),
 
     'citybase:agents.detect': () => detectAgentBinaries(),
     'citybase:agents.list': () => agentManager.listProviders(),

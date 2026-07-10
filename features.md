@@ -207,7 +207,7 @@ Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
 - **Status:** shipped-pending-migration
 
 ### [FEAT-025] v4 Phase D — the workbench in-engine
-- [ ] **Priority:** high
+- [x] **Priority:** high
 - **Area:** godot
 - **File(s):** godot/
 - **Why:** the Godot app must stand alone for daily work: dispatch, review,
@@ -224,7 +224,24 @@ Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
 - **Test plan:** extend the autotest to drive one gated run headlessly;
   manual walkthrough per VERIFICATION Stage 3 equivalents.
 - **Out of scope:** ambient/living layer (FEAT-026).
-- **Status:** open
+- **Implementation:** new core `questService` (pure factory; parses
+  features.md/bugs.md open entries) behind an optional `quests.list` channel
+  (headless-whitelisted in the conformance test) + unit tests. New
+  `godot/workbench.gd`: quest board fed by the real trackers (16 live
+  items; selecting one drafts the prompt), run history, gated dispatch
+  (`approvalMode: 'ask'` — BUG-004 parity), approval modal wired to
+  agent.approve/reject, live activity stream, Outcome panel (changed
+  districts + churn + checks + risk heuristic ported from reviewModel),
+  commit action (`git.commit` addAll + snapshot reload), workspace error
+  surface (BUG-007 parity) and FileDialog → workspace.registerPath.
+  Autotest extended: `CITYBASE_AUTOTEST_DECISION=approve|reject` drives the
+  gate headlessly — reject path verified free-of-spawn (modal → reject →
+  cancelled, no CLI), approve path verified end-to-end with a real claude
+  run (modal → approve → live events → settle → Outcome renders the real
+  workspace diff + checks). Honest gaps: error surface implemented but not
+  screenshot-verified against a live non-repo; outcome diff shows the
+  workspace diff (v1 produceDiff semantics), not per-run isolation.
+- **Status:** shipped-pending-migration
 
 ### [FEAT-026] v4 Phase E — the living layer
 - [ ] **Priority:** med
