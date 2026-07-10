@@ -95,6 +95,11 @@ Local tools
 
 ## Adapter Contract
 
+> **Superseded:** the sketch below is the original planning shape. The
+> canonical, implemented contract (seven methods, event kinds, approval
+> payload) lives in [docs/agent-runtime.md](./docs/agent-runtime.md) — when
+> the two disagree, agent-runtime.md wins.
+
 The UI should not know whether Codex or Claude Code is running. It should talk to a small provider-neutral contract:
 
 ```ts
