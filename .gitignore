@@ -37,3 +37,4 @@ playwright-report
 .claude/sessions/
 .claude/projects/
 .claude/file-history/
+build/

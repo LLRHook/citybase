@@ -135,6 +135,35 @@ The spike (`godot/`) ran the full gate against the real core and the real
 
 **Verdict: GO.** Phases C–F may be ticketed.
 
+## Phase F gate results (2026-07-10, macOS arm64)
+
+`npm run package:v4` produces a single distributable `build/Citybase.app`:
+esbuild flattens the core to one file, `node --build-sea` (Node 25.5+'s
+one-step SEA flag) injects it into an **official** Node binary (Homebrew
+node lacks the SEA fuse), native codesign ad-hoc signs it (required for
+arm64 chained fixups), Godot exports the frontend, and the core binary is
+embedded in `Contents/Resources/` where `main.gd` prefers it over the dev
+node+repo fallback.
+
+v4 parity checklist (the v1 ship gate applied to the packaged Godot app):
+
+| Gate item | Result |
+|-----------|--------|
+| Launches with no dev tooling | ✅ packaged run: `core spawned (bundled)` — no node install, no repo checkout |
+| Auto-boot: recent workspace restored | ✅ snapshot + city + quest board with zero clicks (shared userData with the Electron shell) |
+| Open one local Git repo | ✅ FileDialog → `workspace.registerPath`; packaged first-run with no workspace shows the open prompt instead of auto-registering |
+| City from the real repo | ✅ Phase C (sizes, types, dirty parity) |
+| Git status/branch real | ✅ live snapshot in the top bar + vitals |
+| Claude default provider + detection | ✅ boot payload detect |
+| Read-only + write-approved runs e2e | ✅ Phase D: gated dispatch, approve and reject paths verified (reject spawns nothing) |
+| Default review shows no raw code | ✅ Outcome panel (districts/churn/checks/risk); raw hunks don't exist in-engine |
+| Failure states | ✅ error surface + headless-pick error + detect states; ⚠ non-repo folder not yet screenshot-verified live |
+| Build/lint/tests green | ✅ 450 Vitest + smoke; godot autotest frames |
+| Windows export + parity | ⏳ **pending the Windows machine** (templates installed; record results here) |
+
+**Cutover decision:** the Electron shell stays in-tree as the legacy shell
+until the Windows leg is recorded; no new Electron-only features should land.
+
 ## Risks / honest notes
 
 - **Text-heavy UI in an engine is real work.** Godot's Control nodes +
