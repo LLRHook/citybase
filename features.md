@@ -244,7 +244,7 @@ Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
 - **Status:** shipped-pending-migration
 
 ### [FEAT-026] v4 Phase E — the living layer
-- [ ] **Priority:** med
+- [x] **Priority:** med
 - **Area:** godot, core
 - **File(s):** godot/, core/ (vitals + activity RPCs)
 - **Why:** "no deliberate cuts" — every ambient system from the founding
@@ -257,7 +257,19 @@ Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
   the fiction→real mapping table in docs/v4-game-engine.md is fully checked.
 - **Test plan:** core RPC unit tests; autotest screenshots.
 - **Out of scope:** multiplayer/team anything.
-- **Status:** open
+- **Implementation:** `godot/living_layer.gd` — built entirely from EXISTING
+  real surfaces (no new protocol): activity feed merges `recentCommits` +
+  live run lifecycle events (deduped); vitals chips show commits/day
+  (computed from real commit timestamps), tracked/dirty counts, run count +
+  success rate, and XP/level derived from the persisted run history
+  (done 25 · failed 5 · cancelled 2, level = √(xp/50)+1); ambient life =
+  random building window-flicker + drifting motes between district centers
+  (≤6 concurrent, tween-driven, skipped under reduced motion). Captured
+  live: the feed listed this epic's own merge commits and vitals read
+  LV 3 · 204 xp · 100% success · 10 runs. Deviation from the ticket noted:
+  no new core vitals/activity RPCs were needed — client-side derivation
+  from existing data was simpler and equally real.
+- **Status:** shipped-pending-migration
 
 ### [FEAT-027] v4 Phase F — parity gate + cutover packaging
 - [ ] **Priority:** med
