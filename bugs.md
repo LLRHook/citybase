@@ -140,19 +140,6 @@ the V&V run, fixed in-pass, migrated. What remains, re-verified and ordered:
 - **Status:** open
 
 
-### [BUG-009] Git C-quoted (unicode) paths corrupt the status and diff parsers
-- [ ] **Severity:** med
-- **Area:** git
-- **File(s):** electron/main/services/gitService.cjs, electron/main/agents/parseUnifiedDiff.cjs, src/tests/parseFiles.test.js, src/tests/parseUnifiedDiff.test.js
-- **Observation:** with git's default `core.quotePath=true`, quoted paths are not
-  unquoted: the diff parser silently merges one file's hunks into the previous file
-  (`parseUnifiedDiff.cjs:33`) and the status parser emits literal quoted strings that
-  mismatch `ls-files` (`gitService.cjs:120-170`) (SRS M12).
-- **Expected:** locale- and unicode-safe path handling (NFR-2; FR-V5).
-- **Repro / Notes:** repo with accented or space-containing filenames. WS1.2 — run git
-  with `-c core.quotePath=false` (and `-z` where applicable) or implement C-unquoting;
-  add unicode fixtures to both parser suites; add a rename-only-diff fixture.
-- **Status:** open
 
 ### [BUG-010] `processService` error envelope misclassifies failures as "exited 0"
 - [ ] **Severity:** med
@@ -185,17 +172,6 @@ the V&V run, fixed in-pass, migrated. What remains, re-verified and ordered:
   `selectedBranch` on switch.
 - **Status:** open
 
-### [BUG-013] `workspaces.json` writes are racy and non-atomic
-- [ ] **Severity:** med
-- **Area:** git
-- **File(s):** electron/main/services/workspaceService.cjs
-- **Observation:** read-modify-write races across concurrent IPC calls; the write is
-  non-atomic; corrupt JSON silently resets all recents (SRS M14,
-  `workspaceService.cjs:43-47`). The service is entirely untested (§6.5).
-- **Expected:** persisted state writes are atomic and serialized (NFR-3).
-- **Repro / Notes:** WS1.6 — serialize mutations through a promise queue; temp-file +
-  rename writes; first unit tests for the service (injected fs).
-- **Status:** open
 
 ### [BUG-014] Run registry unbounded; manager-assigned runId never reaches the adapter
 - [ ] **Severity:** med
@@ -212,23 +188,6 @@ the V&V run, fixed in-pass, migrated. What remains, re-verified and ordered:
   FEAT-008 (run persistence) can double as the eviction store.
 - **Status:** open
 
-
-### [BUG-016] Commit-hook defects: body validated instead of subject, git-generated messages rejected, fail-open hook path
-- [ ] **Severity:** med
-- **Area:** build
-- **File(s):** .claude/hooks/validate-commit-msg.sh, hooks/commit-msg, .claude/settings.json
-- **Observation:** the Claude PreToolUse hook's greedy sed captures the **last** `-m`
-  argument, so multi-paragraph commits (`-m subject -m body`) are validated against
-  the body and wrongly blocked (SRS T2, `validate-commit-msg.sh:26-32`); the canonical
-  hook rejects git-generated messages — `Merge branch …`, default `Revert "…"`,
-  `fixup!` (T5, `hooks/commit-msg:29-36`); `.claude/settings.json:25` uses a
-  cwd-relative hook path that silently fails open from another cwd (T10).
-- **Expected:** hooks validate the subject only and accept legitimate git-generated
-  messages.
-- **Repro / Notes:** `git commit -m "feat: x" -m "body."` → blocked by the Claude
-  hook. WS2.4 — anchor sed to the first `-m`; early-exit for `Merge`/`Revert "`/
-  `fixup!`; use `$CLAUDE_PROJECT_DIR` in the settings hook.
-- **Status:** open
 
 
 ### [BUG-018] Low-severity latent batch (unscheduled in SRS plan)
@@ -697,4 +656,64 @@ They are kept here so each `BUG-NNN` stays resolvable.
   `agent run settled · <status>` event (`payload.status`) via `emitEvent`
   after recording + persisting, so every event consumer (history refresh,
   RunDetail, city overlay) sees the transition. Unit-tested; GUI harness 5/5.
+- **Status:** fixed-pending-migration
+
+### [BUG-009] Git C-quoted (unicode) paths corrupt the status and diff parsers
+- [x] **Severity:** med
+- **Area:** git
+- **File(s):** electron/main/services/gitService.cjs, electron/main/agents/parseUnifiedDiff.cjs, src/tests/parseFiles.test.js, src/tests/parseUnifiedDiff.test.js
+- **Observation:** with git's default `core.quotePath=true`, quoted paths are not
+  unquoted: the diff parser silently merges one file's hunks into the previous file
+  (`parseUnifiedDiff.cjs:33`) and the status parser emits literal quoted strings that
+  mismatch `ls-files` (`gitService.cjs:120-170`) (SRS M12).
+- **Expected:** locale- and unicode-safe path handling (NFR-2; FR-V5).
+- **Repro / Notes:** repo with accented or space-containing filenames. WS1.2 — run git
+  with `-c core.quotePath=false` (and `-z` where applicable) or implement C-unquoting;
+  add unicode fixtures to both parser suites; add a rename-only-diff fixture.
+- **Fix:** `-c core.quotePath=false` added to the two path-parsing surfaces:
+  `git status --porcelain=v2` (gitService snapshot) and `git diff` (adapter
+  produceDiff); `ls-files` calls already use `-z` (NUL-safe, unquoted).
+  Unicode fixtures added to `parseFiles` (modify + rename) and
+  `parseUnifiedDiff` (two-file unicode boundary, rename-only diff).
+- **Status:** fixed-pending-migration
+
+### [BUG-013] `workspaces.json` writes are racy and non-atomic
+- [x] **Severity:** med
+- **Area:** git
+- **File(s):** electron/main/services/workspaceService.cjs
+- **Observation:** read-modify-write races across concurrent IPC calls; the write is
+  non-atomic; corrupt JSON silently resets all recents (SRS M14,
+  `workspaceService.cjs:43-47`). The service is entirely untested (§6.5).
+- **Expected:** persisted state writes are atomic and serialized (NFR-3).
+- **Repro / Notes:** WS1.6 — serialize mutations through a promise queue; temp-file +
+  rename writes; first unit tests for the service (injected fs).
+- **Fix:** `workspaceServiceCore` now serializes every read-modify-write
+  (register/setCurrent/forget) as a unit through a promise chain (the
+  runStore pattern) and writes via temp-file + rename. Unit tests cover
+  atomic rename, the concurrent-register lost-update race (with a slowed
+  read to force the interleave), and chain survival after a failed write.
+- **Status:** fixed-pending-migration
+
+### [BUG-016] Commit-hook defects: body validated instead of subject, git-generated messages rejected, fail-open hook path
+- [x] **Severity:** med
+- **Area:** build
+- **File(s):** .claude/hooks/validate-commit-msg.sh, hooks/commit-msg, .claude/settings.json
+- **Observation:** the Claude PreToolUse hook's greedy sed captures the **last** `-m`
+  argument, so multi-paragraph commits (`-m subject -m body`) are validated against
+  the body and wrongly blocked (SRS T2, `validate-commit-msg.sh:26-32`); the canonical
+  hook rejects git-generated messages — `Merge branch …`, default `Revert "…"`,
+  `fixup!` (T5, `hooks/commit-msg:29-36`); `.claude/settings.json:25` uses a
+  cwd-relative hook path that silently fails open from another cwd (T10).
+- **Expected:** hooks validate the subject only and accept legitimate git-generated
+  messages.
+- **Repro / Notes:** `git commit -m "feat: x" -m "body."` → blocked by the Claude
+  hook. WS2.4 — anchor sed to the first `-m`; early-exit for `Merge`/`Revert "`/
+  `fixup!`; use `$CLAUDE_PROJECT_DIR` in the settings hook.
+- **Fix:** subject extraction switched to `grep -o | head -1` (genuinely the
+  FIRST `-m`/`--message`, per quoting style); `hooks/commit-msg` early-exits
+  for `Merge `/`Revert "`/`fixup! `/`squash! `; settings hook path anchored
+  to `$CLAUDE_PROJECT_DIR` — verified live: the hook now actually fires from
+  a worktree cwd (it was failing open before) and all six behavior cases
+  pass (multi-message subject-not-body both ways, git-generated accepts,
+  invalid rejects).
 - **Status:** fixed-pending-migration

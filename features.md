@@ -117,27 +117,6 @@ Priority guide: crit / high / med / low.
 - **Out of scope:** behavior changes (BUG-007 owns those).
 - **Status:** open
 
-### [FEAT-010] Bridge contract parity test
-- [x] **Priority:** med
-- **Area:** tests
-- **File(s):** src/tests/bridgeContract.test.js (new), shared manifest module
-- **Why:** the renderer↔preload contract is tested against a hand-written mock, so
-  drift between preload, the browser stub, and the tests is invisible (SRS §6.5,
-  WS3.3).
-- **Approach:** one shared manifest of `namespace.method` names asserted against both
-  the preload surface and the browser stub; the deliberate stub divergences (SRS R22)
-  whitelisted explicitly.
-- **Library / dependency notes:** none.
-- **Acceptance criteria:**
-  - Removing or renaming a preload method fails the test; stub parity enforced.
-- **Test plan:** this ticket is the test plan.
-- **Out of scope:** E2E (FEAT-001).
-- **Implementation:** realized by FEAT-022's `src/tests/coreProtocol.test.js`:
-  the preload's invoked channels and `createIpcHandlers`' map are asserted
-  against each other in both directions with an explicit headless-only
-  whitelist. The browser stub this ticket wanted to include was deleted with
-  the browser path, so preload ⇄ handlers is the whole contract.
-- **Status:** shipped-pending-migration
 
 ### [FEAT-011] Vitest environment split, coverage, non-watch default
 - [ ] **Priority:** med
@@ -701,4 +680,26 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
   gate re-runnable. Gate results + gotchas (float JSON ids, ETC2/ASTC for
   arm64, `CITYBASE_REPO_ROOT` for exported builds) recorded in
   docs/v4-game-engine.md. **Verdict: GO.**
+- **Status:** shipped-pending-migration
+
+### [FEAT-010] Bridge contract parity test
+- [x] **Priority:** med
+- **Area:** tests
+- **File(s):** src/tests/bridgeContract.test.js (new), shared manifest module
+- **Why:** the renderer↔preload contract is tested against a hand-written mock, so
+  drift between preload, the browser stub, and the tests is invisible (SRS §6.5,
+  WS3.3).
+- **Approach:** one shared manifest of `namespace.method` names asserted against both
+  the preload surface and the browser stub; the deliberate stub divergences (SRS R22)
+  whitelisted explicitly.
+- **Library / dependency notes:** none.
+- **Acceptance criteria:**
+  - Removing or renaming a preload method fails the test; stub parity enforced.
+- **Test plan:** this ticket is the test plan.
+- **Out of scope:** E2E (FEAT-001).
+- **Implementation:** realized by FEAT-022's `src/tests/coreProtocol.test.js`:
+  the preload's invoked channels and `createIpcHandlers`' map are asserted
+  against each other in both directions with an explicit headless-only
+  whitelist. The browser stub this ticket wanted to include was deleted with
+  the browser path, so preload ⇄ handlers is the whole contract.
 - **Status:** shipped-pending-migration

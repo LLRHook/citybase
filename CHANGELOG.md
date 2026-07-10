@@ -35,6 +35,10 @@ sections under each release/date heading.
   packaged `--export-release` macOS app runs the full flow outside the
   editor. Gate results in docs/v4-game-engine.md.
 
+- FEAT-010 Bridge contract parity: realized by `coreProtocol.test.js` —
+  preload channels and the handler map are asserted against each other in
+  both directions with a headless-only whitelist.
+
 ### Verified
 
 - 2026-07-10 V&V pass (v1-gate closure + v4 phase A/B waves): Stages 0–5
@@ -60,6 +64,17 @@ sections under each release/date heading.
 
 ### Fixed
 
+- BUG-009 Git runs with `-c core.quotePath=false` on the path-parsing
+  surfaces (status snapshot, produceDiff), so unicode/accented filenames reach
+  the parsers raw instead of C-quoted; unicode + rename fixtures lock it in.
+- BUG-013 `workspaces.json` mutations are serialized as read-modify-write
+  units and written atomically (temp + rename) in `workspaceServiceCore`,
+  with first unit tests incl. the concurrent-register lost-update race.
+- BUG-016 Commit hooks fixed: the Claude PreToolUse hook validates the FIRST
+  `-m` (the subject, not the body), the canonical hook accepts git-generated
+  Merge/Revert/fixup!/squash! messages, and the settings hook path is
+  anchored to `$CLAUDE_PROJECT_DIR` (it was silently failing open from
+  worktree cwds).
 - BUG-005 `agent.startRun` no longer spawns in a renderer-supplied cwd: the
   handler takes a `workspaceId`, resolves it against the known-workspace
   registry (unknown ids rejected before the manager is touched), and ignores
