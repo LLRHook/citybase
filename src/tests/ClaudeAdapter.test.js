@@ -377,8 +377,8 @@ describe('ClaudeAdapter — produceDiff / runChecks / openPR / cancel', () => {
     const adapter = makeAdapter({ processService: ps });
     const run = await adapter.startTask(VALID_PARAMS);
     await adapter.produceDiff(run.runId);
-    const diffCall = ps.run.mock.calls.find(c => c[0] === 'git' && c[1][0] === 'diff');
-    expect(diffCall[1]).toEqual(['diff', '--unified=3', '--no-color']);
+    const diffCall = ps.run.mock.calls.find(c => c[0] === 'git' && c[1].includes('diff'));
+    expect(diffCall[1]).toEqual(['-c', 'core.quotePath=false', 'diff', '--unified=3', '--no-color']);
     expect(diffCall[2]).toEqual({ cwd: '/abs/repo' });
   });
 
@@ -395,7 +395,7 @@ describe('ClaudeAdapter — produceDiff / runChecks / openPR / cancel', () => {
       run: vi.fn(async (cmd, args) => {
         let stdout = '';
         if (cmd === 'git' && args[0] === 'ls-files') stdout = 'NEW.txt\0';
-        else if (cmd === 'git' && args[0] === 'diff') stdout = newFileDiff;
+        else if (cmd === 'git' && args.includes('diff')) stdout = newFileDiff;
         return { ok: true, code: 0, signal: null, stdout, stderr: '', timedOut: false, durationMs: 5, error: null };
       }),
     });

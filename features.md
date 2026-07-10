@@ -117,22 +117,6 @@ Priority guide: crit / high / med / low.
 - **Out of scope:** behavior changes (BUG-007 owns those).
 - **Status:** open
 
-### [FEAT-010] Bridge contract parity test
-- [ ] **Priority:** med
-- **Area:** tests
-- **File(s):** src/tests/bridgeContract.test.js (new), shared manifest module
-- **Why:** the renderer↔preload contract is tested against a hand-written mock, so
-  drift between preload, the browser stub, and the tests is invisible (SRS §6.5,
-  WS3.3).
-- **Approach:** one shared manifest of `namespace.method` names asserted against both
-  the preload surface and the browser stub; the deliberate stub divergences (SRS R22)
-  whitelisted explicitly.
-- **Library / dependency notes:** none.
-- **Acceptance criteria:**
-  - Removing or renaming a preload method fails the test; stub parity enforced.
-- **Test plan:** this ticket is the test plan.
-- **Out of scope:** E2E (FEAT-001).
-- **Status:** open
 
 ### [FEAT-011] Vitest environment split, coverage, non-watch default
 - [ ] **Priority:** med
@@ -177,99 +161,91 @@ Priority guide: crit / high / med / low.
 
 Decision 2026-07-08 (see [docs/v4-game-engine.md](./docs/v4-game-engine.md)):
 rebuild the presentation tier in Godot 4.7 on top of the extracted Node core.
-Phases C–F are ticketed only after FEAT-023's gate passes.
+Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
 
-### [FEAT-022] Extract `citybase-core`: headless daemon + WS JSON-RPC facade
-- [x] **Priority:** high
-- **Area:** electron, agents, ipc
-- **File(s):** core/ (new), electron/main/ipc.cjs, electron/main/ipcHandlers.cjs, src/tests/
-- **Why:** v4 Phase A. The Godot frontend needs the agent harness behind a
-  transport it can speak (localhost WebSocket); the Electron shell should
-  become a thin client of the same handler map so both frontends share one
-  brain and one security boundary.
-- **Approach:** new `core/server.cjs` that instantiates the existing services
-  (same injected-deps factories) and exposes `createIpcHandlers`' channel map
-  as JSON-RPC over a `127.0.0.1` WebSocket; `{event: 'agent-event'}` push
-  notifications reuse the `pumpAgentEvents` envelope; session token minted at
-  startup and required on connect; `workspace.pick` becomes a
-  register-validated-path method (native dialog moves frontend-side).
-  Electron keeps its in-proc path this ticket — dual-hosting is proven by a
-  protocol conformance test, not by rewiring the shell yet.
-- **Library / dependency notes:** needs a WS server dep (`ws` is the de facto
-  standard) — verify latest stable + advisory status before install, per
-  AGENTS.md new-dep rule.
+### [FEAT-024] v4 Phase C — the real 3D city
+- [ ] **Priority:** high
+- **Area:** godot
+- **File(s):** godot/ (scenes, scripts), docs/v4-game-engine.md
+- **Why:** the epic centerpiece: replace the spike's block-clusters with the
+  living city the original vision promised, driven by real snapshot data.
+- **Approach:** district platforms with real architecture (building meshes
+  weighted by file size/type, materials per district), lighting/bloom/day
+  cycle, camera system (orbit + smooth fly-to-activity), the agent avatar —
+  a visible presence that paths to the building each live tool-use event
+  touches (spike's glow becomes arrival + work animation), dirty-file glow
+  parity with the Electron city (staged green / unstaged amber), and a
+  reduced-motion setting. Keep the spike's autotest screenshot mode working
+  as the visual regression harness.
+- **Library / dependency notes:** Godot 4.7 built-ins only; no addons
+  expected. Any asset packs must be license-checked before vendoring.
 - **Acceptance criteria:**
-  - `node core/server.cjs --workspace <path>` serves the full channel map;
-    a scripted client can pick/validate a workspace, get a snapshot, dispatch
-    a gated run, approve it, and stream its events to completion.
-  - Rejects connections without the session token; binds loopback only.
-  - Protocol conformance test asserts the WS method set === the preload
-    surface (FEAT-010's manifest idea, upgraded).
-  - Entire existing suite stays green; Electron app behavior unchanged.
-- **Test plan:** unit tests for the server glue (injected fake services);
-  integration test driving a real core instance over WS against a fixture
-  repo; conformance test.
-- **Out of scope:** Godot anything (FEAT-023); retiring Electron IPC.
-- **Implementation:** `workspaceService` split into the pure
-  `workspaceServiceCore.cjs` factory (injected userData dir / dialog / fs;
-  new `registerWorkspacePath` primitive) with the Electron singleton as thin
-  glue — every importer unchanged. New `core/rpcServer.cjs` (pure: token-gated
-  loopback WS, JSON-RPC dispatch onto the `citybase:*` handler map,
-  agent-event broadcast, boot push), `core/userData.cjs`, and the
-  `core/server.cjs` daemon entry (`npm run core`; env: TOKEN/PORT/USERDATA,
-  `--print-conn` for scripted clients) wiring the real services exactly like
-  `ipc.cjs`. `workspace.registerPath` added to the shared handler map.
-  Conformance test guards preload ⇄ handler-map parity (headless-only
-  whitelist). `ws@8.21` added (justified: the core's transport). Verified
-  live: daemon booted with real services; a scripted WS client registered
-  this repo, pulled a real snapshot (118 files, correct branch), detected the
-  real claude CLI, got the correct headless `pick` error, and received the
-  boot push. 432 tests + desktop E2E green (Electron shell unchanged).
-- **Status:** shipped-pending-migration
+  - A real repo renders with per-district architecture and legible labels at
+    1480×960; 60 fps with this repo loaded.
+  - A live run walks the avatar to each touched building within ~1s of the
+    event; completion plays a resolve animation.
+  - Dirty files are visually distinct (staged/unstaged) from the snapshot.
+  - Autotest mode still self-screenshots and quits for CI-style verification.
+- **Test plan:** autotest screenshots per gate item; core-side behavior is
+  already covered by the Vitest suite.
+- **Out of scope:** workbench panels (FEAT-025), quests/XP (FEAT-026),
+  packaging (FEAT-027).
+- **Status:** open
 
-### [FEAT-023] Godot 4.7 spike — go/no-go gate for the engine frontend
-- [x] **Priority:** high
-- **Area:** build, renderer
-- **File(s):** godot/ (new project dir), docs/v4-game-engine.md (gate results)
-- **Why:** v4 Phase B. Proves the engine can carry the product before any
-  city/workbench investment: WS client to the core, JSON throughput, 3D
-  render from a real snapshot, live event-driven animation, text UI
-  viability, mac export.
-- **Approach:** minimal Godot 4.7 project (GDScript): spawn `citybase-core`
-  via `OS.create_process` (env-passed token), connect `WebSocketPeer`,
-  render each district of a real repo snapshot as a lit 3D block cluster,
-  dispatch one read-only run and glow the touched building within 1s of the
-  streamed event, plus one `RichTextLabel` panel rendering a run's event
-  trail. Export a signed-nothing `.app` and run it outside the editor.
-  Time-box: if the gate can't pass, record why in docs/v4-game-engine.md and
-  fall back to the WebGL-in-Electron path with Phase A already banked.
-- **Library / dependency notes:** Godot 4.7 stable (editor + export
-  templates) as a dev-machine prerequisite, not an npm dep; no addons for
-  the spike — the sidecar removes the need for process/pipe addons.
-- **Acceptance criteria:**
-  - Spike app on macOS: boots core, authenticates, renders the real city
-    blocks, streams a live run into a building glow, event panel readable.
-  - Frame rate ≥ 60fps with the citybase repo's own tree loaded.
-  - Export runs outside the editor on macOS (Windows export attempted,
-    result recorded).
-  - Go/no-go verdict + measurements appended to docs/v4-game-engine.md.
-- **Test plan:** the gate checklist is the test; core-side interactions
-  covered by FEAT-022's integration test.
-- **Out of scope:** full city visuals (Phase C), workbench panels (Phase D),
-  packaging polish (Phase F).
-- **Implementation:** `godot/` project (Godot 4.7 stable, GDScript): spawns
-  `core/server.cjs` with an env-passed session token, connects
-  `WebSocketPeer` with retry-until-boot, renders the real snapshot as lit 3D
-  district platforms + extruded buildings under a bloom environment, streams
-  the live event trail into a `RichTextLabel`, and glows the exact building
-  a claude tool-use touches (verified with a real read-only run: the
-  `Read README.md` event lit the README building within ~1s). 60 fps after
-  warmup. Packaged `--export-release macOS` app ran the full flow with no
-  editor. Self-screenshotting autotest mode (`CITYBASE_SPIKE_OUT`) makes the
-  gate re-runnable. Gate results + gotchas (float JSON ids, ETC2/ASTC for
-  arm64, `CITYBASE_REPO_ROOT` for exported builds) recorded in
-  docs/v4-game-engine.md. **Verdict: GO.**
-- **Status:** shipped-pending-migration
+### [FEAT-025] v4 Phase D — the workbench in-engine
+- [ ] **Priority:** high
+- **Area:** godot
+- **File(s):** godot/
+- **Why:** the Godot app must stand alone for daily work: dispatch, review,
+  approve, commit — the whole demo sentence without the Electron shell.
+- **Approach:** quest board fed from `features.md`/`bugs.md` (parsed by the
+  core into a `quests.list` RPC) + run history; run detail with Outcome /
+  Changed Districts / live activity (port `reviewModel` semantics); the
+  approval modal as a hard gate wired to `agent.approve`/`agent.reject`;
+  commit + PR actions; workspace/git error surfaces (BUG-007 parity);
+  folder chooser via Godot `FileDialog` → `workspace.registerPath`.
+- **Library / dependency notes:** none beyond Godot Control nodes.
+- **Acceptance criteria:** the demoable v1 sentence executes end-to-end in
+  the Godot app alone, including reject-path and error states.
+- **Test plan:** extend the autotest to drive one gated run headlessly;
+  manual walkthrough per VERIFICATION Stage 3 equivalents.
+- **Out of scope:** ambient/living layer (FEAT-026).
+- **Status:** open
+
+### [FEAT-026] v4 Phase E — the living layer
+- [ ] **Priority:** med
+- **Area:** godot, core
+- **File(s):** godot/, core/ (vitals + activity RPCs)
+- **Why:** "no deliberate cuts" — every ambient system from the founding
+  prototype returns as a real one.
+- **Approach:** live activity feed (run events + `git log` + branch
+  switches); real vitals (checks results, test counts, lint status, commit
+  cadence); XP/levels derived from persisted run history; ambient city life
+  (idle citizens, traffic along recently-committed paths, day/night).
+- **Acceptance criteria:** every number on screen traces to a real source;
+  the fiction→real mapping table in docs/v4-game-engine.md is fully checked.
+- **Test plan:** core RPC unit tests; autotest screenshots.
+- **Out of scope:** multiplayer/team anything.
+- **Status:** open
+
+### [FEAT-027] v4 Phase F — parity gate + cutover packaging
+- [ ] **Priority:** med
+- **Area:** build, godot, docs
+- **File(s):** VERIFICATION.md (v4 stages), godot/export_presets.cfg, docs/
+- **Why:** the Electron shell retires only when the Godot app passes the
+  same gate the v1 shell did.
+- **Approach:** a v4 parity checklist mirroring the v1 ship gate run against
+  the Godot app; bundle a Node runtime (or pkg'd binary) for citybase-core
+  in the export; Windows export verified (the Phase B leftover); signed
+  macOS build folded in from FEAT-003's successor; `--legacy-shell` kept one
+  release.
+- **Acceptance criteria:** parity checklist green on macOS + Windows;
+  a single distributable artifact boots city + core with no dev tooling.
+- **Test plan:** the checklist is the test; packaged-app autotest run.
+- **Out of scope:** auto-update.
+- **Status:** open
+
+
 
 ---
 
@@ -309,27 +285,6 @@ agent works, real cancel, and persistent runs. Functional core is the existing
 backlog: **FEAT-004** (streaming runner), **FEAT-005** (real streaming events incl.
 codex), **FEAT-008** (run persistence). New visual + release tickets below.
 
-### [FEAT-020] Streaming run detail
-- [x] **Priority:** high
-- **Area:** renderer
-- **File(s):** src/views/RunDetail.jsx
-- **Why:** events should append live with progress, not appear all at once when
-  the run finishes.
-- **Approach:** render the live `useRunEvents` stream incrementally; a context/
-  progress bar from `reportUsage`; a live "running…" indicator; auto-scroll.
-- **Acceptance criteria:** events appear as they stream; terminal state loads the
-  diff/checks; backstop (`getEvents`) still covers re-mounts.
-- **Test plan:** component test with an incremental event stream.
-- **Out of scope:** changing the event protocol.
-- **Implementation:** running runs render a "Live Activity" panel — the
-  `useRunEvents` stream appends incrementally, the container follows the tail
-  (auto-scroll), and a pulsing "agent working" indicator (reduced-motion-safe)
-  makes in-flight state unambiguous. Terminal state swaps to the Phase 4
-  review surface and loads diff/checks; `getEvents` remains the re-mount
-  backstop. The `reportUsage` progress bar was skipped — the adapter's
-  `reportUsage` is still a placeholder envelope, so there is nothing real to
-  render. Covered by `src/tests/RunDetail.test.jsx` (incremental stream case).
-- **Status:** shipped-pending-migration
 
 ---
 
@@ -611,4 +566,140 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
 - **Test plan:** version assertion; doc-drift check.
 - **Out of scope:** production packaging (FEAT-003).
 - **Implementation:** package.json 3.0.0, TopBar v3.0 label, CHANGELOG 3.0.0 section, README/ROADMAP real-time framing.
+- **Status:** shipped-pending-migration
+
+### [FEAT-020] Streaming run detail
+- [x] **Priority:** high
+- **Area:** renderer
+- **File(s):** src/views/RunDetail.jsx
+- **Why:** events should append live with progress, not appear all at once when
+  the run finishes.
+- **Approach:** render the live `useRunEvents` stream incrementally; a context/
+  progress bar from `reportUsage`; a live "running…" indicator; auto-scroll.
+- **Acceptance criteria:** events appear as they stream; terminal state loads the
+  diff/checks; backstop (`getEvents`) still covers re-mounts.
+- **Test plan:** component test with an incremental event stream.
+- **Out of scope:** changing the event protocol.
+- **Implementation:** running runs render a "Live Activity" panel — the
+  `useRunEvents` stream appends incrementally, the container follows the tail
+  (auto-scroll), and a pulsing "agent working" indicator (reduced-motion-safe)
+  makes in-flight state unambiguous. Terminal state swaps to the Phase 4
+  review surface and loads diff/checks; `getEvents` remains the re-mount
+  backstop. The `reportUsage` progress bar was skipped — the adapter's
+  `reportUsage` is still a placeholder envelope, so there is nothing real to
+  render. Covered by `src/tests/RunDetail.test.jsx` (incremental stream case).
+- **Status:** shipped-pending-migration
+
+### [FEAT-022] Extract `citybase-core`: headless daemon + WS JSON-RPC facade
+- [x] **Priority:** high
+- **Area:** electron, agents, ipc
+- **File(s):** core/ (new), electron/main/ipc.cjs, electron/main/ipcHandlers.cjs, src/tests/
+- **Why:** v4 Phase A. The Godot frontend needs the agent harness behind a
+  transport it can speak (localhost WebSocket); the Electron shell should
+  become a thin client of the same handler map so both frontends share one
+  brain and one security boundary.
+- **Approach:** new `core/server.cjs` that instantiates the existing services
+  (same injected-deps factories) and exposes `createIpcHandlers`' channel map
+  as JSON-RPC over a `127.0.0.1` WebSocket; `{event: 'agent-event'}` push
+  notifications reuse the `pumpAgentEvents` envelope; session token minted at
+  startup and required on connect; `workspace.pick` becomes a
+  register-validated-path method (native dialog moves frontend-side).
+  Electron keeps its in-proc path this ticket — dual-hosting is proven by a
+  protocol conformance test, not by rewiring the shell yet.
+- **Library / dependency notes:** needs a WS server dep (`ws` is the de facto
+  standard) — verify latest stable + advisory status before install, per
+  AGENTS.md new-dep rule.
+- **Acceptance criteria:**
+  - `node core/server.cjs --workspace <path>` serves the full channel map;
+    a scripted client can pick/validate a workspace, get a snapshot, dispatch
+    a gated run, approve it, and stream its events to completion.
+  - Rejects connections without the session token; binds loopback only.
+  - Protocol conformance test asserts the WS method set === the preload
+    surface (FEAT-010's manifest idea, upgraded).
+  - Entire existing suite stays green; Electron app behavior unchanged.
+- **Test plan:** unit tests for the server glue (injected fake services);
+  integration test driving a real core instance over WS against a fixture
+  repo; conformance test.
+- **Out of scope:** Godot anything (FEAT-023); retiring Electron IPC.
+- **Implementation:** `workspaceService` split into the pure
+  `workspaceServiceCore.cjs` factory (injected userData dir / dialog / fs;
+  new `registerWorkspacePath` primitive) with the Electron singleton as thin
+  glue — every importer unchanged. New `core/rpcServer.cjs` (pure: token-gated
+  loopback WS, JSON-RPC dispatch onto the `citybase:*` handler map,
+  agent-event broadcast, boot push), `core/userData.cjs`, and the
+  `core/server.cjs` daemon entry (`npm run core`; env: TOKEN/PORT/USERDATA,
+  `--print-conn` for scripted clients) wiring the real services exactly like
+  `ipc.cjs`. `workspace.registerPath` added to the shared handler map.
+  Conformance test guards preload ⇄ handler-map parity (headless-only
+  whitelist). `ws@8.21` added (justified: the core's transport). Verified
+  live: daemon booted with real services; a scripted WS client registered
+  this repo, pulled a real snapshot (118 files, correct branch), detected the
+  real claude CLI, got the correct headless `pick` error, and received the
+  boot push. 432 tests + desktop E2E green (Electron shell unchanged).
+- **Status:** shipped-pending-migration
+
+### [FEAT-023] Godot 4.7 spike — go/no-go gate for the engine frontend
+- [x] **Priority:** high
+- **Area:** build, renderer
+- **File(s):** godot/ (new project dir), docs/v4-game-engine.md (gate results)
+- **Why:** v4 Phase B. Proves the engine can carry the product before any
+  city/workbench investment: WS client to the core, JSON throughput, 3D
+  render from a real snapshot, live event-driven animation, text UI
+  viability, mac export.
+- **Approach:** minimal Godot 4.7 project (GDScript): spawn `citybase-core`
+  via `OS.create_process` (env-passed token), connect `WebSocketPeer`,
+  render each district of a real repo snapshot as a lit 3D block cluster,
+  dispatch one read-only run and glow the touched building within 1s of the
+  streamed event, plus one `RichTextLabel` panel rendering a run's event
+  trail. Export a signed-nothing `.app` and run it outside the editor.
+  Time-box: if the gate can't pass, record why in docs/v4-game-engine.md and
+  fall back to the WebGL-in-Electron path with Phase A already banked.
+- **Library / dependency notes:** Godot 4.7 stable (editor + export
+  templates) as a dev-machine prerequisite, not an npm dep; no addons for
+  the spike — the sidecar removes the need for process/pipe addons.
+- **Acceptance criteria:**
+  - Spike app on macOS: boots core, authenticates, renders the real city
+    blocks, streams a live run into a building glow, event panel readable.
+  - Frame rate ≥ 60fps with the citybase repo's own tree loaded.
+  - Export runs outside the editor on macOS (Windows export attempted,
+    result recorded).
+  - Go/no-go verdict + measurements appended to docs/v4-game-engine.md.
+- **Test plan:** the gate checklist is the test; core-side interactions
+  covered by FEAT-022's integration test.
+- **Out of scope:** full city visuals (Phase C), workbench panels (Phase D),
+  packaging polish (Phase F).
+- **Implementation:** `godot/` project (Godot 4.7 stable, GDScript): spawns
+  `core/server.cjs` with an env-passed session token, connects
+  `WebSocketPeer` with retry-until-boot, renders the real snapshot as lit 3D
+  district platforms + extruded buildings under a bloom environment, streams
+  the live event trail into a `RichTextLabel`, and glows the exact building
+  a claude tool-use touches (verified with a real read-only run: the
+  `Read README.md` event lit the README building within ~1s). 60 fps after
+  warmup. Packaged `--export-release macOS` app ran the full flow with no
+  editor. Self-screenshotting autotest mode (`CITYBASE_SPIKE_OUT`) makes the
+  gate re-runnable. Gate results + gotchas (float JSON ids, ETC2/ASTC for
+  arm64, `CITYBASE_REPO_ROOT` for exported builds) recorded in
+  docs/v4-game-engine.md. **Verdict: GO.**
+- **Status:** shipped-pending-migration
+
+### [FEAT-010] Bridge contract parity test
+- [x] **Priority:** med
+- **Area:** tests
+- **File(s):** src/tests/bridgeContract.test.js (new), shared manifest module
+- **Why:** the renderer↔preload contract is tested against a hand-written mock, so
+  drift between preload, the browser stub, and the tests is invisible (SRS §6.5,
+  WS3.3).
+- **Approach:** one shared manifest of `namespace.method` names asserted against both
+  the preload surface and the browser stub; the deliberate stub divergences (SRS R22)
+  whitelisted explicitly.
+- **Library / dependency notes:** none.
+- **Acceptance criteria:**
+  - Removing or renaming a preload method fails the test; stub parity enforced.
+- **Test plan:** this ticket is the test plan.
+- **Out of scope:** E2E (FEAT-001).
+- **Implementation:** realized by FEAT-022's `src/tests/coreProtocol.test.js`:
+  the preload's invoked channels and `createIpcHandlers`' map are asserted
+  against each other in both directions with an explicit headless-only
+  whitelist. The browser stub this ticket wanted to include was deleted with
+  the browser path, so preload ⇄ handlers is the whole contract.
 - **Status:** shipped-pending-migration

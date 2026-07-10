@@ -82,12 +82,13 @@ equivalents appear where the syntax differs materially.
   npm run lint
   ```
   Expected: exits 0 with no findings printed.
-- [ ] 1.2 Runtime dependencies are frozen at exactly `react` + `react-dom`
-  (AGENTS.md: no new runtime deps without PR justification):
+- [ ] 1.2 Runtime dependencies are frozen at exactly `react` + `react-dom` +
+  `ws` (AGENTS.md: no new runtime deps without PR justification; `ws` was
+  justified in PR #56 as the citybase-core transport):
   ```bash
-  node -e "const d=Object.keys(require('./package.json').dependencies);console.log(d.join(','));process.exit(d.length===2&&d.includes('react')&&d.includes('react-dom')?0:1)"
+  node -e "const d=Object.keys(require('./package.json').dependencies).sort();console.log(d.join(','));process.exit(d.join(',')==='react,react-dom,ws'?0:1)"
   ```
-  Expected: prints `react,react-dom`, exits 0.
+  Expected: prints `react,react-dom,ws`, exits 0.
 - [ ] 1.3 No TypeScript migration crept in (deferred by project rule):
   ```bash
   git ls-files '*.ts' '*.tsx'
@@ -147,35 +148,37 @@ A failure in this stage is a hard block.
   ```bash
   npm test -- --run
   ```
-  Expected: `Test Files  30 passed (30)`, `Tests  393 passed (393)`, exit 0.
+  Expected: `Test Files  36 passed (36)`, `Tests  440 passed (440)`, exit 0.
 - [ ] 2.3 Test-count baseline matches the collector:
   ```bash
-  npx vitest list | wc -l   # expect: 393
+  npx vitest list | wc -l   # expect: 440
   ```
   A mismatch with the table below means tests appeared or disappeared without
   a deliberate decision — investigate before ticking, then update the table
   in the same change as the run.
 
-**Baseline (2026-06-18, SHA `31c4014`, v3.0.0 + post-cut hardening): 30 test files / 393 test cases — all Vitest (jsdom). The desktop launch path is covered by the Playwright smoke (2.4); the real-`claude` agent path (incl. non-blocking streaming dispatch + persistence) by the integration harnesses (Appendix F).**
+**Baseline (2026-07-10, v1-gate closure + v4 phase A/B waves): 36 test files / 440 test cases — all Vitest (jsdom). The desktop launch path is covered by the Playwright smoke (2.4); the real-`claude` agent path (incl. non-blocking streaming dispatch + persistence) by the integration harnesses (Appendix F).**
 
 | Test file | Cases | | Test file | Cases |
 |---|---|---|---|---|
 | `AgentDetectError.test.jsx` | 5 | | `iso.test.js` | 8 |
 | `agentAdapter.test.js` | 13 | | `menuTemplate.test.js` | 8 |
-| `agentManager.test.js` | 43 | | `parseBranchList.test.js` | 8 |
-| `AppAutoBoot.test.jsx` | 9 | | `parseFiles.test.js` | 12 |
-| `ApprovalModal.test.jsx` | 10 | | `parseUnifiedDiff.test.js` | 10 |
+| `agentManager.test.js` | 44 | | `parseBranchList.test.js` | 8 |
+| `AppAutoBoot.test.jsx` | 9 | | `parseFiles.test.js` | 14 |
+| `ApprovalModal.test.jsx` | 10 | | `parseUnifiedDiff.test.js` | 12 |
 | `bootPayload.test.js` | 8 | | `preload.contract.test.js` | 3 |
 | `BranchSelector.test.jsx` | 12 | | `processService.test.js` | 13 |
 | `ClaudeAdapter.test.js` | 31 | | `resolveProvider.test.js` | 7 |
-| `CliAgentAdapter.test.js` | 19 | | `runCity.test.js` | 17 |
-| `cityModel.test.js` | 9 | | `runStore.test.js` | 9 |
-| `CityView.test.jsx` | 8 | | `useAgentDetect.test.jsx` | 8 |
-| `citybaseApi.test.js` | 2 | | `useRunHistory.test.jsx` | 6 |
-| `CodexAdapter.test.js` | 25 | | `windowConfig.test.js` | 10 |
+| `CliAgentAdapter.test.js` | 19 | | `reviewModel.test.js` | 9 |
+| `cityModel.test.js` | 9 | | `RunDetail.test.jsx` | 7 |
+| `CityView.test.jsx` | 8 | | `runCity.test.js` | 17 |
+| `citybaseApi.test.js` | 2 | | `runStore.test.js` | 9 |
+| `CodexAdapter.test.js` | 25 | | `useAgentDetect.test.jsx` | 8 |
+| `coreProtocol.test.js` | 2 | | `useRunHistory.test.jsx` | 6 |
+| `coreRpcServer.test.js` | 7 | | `windowConfig.test.js` | 10 |
 | `detectAgentBinaries.test.js` | 19 | | `workspaceChecks.test.js` | 13 |
-| `gitMutations.test.js` | 14 | | | |
-| `ipcHandlers.test.js` | 34 | | | |
+| `gitMutations.test.js` | 14 | | `WorkspaceErrorStates.test.jsx` | 6 |
+| `ipcHandlers.test.js` | 36 | | `workspaceServiceCore.test.js` | 9 |
 
 - [ ] 2.4 Desktop E2E smoke (Playwright `_electron`, FEAT-001) — requires a
   fresh `dist/`:
@@ -299,18 +302,19 @@ mechanically in Stage 1; this stage is the human sign-off):
 - [ ] 5.4 **Approval boundary holds.** Every file-changing agent mode requires
   explicit approval before execution (3.6 manual pass +
   `ApprovalModal.test.jsx` / `agentManager.test.js` green).
-- [ ] 5.5 **Fully local, no telemetry.** No analytics or phone-home endpoints:
+- [ ] 5.5 **Fully local, no telemetry.** No analytics or phone-home endpoints
+  in production code (test fixtures use fake GitHub PR URLs and are excluded):
   ```bash
-  git grep -nE "https?://" -- src electron | grep -vE "localhost|comment|//.*http"
+  git grep -nE "https?://" -- src electron ':!src/tests' | grep -vE "localhost|comment|//.*http"
   ```
-  Expected (as of SHA `1356437`): exactly two hits — the user-initiated
-  Help-menu `openExternal` link to the GitHub repo in
-  `electron/main/menuTemplate.cjs` and its test. Any new hit must be
-  user-initiated navigation, never an automatic network call.
+  Expected: exactly one hit — the user-initiated Help-menu `openExternal`
+  link to the GitHub repo in `electron/main/menuTemplate.cjs`. Any new hit
+  must be user-initiated navigation, never an automatic network call.
 - [ ] 5.6 **Scope constraints.** No TS files (1.3), no styling-system deps
   (1.4), runtime deps frozen (1.2) — re-confirmed at this gate.
-- [ ] 5.7 **Single mock-data source.** `src/data/seed.js` is canonical and the
-  two shims re-export it (1.8).
+- [ ] 5.7 **No fixture data in production paths.** The seed module is deleted;
+  test fixtures live only under `src/tests/` and nothing outside tests imports
+  them (1.8).
 
 A failure in this stage is a hard block.
 

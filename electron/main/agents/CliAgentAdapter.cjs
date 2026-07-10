@@ -293,7 +293,9 @@ class CliAgentAdapter extends AgentAdapter {
     if (newFiles.length > 0) {
       await this._processService.run('git', ['add', '--intent-to-add', '--', ...newFiles], { cwd });
     }
-    const result = await this._processService.run('git', ['diff', '--unified=3', '--no-color'], { cwd });
+    // quotePath=false: C-quoted unicode paths in diff headers would make the
+    // parser silently merge one file's hunks into the previous file (BUG-009).
+    const result = await this._processService.run('git', ['-c', 'core.quotePath=false', 'diff', '--unified=3', '--no-color'], { cwd });
     if (newFiles.length > 0) {
       await this._processService.run('git', ['reset', '--quiet', '--', ...newFiles], { cwd });
     }

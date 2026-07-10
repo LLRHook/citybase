@@ -22,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/validate-commit-msg.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/validate-commit-msg.sh\"",
             "timeout": 5
           }
         ]

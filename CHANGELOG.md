@@ -12,8 +12,46 @@ sections under each release/date heading.
 
 ## Unreleased
 
+### Added
+
+- FEAT-020 Streaming run detail: live runs render a "Live Activity" panel —
+  events append incrementally with tail-follow auto-scroll and a
+  reduced-motion-safe working indicator; terminal state swaps to the review
+  surface with `getEvents` as the re-mount backstop.
+- Phase 4 no-code review surface (v1 ship gate): RunDetail's terminal view
+  leads with Outcome (agent summary + explainable risk via the pure
+  `src/app/reviewModel.js`) and Changed Districts (files grouped by the
+  city's district convention); raw diff hunks and the agent log moved to
+  collapsed drawers.
+- FEAT-022 `citybase-core`: the agent harness extracted into a headless
+  daemon (`npm run core`) serving the `citybase:*` handler map as JSON-RPC
+  over a token-gated loopback WebSocket (`ws@8.21`), sharing services,
+  approval boundary, and userData state with the Electron shell;
+  `workspace.registerPath` added for headless frontends; a protocol
+  conformance test guards preload ⇄ handler-map parity.
+- FEAT-023 Godot 4.7 spike (v4 Phase B gate — **GO**): `godot/` spawns the
+  core, speaks the WS protocol, renders the real repo as a lit 3D city,
+  glows the exact building a live claude tool-use touches at 60 fps, and the
+  packaged `--export-release` macOS app runs the full flow outside the
+  editor. Gate results in docs/v4-game-engine.md.
+
+- FEAT-010 Bridge contract parity: realized by `coreProtocol.test.js` —
+  preload channels and the handler map are asserted against each other in
+  both directions with a headless-only whitelist.
+
 ### Verified
 
+- 2026-07-10 V&V pass (v1-gate closure + v4 phase A/B waves): Stages 0–5
+  green after two in-pass fixes. 440 Vitest cases across 36 files, Playwright
+  desktop smoke, lint zero-error across the renderer/electron/core/scripts
+  tiers, build clean; renderer isolation / IPC allow-list / single-spawn-site
+  / no-telemetry invariants re-confirmed (telemetry grep rescoped to exclude
+  test fixtures — the production surface is exactly the Help-menu link).
+  Real-`claude` harnesses: `claude-e2e` 13/13; `gui-claude-e2e` 5/5 after the
+  pass caught BUG-030 and BUG-031 — both fixed and regression-tested
+  in-pass. Baseline bumped 393 → 440 (incl. the same-cycle hygiene batch). Doc drift fixed
+  (AGENTS.md / CLAUDE.md / ROADMAP / VERIFICATION); runtime-deps rule now
+  react + react-dom + ws.
 - 2026-06-18 V&V pass (SHA `31c4014`, v3.0.0 + post-cut hardening): Stages 0–5
   green. 393 Vitest cases across 30 files, 1 Playwright desktop smoke, lint +
   build clean, renderer isolation / IPC allow-list / single-spawn-site /
@@ -26,6 +64,43 @@ sections under each release/date heading.
 
 ### Fixed
 
+- BUG-009 Git runs with `-c core.quotePath=false` on the path-parsing
+  surfaces (status snapshot, produceDiff), so unicode/accented filenames reach
+  the parsers raw instead of C-quoted; unicode + rename fixtures lock it in.
+- BUG-013 `workspaces.json` mutations are serialized as read-modify-write
+  units and written atomically (temp + rename) in `workspaceServiceCore`,
+  with first unit tests incl. the concurrent-register lost-update race.
+- BUG-016 Commit hooks fixed: the Claude PreToolUse hook validates the FIRST
+  `-m` (the subject, not the body), the canonical hook accepts git-generated
+  Merge/Revert/fixup!/squash! messages, and the settings hook path is
+  anchored to `$CLAUDE_PROJECT_DIR` (it was silently failing open from
+  worktree cwds).
+- BUG-005 `agent.startRun` no longer spawns in a renderer-supplied cwd: the
+  handler takes a `workspaceId`, resolves it against the known-workspace
+  registry (unknown ids rejected before the manager is touched), and ignores
+  any renderer-supplied `repoUrl`.
+- BUG-007 Broken workspace/git states now render as an explicit
+  `WorkspaceStatusPanel` (not-a-repo / git missing / snapshot IPC failure)
+  with retry/pick affordances; the TopBar pill reads amber `· git error`
+  instead of linked green; `useWorkspace` hydrate/refresh/close route
+  failures to the error state (no more stranded `loading`) and the dead
+  no-arg `git.refresh()` pre-call is gone.
+- BUG-015 The `electron/`, `core/`, and `scripts/` tiers are linted
+  (commonjs + node globals); the 15 findings it surfaced were fixed.
+- BUG-017 Closed: ROADMAP's adapter-contract sketch carries an explicit
+  "superseded by docs/agent-runtime.md" note; the stale CI-trigger claim and
+  the inert-controls carriers no longer exist.
+- BUG-019 Closed by the 2026-07-10 V&V doc pass: AGENTS.md / CLAUDE.md /
+  VERIFICATION.md describe the live-data, post-seed, two-view reality with
+  refreshed baselines and commands.
+- BUG-030 `gui-claude-e2e` seeded the Windows-only userData path — on macOS
+  the run executed against the user's real workspace and the diff check
+  passed vacuously on prompt text. Platform-correct path + the check now
+  waits for the terminal pill and asserts inside Changed Districts.
+- BUG-031 Run status no longer sticks on `running` after settle: the manager
+  emits a final `agent run settled · <status>` event at the terminal
+  transition, so the history refresh, RunDetail, and city overlay all see
+  the flip within a second.
 - BUG-008 Verified resolved by the v2.0 city rebuild (FEAT-014) and closed during the
   2026-06-18 re-groom: districts seat at 6.2 world units against a ≤4.7 footprint (no
   overlap, proven by enumerating adjacent seats) and buildings use a center-tile-free
