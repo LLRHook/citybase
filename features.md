@@ -272,7 +272,7 @@ Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
 - **Status:** shipped-pending-migration
 
 ### [FEAT-027] v4 Phase F — parity gate + cutover packaging
-- [ ] **Priority:** med
+- [x] **Priority:** med
 - **Area:** build, godot, docs
 - **File(s):** VERIFICATION.md (v4 stages), godot/export_presets.cfg, docs/
 - **Why:** the Electron shell retires only when the Godot app passes the
@@ -286,7 +286,20 @@ Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
   a single distributable artifact boots city + core with no dev tooling.
 - **Test plan:** the checklist is the test; packaged-app autotest run.
 - **Out of scope:** auto-update.
-- **Status:** open
+- **Implementation:** `npm run package:v4` (scripts/package-v4.mjs): esbuild
+  bundles the core to one CJS file; Node 25.5+'s one-step `--build-sea`
+  injects it into a cached OFFICIAL node binary (Homebrew node has no SEA
+  fuse); native ad-hoc codesign (arm64 chained fixups); Godot export; core
+  embedded at Contents/Resources/citybase-core; app re-signed. main.gd
+  prefers the bundled core and, packaged with no remembered workspace,
+  prompts instead of auto-registering. Verified: the packaged app booted
+  standalone — `core spawned (bundled)`, workspace restored, city + quest
+  board live, autotest frames captured. macOS parity checklist recorded in
+  docs/v4-game-engine.md; **Windows leg pending the Windows machine**
+  (acceptance is therefore partially open — tracked in the gate table, not
+  silently dropped). esbuild added as a devDependency (justified: the SEA
+  bundling step).
+- **Status:** shipped-pending-migration
 
 
 
