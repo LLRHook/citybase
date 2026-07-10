@@ -31,7 +31,15 @@ writeFileSync(path.join(ws, 'src', 'a.js'), 'export const a = 1;\n');
 writeFileSync(path.join(ws, 'src', 'b.js'), 'export const b = 2;\n');
 git('add', '-A'); git('commit', '-q', '-m', 'init');
 
-const userData = path.join(process.env.APPDATA || path.join(homedir(), 'AppData', 'Roaming'), 'Citybase');
+// Electron's userData root differs per OS — the Windows-only path silently
+// seeded a file the app never read on macOS, so the run executed against the
+// user's real current workspace instead of the throwaway repo (BUG-030).
+const userDataRoot = process.platform === 'darwin'
+  ? path.join(homedir(), 'Library', 'Application Support')
+  : process.platform === 'win32'
+    ? (process.env.APPDATA || path.join(homedir(), 'AppData', 'Roaming'))
+    : (process.env.XDG_CONFIG_HOME || path.join(homedir(), '.config'));
+const userData = path.join(userDataRoot, 'Citybase');
 const stateFile = path.join(userData, 'workspaces.json');
 const backup = stateFile + '.guie2e.bak';
 let hadState = false;
@@ -103,9 +111,16 @@ try {
   // Non-blocking + streaming: the first `claude:` event arrives before the Edit
   // tool runs, so wait for the run to COMPLETE — the diff panel only lists the
   // edited file once the run is terminal (RunDetail loads the diff then).
+  // Wait for the terminal transition first (the status pill reads exactly
+  // 'done'; BUG-031's settle event drives the refresh), then assert the
+  // review surface lists the file. A bare getByText('src/a.js') also matches
+  // the prompt echoed in the agent's response text, which let this check
+  // pass vacuously (BUG-030) — scope it to the Changed Districts panel.
   let sawDiffFile = true;
   try {
-    await win.getByText('src/a.js').first().waitFor({ timeout: 180_000 });
+    await win.getByText('done', { exact: true }).first().waitFor({ timeout: 300_000 });
+    await win.locator('div', { has: win.getByText('Changed Districts') })
+      .getByText('src/a.js').first().waitFor({ timeout: 15_000 });
   } catch { sawDiffFile = false; }
   check('diff lists the edited file once the run completes', sawDiffFile);
   await win.screenshot({ path: path.join(outDir, 'gui-01-rundetail.png') });
