@@ -164,7 +164,7 @@ rebuild the presentation tier in Godot 4.7 on top of the extracted Node core.
 Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
 
 ### [FEAT-024] v4 Phase C — the real 3D city
-- [ ] **Priority:** high
+- [x] **Priority:** high
 - **Area:** godot
 - **File(s):** godot/ (scenes, scripts), docs/v4-game-engine.md
 - **Why:** the epic centerpiece: replace the spike's block-clusters with the
@@ -190,7 +190,21 @@ Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
   already covered by the Vitest suite.
 - **Out of scope:** workbench panels (FEAT-025), quests/XP (FEAT-026),
   packaging (FEAT-027).
-- **Status:** open
+- **Implementation:** godot/ split into `city_builder.gd` (districts on
+  non-overlapping concentric rings; buildings typed by extension — code
+  towers with roof lights, doc slabs, config cylinders — heights from real
+  blob sizes via the new additive `snapshot.fileSizes`, `git ls-tree -r -l`;
+  dirty parity: unstaged amber / staged green, refreshed on settle),
+  `agent_avatar.gd` (glowing drone + ground-to-sky beam that flies to each
+  touched building; green/red completion ripple on the BUG-031 settle
+  event), `camera_rig.gd` (drag orbit + wheel zoom + fly-to-activity that
+  yields to user input), and a slimmed `main.gd` (day-cycle sun, ambient,
+  occlusion-tolerant screenshot autotest). Verified with a real claude run:
+  beam lands on README within ~1s of the tool-use event, camera flies in,
+  ripple resolves; 60fps vsync / 145fps uncapped with this repo loaded;
+  reduced-motion env respected. Staged-green rendering is code-paritied but
+  not screenshot-verified (no staged files at capture time).
+- **Status:** shipped-pending-migration
 
 ### [FEAT-025] v4 Phase D — the workbench in-engine
 - [ ] **Priority:** high
