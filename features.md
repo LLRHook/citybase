@@ -227,6 +227,19 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
 
 ## Shipped
 
+### [FEAT-022] Citybase Model Shop — a playable local repository
+
+- [x] **Priority:** high
+- **Area:** renderer / desktop
+- **Status:** shipped (feature branch)
+- **Why:** Reimagine the rough city as a compelling, functional portfolio experience while retaining real repository and agent state.
+- **Scope:** A balsa-and-card model town, controllable Pip scout, first-shift tutorial, painted crew tokens with building assignment, Survey/Craft/Mend jobs, verified outcome receipts and persistent per-agent skill progression; contextual real file/diff inspection and desktop verification.
+- **Acceptance:** Open a real Git repository, select/search a file, inspect its real contents and changes, navigate neighborhoods, dispatch/observe/cancel a real agent through existing approval flow, inspect persisted results. Ambient traffic must not claim agent activity. Unsupported runtime paths must be truthful.
+- **Technology:** Three.js 0.185.1 (latest stable verified via npm registry 2026-09-05), official OrbitControls and InstancedMesh APIs. Real depth, lighting, orbiting and efficient repeated architecture justify the one runtime addition. React/Electron and existing CLI services remain.
+- **Validation:** Existing lint/build/unit suite, new inspector security tests, semantic city interactions, real Electron journey and visual/performance inspection.
+- **Implementation:** Three.js scene and playable first shift now drive actual repository inspection and approved Claude/Codex work. Reward receipts persist by agent and workspace. Includes native app icon assets, self-hosted fonts, camera-preserving refresh, bounded file/diff IPC, verified quest outcomes and isolated Electron journey coverage.
+
+
 ### [FEAT-005] Real CLI integration: correct `claude` / `codex` argv + event normalization
 - [x] **Priority:** high
 - **Area:** agents

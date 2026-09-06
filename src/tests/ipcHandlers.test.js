@@ -119,6 +119,7 @@ describe('createIpcHandlers — channel set', () => {
       'citybase:checks.run',
       'citybase:git.checkout',
       'citybase:git.commit',
+      'citybase:git.getFileDiff',
       'citybase:git.getSnapshot',
       'citybase:git.listBranches',
       'citybase:git.refresh',
@@ -126,6 +127,7 @@ describe('createIpcHandlers — channel set', () => {
       'citybase:workspace.getCurrent',
       'citybase:workspace.listRecent',
       'citybase:workspace.pick',
+      'citybase:workspace.readFile',
       'citybase:workspace.setCurrent',
     ]);
   });
@@ -306,19 +308,34 @@ describe('createIpcHandlers — agents.detect + agents.list', () => {
 });
 
 describe('createIpcHandlers — agent.startRun + event fan-out', () => {
+  it('rejects missing and unknown workspace identities before spawning', async () => {
+    const stubs = makeStubs();
+    const { handlers } = build(stubs);
+    await expect(handlers['citybase:agent.startRun'](null, { repoUrl: '/arbitrary' })).rejects.toThrow(/workspaceId is required/);
+    await expect(handlers['citybase:agent.startRun'](null, { workspaceId: 'unknown' })).rejects.toThrow(/unknown workspace/);
+    expect(stubs.agentManager.startRun).not.toHaveBeenCalled();
+  });
+
+  it('pins the agent path to the remembered workspace', async () => {
+    const stubs = makeStubs();
+    const { handlers } = build(stubs);
+    await handlers['citybase:agent.startRun'](null, { workspaceId: 'ws-1', repoUrl: '/arbitrary', provider: 'codex' });
+    expect(stubs.agentManager.startRun).toHaveBeenCalledWith({ workspaceId: 'ws-1', repoUrl: '/repo', provider: 'codex' });
+  });
+
   it('agent.startRun returns the AgentRun the manager produces', async () => {
     const stubs = makeStubs();
     const { handlers } = build(stubs);
-    const params = { provider: 'codex', questId: 'TASK-1' };
+    const params = { provider: 'codex', questId: 'TASK-1', workspaceId: 'ws-1' };
     const run = await handlers['citybase:agent.startRun'](null, params);
     expect(run).toMatchObject({ runId: 'run-1', status: 'running' });
-    expect(stubs.agentManager.startRun).toHaveBeenCalledWith(params);
+    expect(stubs.agentManager.startRun).toHaveBeenCalledWith({ ...params, repoUrl: '/repo' });
   });
 
   it('agent.startRun fires events through sendAgentEvent without awaiting', async () => {
     const stubs = makeStubs();
     const { handlers } = build(stubs);
-    await handlers['citybase:agent.startRun'](null, { provider: 'codex' });
+    await handlers['citybase:agent.startRun'](null, { provider: 'codex', workspaceId: 'ws-1' });
     // Drain microtasks so the fire-and-forget pump finishes.
     await new Promise((resolve) => setImmediate(resolve));
     // 1 immediate "started" event (so the renderer sees the live run) + the
@@ -351,7 +368,7 @@ describe('createIpcHandlers — agent.startRun + event fan-out', () => {
     };
     const stubs = makeStubs({ agentManager });
     const { handlers } = build(stubs);
-    await handlers['citybase:agent.startRun'](null, { provider: 'codex' });
+    await handlers['citybase:agent.startRun'](null, { provider: 'codex', workspaceId: 'ws-1' });
     await new Promise((resolve) => setImmediate(resolve));
     const calls = stubs.sendAgentEvent.mock.calls.map(c => c[0].event);
     expect(calls.at(-1)).toMatchObject({ kind: 'error', text: 'stream blew up' });
@@ -359,6 +376,22 @@ describe('createIpcHandlers — agent.startRun + event fan-out', () => {
 
   it('AGENT_EVENT_CHANNEL constant is exported and matches the expected name', () => {
     expect(AGENT_EVENT_CHANNEL).toBe('citybase:agent.event');
+  });
+});
+
+describe('building file IPC', () => {
+  it('looks up a known workspace before reading file content or changes', async () => {
+    const stubs = makeStubs();
+    const fileService = { readFile: vi.fn(async () => ({ content: 'city' })), getFileDiff: vi.fn(async () => ({ text: '+city' })) };
+    const { handlers } = build({ ...stubs, fileService });
+    expect(await handlers['citybase:workspace.readFile'](null, 'ws-1', 'src/city.js')).toEqual({ content: 'city' });
+    expect(await handlers['citybase:git.getFileDiff'](null, 'ws-1', 'src/city.js')).toEqual({ text: '+city' });
+    expect(fileService.readFile).toHaveBeenCalledWith({ id: 'ws-1', rootPath: '/repo' }, 'src/city.js');
+    expect(fileService.getFileDiff).toHaveBeenCalledWith({ id: 'ws-1', rootPath: '/repo' }, 'src/city.js');
+    await expect(handlers['citybase:workspace.readFile'](null, 'unknown', 'src/city.js')).rejects.toThrow(/unknown workspace/);
+    await expect(handlers['citybase:git.getFileDiff'](null, 'unknown', 'src/city.js')).rejects.toThrow(/unknown workspace/);
+    expect(fileService.readFile).toHaveBeenCalledTimes(1);
+    expect(fileService.getFileDiff).toHaveBeenCalledTimes(1);
   });
 });
 

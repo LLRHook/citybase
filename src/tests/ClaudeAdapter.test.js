@@ -135,6 +135,13 @@ describe('ClaudeAdapter — claude CLI presence', () => {
 });
 
 describe('ClaudeAdapter — buildClaudeArgv (real Claude CLI flags)', () => {
+  it('restricts scouting runs to read tools and denies permission prompts', () => {
+    const argv = buildClaudeArgv({ params: { ...VALID_PARAMS, readOnly: true } });
+    expect(argv[argv.indexOf('--permission-mode') + 1]).toBe('dontAsk');
+    expect(argv[argv.indexOf('--tools') + 1]).toBe('Read,Glob,Grep');
+    expect(argv).toContain('--strict-mcp-config');
+    expect(argv).not.toContain('bypassPermissions');
+  });
   it('uses --print and streaming --output-format stream-json --verbose', () => {
     const argv = buildClaudeArgv({ params: VALID_PARAMS });
     expect(argv).toContain('--print');

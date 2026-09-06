@@ -9,7 +9,7 @@ const WINDOW_BOUNDS = Object.freeze({
   minHeight: 720,
 });
 
-const DEFAULT_DEV_URL = 'http://localhost:5173';
+const DEFAULT_DEV_URL = 'http://localhost:5187';
 
 // Decide whether the BrowserWindow should load the Vite dev server or the
 // packaged index.html, and whether to open dev tools. Pure: every input

@@ -18,11 +18,11 @@ describe('ApprovalModal (presentation)', () => {
       summary: { text: 'about to edit', files: ['lib/foo.js', 'lib/bar.js'] },
     };
     render(<ApprovalModal pending={pending} onApprove={() => {}} onReject={() => {}} />);
-    expect(screen.getByText(/AGENT REQUESTS APPROVAL/i)).toBeInTheDocument();
+    expect(screen.getByText('WORK PERMIT')).toBeInTheDocument();
     expect(screen.getByText('run-abc')).toBeInTheDocument();
     expect(screen.getByText('about to edit')).toBeInTheDocument();
-    expect(screen.getByText('· lib/foo.js')).toBeInTheDocument();
-    expect(screen.getByText('· lib/bar.js')).toBeInTheDocument();
+    expect(screen.getByText('lib/foo.js')).toBeInTheDocument();
+    expect(screen.getByText('lib/bar.js')).toBeInTheDocument();
   });
 
   it('Approve and Reject buttons fire the right callbacks', async () => {
@@ -36,10 +36,10 @@ describe('ApprovalModal (presentation)', () => {
         onReject={onReject}
       />,
     );
-    await user.click(screen.getByRole('button', { name: /✓ Approve/ }));
+    await user.click(screen.getByRole('button', { name: /^Approve$/i }));
     expect(onApprove).toHaveBeenCalledTimes(1);
     expect(onReject).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: /✕ Reject/ }));
+    await user.click(screen.getByRole('button', { name: /^Reject$/i }));
     expect(onReject).toHaveBeenCalledTimes(1);
   });
 });

@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "test": "vitest",
     "test:e2e": "playwright test",
-    "dev:desktop": "concurrently -k -n vite,electron -c blue,magenta \"vite\" \"wait-on http://localhost:5173 && electron . --dev\"",
+    "dev:desktop": "concurrently -k -n vite,electron -c blue,magenta \"vite\" \"wait-on http://localhost:5187 && electron . --dev\"",
     "build:desktop": "vite build",
     "start:desktop": "electron .",
     "package:dir": "npm run build:desktop && electron-builder --dir",
@@ -40,12 +40,14 @@
         }
       ],
       "category": "public.app-category.developer-tools",
-      "identity": null
+      "identity": null,
+      "icon": "build/icon.icns"
     }
   },
   "dependencies": {
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

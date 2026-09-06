@@ -4,7 +4,7 @@
 // The browser-stub path is already exercised by App.idle.test.jsx; here
 // we verify the desktop-bridge path: when window.citybase is present,
 // useWorkspace and useAgentDetect both fire on mount without user input.
-import { render, waitFor, screen } from '@testing-library/react';
+import { render, waitFor, screen, fireEvent } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Build a fresh desktop-bridge stub per test. vi.fn instances live on the
@@ -107,24 +107,22 @@ describe('App auto-boot (desktop bridge present)', () => {
     });
   });
 
-  it("renders the 'WORKSPACE · <name>' linked label when getCurrent resolves", async () => {
+  it("renders the restored world switcher when getCurrent resolves", async () => {
     render(<App />);
-    expect(await screen.findByText(/WORKSPACE · demo/i)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Current city: demo/ })).toBeInTheDocument();
   });
 
-  it('shows the codex-not-installed / claude-installed status rows after detect resolves', async () => {
+  it('offers installed agents and disables unavailable adventurers in the guild', async () => {
     render(<App />);
-    await waitFor(() => {
-      const rows = screen.getAllByRole('status');
-      expect(rows.some(r => r.getAttribute('data-state') === 'ok')).toBe(true);
-      expect(rows.some(r => r.getAttribute('data-state') === 'bad')).toBe(true);
-    });
+    fireEvent.click(await screen.findByRole('button', { name: /New quest/ }));
+    expect(await screen.findByRole('button', { name: 'Choose Juniper, claude ready' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Choose Mica, codex unavailable' })).toBeDisabled();
   });
 
-  it('falls back to NO WORKSPACE state when getCurrent resolves to null (first launch)', async () => {
+  it('offers the first-city journey when no workspace is restored', async () => {
     desktopBridge.workspace.getCurrent.mockImplementationOnce(async () => null);
     render(<App />);
-    expect(await screen.findByText(/NO WORKSPACE · open one/i)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Open your first city/ })).toBeInTheDocument();
   });
 
   it('still calls agents.detect even when no workspace is restored', async () => {
@@ -150,10 +148,8 @@ describe('App auto-boot (desktop bridge present)', () => {
       expect(desktopBridge.agents.detect).toHaveBeenCalled();
     });
     // After the confirm resolves, the live result drives the status rows.
-    await waitFor(() => {
-      const rows = screen.getAllByRole('status');
-      expect(rows.some(r => r.getAttribute('data-state') === 'ok')).toBe(true);
-    });
+    fireEvent.click(await screen.findByRole('button', { name: /New quest/ }));
+    expect(await screen.findByRole('button', { name: 'Choose Juniper, claude ready' })).toBeEnabled();
   });
 
   it('falls back to agents.detect when onBoot fires AFTER mount with detect data', async () => {

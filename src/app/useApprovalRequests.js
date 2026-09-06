@@ -27,7 +27,7 @@ export function useApprovalRequests({ api } = {}) {
       if (!ev.payload || !ev.payload.needsApproval) return;
       setQueue((prev) => {
         if (prev.some((p) => p.runId === payload.runId)) return prev;
-        return [...prev, { runId: payload.runId, summary: ev.payload }];
+        return [...prev, { runId: payload.runId, summary: ev.payload.summary || null }];
       });
     });
     return typeof off === 'function' ? off : undefined;

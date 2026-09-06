@@ -1,0 +1,12 @@
+import { Icon } from './Icon.jsx';
+export function Atlas({ model, query, onQuery, district, onDistrict, selected, onSelect, changes, visited, onClose }) {
+  const status = new Map(changes.map(f => [f.path, f]));
+  const files = model.districts.filter(d => !district || d.id === district).flatMap(d => d.paths).filter(p => p.toLowerCase().includes(query.toLowerCase()));
+  return <aside className="drawer atlas" aria-label="City atlas">
+    <div className="drawer-heading"><span className="eyebrow">A FIELD GUIDE TO YOUR CITY</span><button className="icon-button" onClick={onClose} aria-label="Close atlas"><Icon name="close"/></button></div>
+    <h2>Wander a little.</h2><p className="muted">Every neighborhood is a folder.<br/>Every building has something inside.</p>
+    <label className="atlas-search"><Icon name="search"/><input placeholder="Find a building…" aria-label="Find a building" value={query} onChange={e => onQuery(e.target.value)}/><kbd>⌘ K</kbd></label>
+    {!query && <div className="district-list"><button className={`district-row ${!district ? 'selected' : ''}`} onClick={() => onDistrict(null)}><Icon name="compass"/><span><strong>The whole world</strong><small>{model.totalFiles} files · {model.districts.length} districts</small></span></button>{model.districts.map(d => <button key={d.id} className={`district-row ${district === d.id ? 'selected' : ''}`} onClick={() => onDistrict(d.id)}><span className="district-gem" style={{ '--district': d.color }}>{visited.includes(d.id) ? <Icon name="check" size={13}/> : <Icon name="home" size={15}/>}</span><span><strong>{d.label}</strong><small>{d.name} · {d.files} files</small></span><Icon name="arrow" size={14}/></button>)}</div>}
+    {(query || district) && <><div className="drawer-heading file-list-heading"><span className="eyebrow">{files.length} BUILDINGS</span>{district && <button className="text-button" onClick={() => onDistrict(null)}>All districts</button>}</div><div className="atlas-files">{files.slice(0, 150).map(p => <button key={p} className={`file-row ${selected === p ? 'selected' : ''}`} onClick={() => onSelect(p)}><Icon name="file" size={16}/><span><strong>{p.split('/').at(-1)}</strong><small>{p}</small></span>{status.has(p) && <i className={`status-dot ${status.get(p).staged ? 'mint' : 'amber'}`}/>}</button>)}{!files.length && <p className="muted">No buildings match this name.</p>}{files.length > 150 && <p className="fine-print">Showing 150 matches. Keep typing to narrow your search.</p>}</div></>}
+  </aside>;
+}

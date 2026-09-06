@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+<title>Citybase — The Model Shop</title>
+<desc>Three card buildings on a balsa model board. A red-roofed workshop gives the cream city its signature.</desc>
+<defs>
+  <linearGradient id="card" x1="180" y1="100" x2="870" y2="950" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#faf4e5"/><stop offset="1" stop-color="#e9ddc2"/>
+  </linearGradient>
+</defs>
+<!-- A generous macOS tile, with transparent corners outside the card. -->
+<rect x="64" y="64" width="896" height="896" rx="196" fill="url(#card)"/>
+<rect x="65.5" y="65.5" width="893" height="893" rx="194.5" stroke="#d9cbb0" stroke-width="3"/>
+<!-- The hard, offset shadow belongs to a physical model on a desk. -->
+<path d="M170 690 512 490 872 689 523 908Z" fill="#47321b" opacity=".14"/>
+<g id="balsa-board" stroke-linejoin="round">
+<polygon points="166,644 512,844 512,882 166,682" fill="#ae8955" />
+<polygon points="858,644 512,844 512,882 858,682" fill="#89633d" />
+<polygon points="512,444 858,644 512,844 166,644" fill="#c9b48a" />
+<polygon points="512,453 836,640 512,827 188,640" fill="#e0c99d" />
+</g>
+<!-- The tall card tower: the useful city silhouette at small sizes. -->
+<g id="tower" stroke-linejoin="round">
+<polygon points="302,299 410,361 410,659 302,597" fill="#e9ddbd" />
+<polygon points="533,290 410,361 410,659 533,588" fill="#b7a47e" />
+<polygon points="425,228 533,290 410,361 302,299" fill="#fbf3dc" />
+</g>
+<polygon points="518,333 500,343 500,373 518,363" fill="#f2b544" />
+<polygon points="484,353 465,363 465,393 484,383" fill="#514b37" />
+<polygon points="449,373 431,383 431,413 449,403" fill="#514b37" />
+<polygon points="518,392 500,402 500,432 518,422" fill="#514b37" />
+<polygon points="484,412 465,422 465,452 484,442" fill="#514b37" />
+<polygon points="449,432 431,442 431,472 449,462" fill="#f2b544" />
+<polygon points="518,451 500,461 500,491 518,481" fill="#514b37" />
+<polygon points="484,471 465,481 465,511 484,501" fill="#f2b544" />
+<polygon points="449,491 431,501 431,531 449,521" fill="#514b37" />
+<polygon points="518,510 500,520 500,550 518,540" fill="#f2b544" />
+<polygon points="484,530 465,540 465,570 484,560" fill="#514b37" />
+<polygon points="449,550 431,560 431,590 449,580" fill="#514b37" />
+<polygon points="316,341 335,352 335,382 316,371" fill="#f2b544" />
+<polygon points="346,358 365,369 365,399 346,388" fill="#514b37" />
+<polygon points="376,376 395,387 395,417 376,406" fill="#514b37" />
+<polygon points="316,400 335,411 335,441 316,430" fill="#514b37" />
+<polygon points="346,417 365,428 365,458 346,447" fill="#514b37" />
+<polygon points="376,435 395,446 395,476 376,465" fill="#514b37" />
+<polygon points="316,459 335,470 335,500 316,489" fill="#514b37" />
+<polygon points="346,476 365,487 365,517 346,506" fill="#514b37" />
+<polygon points="376,494 395,505 395,535 376,524" fill="#f2b544" />
+<polygon points="316,518 335,529 335,559 316,548" fill="#514b37" />
+<polygon points="346,535 365,546 365,576 346,565" fill="#f2b544" />
+<polygon points="376,553 395,564 395,594 376,583" fill="#514b37" />
+<g id="tower-cap" stroke-linejoin="round">
+<polygon points="330,262 413,310 413,345 330,297" fill="#e9ddbd" />
+<polygon points="506,257 413,310 413,345 506,292" fill="#b7a47e" />
+<polygon points="423,209 506,257 413,310 330,262" fill="#fff8e7" />
+</g>
+<polygon points="423,202 515,255 413,313 321,260" fill="#b4a17b" />
+<!-- A lower studio gives the skyline a second beat. -->
+<g id="studio" stroke-linejoin="round">
+<polygon points="562,433 676,499 676,702 562,636" fill="#e9ddbd" />
+<polygon points="777,440 676,499 676,702 777,643" fill="#b7a47e" />
+<polygon points="664,375 777,440 676,499 562,433" fill="#fbf3dc" />
+</g>
+<polygon points="763,483 744,493 744,523 763,513" fill="#f2b544" />
+<polygon points="721,506 703,517 703,547 721,536" fill="#514b37" />
+<polygon points="763,542 744,552 744,582 763,572" fill="#514b37" />
+<polygon points="721,565 703,576 703,606 721,595" fill="#514b37" />
+<polygon points="763,601 744,611 744,641 763,631" fill="#514b37" />
+<polygon points="721,624 703,635 703,665 721,654" fill="#f2b544" />
+<polygon points="576,475 595,486 595,516 576,505" fill="#f2b544" />
+<polygon points="608,494 627,505 627,535 608,524" fill="#514b37" />
+<polygon points="640,512 659,523 659,553 640,542" fill="#514b37" />
+<polygon points="576,534 595,545 595,575 576,564" fill="#514b37" />
+<polygon points="608,553 627,564 627,594 608,583" fill="#514b37" />
+<polygon points="640,571 659,582 659,612 640,601" fill="#514b37" />
+<polygon points="576,593 595,604 595,634 576,623" fill="#514b37" />
+<polygon points="608,612 627,623 627,653 608,642" fill="#514b37" />
+<polygon points="640,630 659,641 659,671 640,660" fill="#f2b544" />
+<g id="studio-roof" stroke-linejoin="round">
+<polygon points="593,409 674,456 674,481 593,434" fill="#e9ddbd" />
+<polygon points="747,414 674,456 674,481 747,439" fill="#b7a47e" />
+<polygon points="666,367 747,414 674,456 593,409" fill="#fcf4df" />
+</g>
+<polygon points="666,359 757,412 674,460 583,407" fill="#a6936c" />
+<!-- One red roof is the shop's signature, never a stock chart mark. -->
+<g id="workshop" stroke-linejoin="round">
+<polygon points="374,617 485,681 485,791 374,727" fill="#e9ddbd" />
+<polygon points="579,627 485,681 485,791 579,737" fill="#b7a47e" />
+<polygon points="468,563 579,627 485,681 374,617" fill="#fbf3dc" />
+</g>
+<g id="red-roof">
+<polygon points="467,552 590,623 538,597 415,526" fill="#e05231" />
+<polygon points="415,526 538,597 485,684 362,613" fill="#c8391f" />
+<polygon points="579,627 532,594 485,681" fill="#f3e8ca" />
+</g>
+<polygon points="397,659 428,677 428,758 397,740" fill="#363424" />
+<polygon points="447,686 470,699 470,735 447,722" fill="#f2b544" />
+<polygon points="560,665 537,678 537,714 560,701" fill="#514b37" />
+<!-- A short card path leads to the red-roofed workshop. -->
+<polygon points="385,739 431,766 412,777 366,750" fill="#f5ead0" />
+</svg>

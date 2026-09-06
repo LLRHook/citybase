@@ -446,6 +446,32 @@ describe('createAgentManager — pre-flight approval gate (BUG-004)', () => {
     expect(mgr.listPendingApprovals()).toEqual([]);
   });
 
+  it('notifies history subscribers after a rejection', async () => {
+    const emitEvent = vi.fn();
+    const mgr = createAgentManager({ adapters: { fake: echoAdapter() }, emitEvent });
+    const promise = mgr.startRun({ ...startParams, approvalMode: 'ask' });
+    await Promise.resolve();
+    const id = mgr.listPendingApprovals()[0].runId;
+    mgr.rejectRun(id);
+    await expect(promise).rejects.toThrow(/rejected/);
+    expect(emitEvent.mock.calls.at(-1)[0]).toMatchObject({ runId: id, event: { payload: { status: 'cancelled' } } });
+    expect(mgr.listRuns()[0].status).toBe('cancelled');
+  });
+
+  it('cancels a pre-flight approval without calling an unstarted adapter', async () => {
+    const adapter = echoAdapter({ cancel: vi.fn(async () => { throw new Error('unknown adapter run'); }) });
+    const mgr = createAgentManager({ adapters: { fake: adapter }, emitEvent: vi.fn() });
+    const promise = mgr.startRun({ ...startParams, approvalMode: 'ask' });
+    await Promise.resolve();
+    const id = mgr.listPendingApprovals()[0].runId;
+    const rejection = expect(promise).rejects.toThrow(/rejected/);
+    await expect(mgr.cancel(id)).resolves.toBeUndefined();
+    await rejection;
+    expect(adapter.cancel).not.toHaveBeenCalled();
+    expect(adapter.startTask).not.toHaveBeenCalled();
+    expect(mgr.listPendingApprovals()).toEqual([]);
+  });
+
   it('persists the rejected run so the cancelled record survives a restart (FEAT-008)', async () => {
     const persist = vi.fn();
     const adapter = echoAdapter();
@@ -471,6 +497,23 @@ describe('createAgentManager — pre-flight approval gate (BUG-004)', () => {
 });
 
 describe('createAgentManager — run persistence (FEAT-008)', () => {
+  it('keeps quest prompts and workspace identity across persistence and filtering', async () => {
+    const persist = vi.fn();
+    const adapter = makeAdapter({
+      startTask: vi.fn(async (p) => ({ runId: p.questId, status: 'done' })),
+      streamEvents: vi.fn(() => (async function* () {})()),
+    });
+    const mgr = createAgentManager({ adapters: { fake: adapter }, persist });
+    await mgr.startRun({ ...startParams, questId: 'scout', workspaceId: 'city-a', readOnly: true, promptContext: 'Scout the market' });
+    await mgr.startRun({ ...startParams, questId: 'other', workspaceId: 'city-b' });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(mgr.listRuns({ workspaceId: 'city-a' })).toHaveLength(1);
+    const restored = createAgentManager({ initialRuns: persist.mock.calls.at(-1)[0] });
+    expect(restored.listRuns({ workspaceId: 'city-a' })[0]).toMatchObject({
+      runId: 'scout', workspaceId: 'city-a', rootPath: startParams.repoUrl,
+      prompt: 'Scout the market', readOnly: true, historical: true,
+    });
+  });
   const seed = [{
     runId: 'old-1', questId: 'q', adventurerId: 'a', status: 'done',
     provider: 'claude', branch: 'main', startedAt: 1,

@@ -101,6 +101,7 @@ describe('CodexAdapter — startTask', () => {
     await adapter.startTask({ ...VALID_PARAMS, model: 'gpt-5-codex' });
     const [, args, options] = ps.spawnStream.mock.calls[0];
     expect(args[0]).toBe('exec');
+    expect(args).toContain('--json');
     expect(args).toContain('--cd');
     expect(args).toContain('/abs/repo');
     expect(args).toContain('--sandbox');
@@ -168,11 +169,59 @@ describe('CodexAdapter — streamEvents', () => {
       .rejects.toThrow(/unknown runId: nope/);
   });
 
-  it('emits a plan -> edit -> test -> pr trail on a clean run', async () => {
+  it('streams actual messages and changed paths before the process exits', async () => {
+    let stdout;
+    let finish;
+    const ps = makeProcessService({ spawnStream: vi.fn((_cmd, _args, options) => {
+      stdout = options.onStdout;
+      return { kill: vi.fn(), done: new Promise((resolve) => { finish = resolve; }) };
+    }) });
+    const adapter = makeAdapter({ processService: ps });
+    const run = await adapter.startTask(VALID_PARAMS);
+    const iterator = adapter.streamEvents(run.runId);
+    const first = iterator.next();
+    stdout('{"type":"thread.star');
+    stdout('ted","thread_id":"real-thread"}\n');
+    expect((await first).value.text).toBe('codex: session started');
+    expect(run.status).toBe('running');
+    stdout(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'I inspected city.js.' } }) + '\n');
+    stdout(JSON.stringify({ type: 'item.completed', item: { type: 'file_change', status: 'completed', changes: [{ path: '/abs/repo/city.js', kind: 'update' }] } }) + '\n');
+    stdout(JSON.stringify({ type: 'item.completed', item: { type: 'reasoning', text: 'private reasoning' } }) + '\n');
+    stdout(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 30, output_tokens: 12 } }));
+    finish({ ok: true, stdout: '', stderr: '' });
+    const rest = await collect(iterator);
+    expect(rest.map((event) => event.text)).toEqual(['codex: I inspected city.js.', 'codex: changed /abs/repo/city.js', 'codex: turn completed']);
+    expect(rest[1].payload.path).toBe('/abs/repo/city.js');
+    expect(run.contextUsed).toBe(42);
+    expect(run.status).toBe('done');
+  });
+
+  it('uses the terminal JSON failure even if the process exits zero', async () => {
+    const ps = makeProcessService({ spawnStream: vi.fn((_cmd, _args, options) => {
+      options.onStdout('{"type":"turn.failed","error":{"message":"quota unavailable"}}\n');
+      return { kill: vi.fn(), done: Promise.resolve({ ok: true, stdout: '', stderr: '' }) };
+    }) });
+    const adapter = makeAdapter({ processService: ps });
+    const run = await adapter.startTask(VALID_PARAMS);
+    const events = await collect(adapter.streamEvents(run.runId));
+    expect(run.status).toBe('failed');
+    expect(events[0]).toMatchObject({ kind: 'error', text: 'codex: quota unavailable' });
+  });
+
+  it('enforces a read-only sandbox for a scouting run', async () => {
+    const ps = makeProcessService();
+    const adapter = makeAdapter({ processService: ps });
+    await adapter.startTask({ ...VALID_PARAMS, skill: 'review', readOnly: true });
+    const args = ps.spawnStream.mock.calls[0][1];
+    expect(args[args.indexOf('--sandbox') + 1]).toBe('read-only');
+  });
+
+  it('reports an empty process exit without inventing edits, checks or PRs', async () => {
     const adapter = makeAdapter();
     const run = await adapter.startTask(VALID_PARAMS);
     const events = await collect(adapter.streamEvents(run.runId));
-    expect(events.map(e => e.kind)).toEqual(['plan', 'edit', 'test', 'pr']);
+    expect(events.map(e => e.kind)).toEqual(['plan']);
+    expect(events[0].text).toBe('codex: process exited without structured output');
     for (const e of events) {
       expect(e.runId).toBe(run.runId);
       expect(e.t).toMatch(/^\d{2}:\d{2}$/);

@@ -34,7 +34,8 @@ function buildClaudeArgv({ params }) {
     // bypassPermissions: the run is non-interactive, so there's nowhere to
     // surface a CLI permission prompt. Citybase gates write runs with its own
     // approval modal (BUG-004) before the process ever spawns.
-    '--permission-mode', 'bypassPermissions',
+    '--permission-mode', params.readOnly === true ? 'dontAsk' : 'bypassPermissions',
+    ...(params.readOnly === true ? ['--tools', 'Read,Glob,Grep', '--strict-mcp-config'] : []),
     params.promptContext,
   ];
 }
@@ -112,6 +113,7 @@ class ClaudeAdapter extends CliAgentAdapter {
     if (obj.type === 'assistant' && obj.message && Array.isArray(obj.message.content)) {
       for (const block of obj.message.content) {
         if (block.type === 'text' && typeof block.text === 'string' && block.text.trim()) {
+          entry.hasAssistantOutput = true;
           this._ev(entry, 'edit', `claude: ${block.text.trim()}`);
         } else if (block.type === 'tool_use') {
           const input = block.input || {};
@@ -129,6 +131,7 @@ class ClaudeAdapter extends CliAgentAdapter {
     }
     if (obj.type === 'result') {
       entry.claudeResult = obj;
+      if (!obj.is_error && typeof obj.result === 'string' && obj.result.trim()) entry.hasAssistantOutput = true;
       if (obj.is_error) {
         this._ev(entry, 'error', `claude: ${obj.result || obj.subtype || 'error'}`);
       }

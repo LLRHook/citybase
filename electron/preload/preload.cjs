@@ -70,9 +70,11 @@ const api = {
     setCurrent: (id) => invoke('citybase:workspace.setCurrent', id),
     listRecent: () => invoke('citybase:workspace.listRecent'),
     forget: (id) => invoke('citybase:workspace.forget', id),
+    readFile: (workspaceId, relativePath) => invoke('citybase:workspace.readFile', workspaceId, relativePath),
   },
   git: {
     getSnapshot: (workspaceId) => invoke('citybase:git.getSnapshot', workspaceId),
+    getFileDiff: (workspaceId, relativePath) => invoke('citybase:git.getFileDiff', workspaceId, relativePath),
     refresh: (workspaceId) => invoke('citybase:git.refresh', workspaceId),
     listBranches: (workspaceId) => invoke('citybase:git.listBranches', workspaceId),
     checkout: (workspaceId, branchName) =>

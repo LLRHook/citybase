@@ -59,27 +59,37 @@ export function useWorkspace() {
       if (!s.workspace) return s;
       return { ...s, status: 'loading' };
     });
-    // Ask the main process to re-read git state before we pull the snapshot,
-    // so we never serve a stale view after a user-driven refresh.
-    try { await citybaseApi.git.refresh(); } catch { /* fall through to snapshot */ }
-    if (myLoad !== loadIdRef.current) return;
-    const ws = await citybaseApi.workspace.getCurrent();
-    if (myLoad !== loadIdRef.current) return;
-    if (!ws) {
-      setState({ status: 'idle', workspace: null, snapshot: null, error: null });
-      return;
+    try {
+      const ws = await citybaseApi.workspace.getCurrent();
+      if (myLoad !== loadIdRef.current) return;
+      if (!ws) {
+        setState({ status: 'idle', workspace: null, snapshot: null, error: null });
+        return;
+      }
+      // refresh already returns the freshly read snapshot. Pass the workspace
+      // identity and use that result, rather than running a second Git scan.
+      const snapshot = await citybaseApi.git.refresh(ws.id);
+      if (myLoad !== loadIdRef.current) return;
+      setState({ status: 'ready', workspace: ws, snapshot, error: null });
+    } catch (err) {
+      if (myLoad !== loadIdRef.current) return;
+      setState(s => ({ ...s, status: 'error', error: { message: err.message || String(err) } }));
     }
-    const snapshot = await loadSnapshot(ws);
-    if (myLoad !== loadIdRef.current) return;
-    setState({ status: 'ready', workspace: ws, snapshot, error: null });
-  }, [loadSnapshot]);
+  }, []);
 
   const close = useCallback(async () => {
     // Invalidate any in-flight hydrate/refresh/pick so its terminal setState is dropped.
-    loadIdRef.current += 1;
-    const ws = await citybaseApi.workspace.getCurrent();
-    if (ws) await citybaseApi.workspace.forget(ws.id);
-    setState({ status: 'idle', workspace: null, snapshot: null, error: null });
+    const myLoad = ++loadIdRef.current;
+    try {
+      const ws = await citybaseApi.workspace.getCurrent();
+      if (myLoad !== loadIdRef.current) return;
+      if (ws) await citybaseApi.workspace.forget(ws.id);
+      if (myLoad !== loadIdRef.current) return;
+      setState({ status: 'idle', workspace: null, snapshot: null, error: null });
+    } catch (err) {
+      if (myLoad !== loadIdRef.current) return;
+      setState(s => ({ ...s, status: 'error', error: { message: err.message || String(err) } }));
+    }
   }, []);
 
   // Initial load: hydrate from any remembered workspace.
@@ -95,7 +105,10 @@ export function useWorkspace() {
       const snapshot = await loadSnapshot(ws);
       if (myLoad !== loadIdRef.current) return;
       setState({ status: 'ready', workspace: ws, snapshot, error: null });
-    })();
+    })().catch((err) => {
+      if (myLoad !== loadIdRef.current) return;
+      setState(s => ({ ...s, status: 'error', error: { message: err.message || String(err) } }));
+    });
     return () => {
       // Mark this hydrate's writes as superseded.
       loadIdRef.current += 1;

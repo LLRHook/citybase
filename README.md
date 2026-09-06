@@ -1,150 +1,89 @@
-# Citybase
+# Citybase — The Model Shop
 
-> An isometric IDE that visualizes a repository as a hex-tile city, where local tasks and agent runs become quests, contributors are guilds, and coding agents are the adventurers dispatched to fulfill them.
+Your repository is a little town on a workbench. Folders become neighborhoods, files become buildings, and local coding agents become a crew you can send to work.
 
-## What is this?
+Citybase is a **playable local Electron app**. Wander the model with Pip, inspect real files, assign a crew member to a building, and watch actual Claude or Codex activity arrive as work-order notes. The first shift teaches the game before asking you to build anything.
 
-Citybase is a local-first desktop app: open one Git repository from disk, **see it as a living isometric city**, dispatch a Claude Code run from the UI, and watch the agent work the city in real time — then review the result without staring at raw diffs.
+## Open the shop
 
-**v3.0 — "Real-Time City."** Dispatch is **non-blocking and streaming**: the UI never freezes, the run shows as `running` the instant it starts, and **cancel actually terminates the agent**. While it works, a live **agent presence** scans the city and the buildings it touches light up, resolving with a completion ripple. Run history is **persisted across restarts**. Built on v2.0's foundation — the isometric city where top-level folders are districts on raised slabs, files are extruded buildings, and Git status lights the skyline (staged green, unstaged amber), with a City / Work toggle.
-
-Claude Code runs inside the IDE end-to-end; Codex CLI is wired through the same provider contract as a fallback adapter.
-
-## Prerequisites
-
-- **Node 20+** and **npm** for the renderer / Electron build.
-- **Git ≥ 1.8.5** — the workspace service uses the `git -C <path>` flag (released November 2013).
-- **Claude Code CLI** on `PATH`, authenticated. Citybase shells out to `claude --print --output-format json …` for non-interactive runs. Install per [docs.claude.com](https://docs.claude.com/en/docs/claude-code/overview) and confirm `claude --version` works in a terminal.
-- **GitHub CLI (`gh`)** on `PATH`, authenticated, if you intend to use the PR-creation surface. `gh auth status` must show a logged-in account.
-- **Codex CLI** is optional in v1. If installed, it's available as an alternative adapter; if not, Citybase falls back to Claude.
-
-## Quick start
-
-```bash
-npm install
-npm run dev:desktop    # Electron shell with HMR against the Vite dev server
+```sh
+npm ci
+npm run build
+npm run start:desktop
 ```
 
-For a one-shot launch against the production build:
+Choose a local Git repository with **Open your first city**. Citybase remembers the repository between launches. To switch cities, click the repository name at the top. The title block and footer identify the actual local workspace.
 
-```bash
-npm run build:desktop && npm run start:desktop
+For development with hot reload:
+
+```sh
+npm run dev:desktop
 ```
 
-**There is no standalone-browser path.** The renderer always runs inside Electron — `citybaseApi.js` throws on import when `window.citybase` is missing instead of silently degrading to a stub. The browser-only `dev` and `preview` scripts were removed on 2026-05-10.
+Node 22.12+ is recommended for the existing Vite/Electron toolchain. Git is required. A locally installed, authenticated Claude Code or Codex CLI is required for crew jobs; exploring files does not require either. Fonts ship locally. There is no hosted backend, standalone browser stub, or silently simulated agent execution.
 
-## What v2 does
+## Your first shift
 
-A normal session looks like this — every step is real activity, not seeded data:
+1. **Walk Pip.** Select the walking tool. Use WASD or arrow keys to move, Space to hop, or click the ground to travel. Visit a neighborhood to mark a discovery.
+2. **Open a real file.** Click a building. Its paper inspector shows the file on your computer and its current changes against Git HEAD. The Atlas also supports keyboard navigation and search with ⌘/Ctrl K.
+3. **Choose your crew.** Juniper uses Claude; Mica uses Codex. Click a crew token, then a building to assign a Survey job there. Unavailable providers are visibly disabled.
+4. **Stamp a finished job.** Read the crew’s real output, then stamp the verified work order to record skill points. The first suggested follow-up creates an interactive campfire HTML file in your repository.
 
-1. **Launch.** The main process restores the most recent workspace and runs `detectAgentBinaries()`. Both results are pushed to the renderer over the `BOOT_PAYLOAD_CHANNEL` before App.jsx mounts, so the UI lands populated with no extra clicks.
-2. **Open a workspace** if one isn't already restored: `File → Open Workspace…`. The Git service reads branch, status, file tree, and recent commits via `git status --porcelain=v2` / `git log` / `git ls-files`.
-3. **See the city.** The City view projects the tracked file tree into districts (folders) and buildings (files); dirty files glow green/amber by stage. Pan with drag, zoom with the wheel, hover for a path, click to inspect.
-4. **Pick a branch** in the top-bar selector. CHECKOUT runs when the workspace is clean; if it's dirty the selector shows a "commit first" pill instead.
-5. **Dispatch an agent** (switch to Work). The IPC handler resolves the right `AgentProvider` adapter (`auto` prefers Claude when installed) and starts a real `claude` process inside the workspace cwd. While it runs, the City view auto-refreshes and lights up the buildings being changed.
-6. **Review** the run detail: real CI checks, a real diff (parsed from `git diff --unified=3`), and the live event stream. A Run History sidebar lists every run started this session.
-7. **Commit.** With dirty files, the commit card opens. Type a message; the action runs `git add -A && git commit -m`, then `git rev-parse HEAD` for the new hash.
-8. **Open a PR** by pushing the branch yourself, then calling `agents.openPR` from the UI. The adapter shells out to `gh pr create --title --body --base --head` from the run cwd and parses the URL out of stdout.
+Drag the model to orbit, scroll to zoom, and use **H** to return to the overview. The scenic-route tool rotates the model; the lamp/daylight tool changes the light. Discovery sounds are optional. Reduced-motion preferences disable ambient motion. The Atlas remains usable when WebGL is unavailable.
 
-## Available scripts
+## Jobs and skills
 
-| Script | What it does |
-|---|---|
-| `npm run dev:desktop` | Electron shell with HMR against the Vite dev server |
-| `npm run start:desktop` | Electron against the built renderer in `dist/` |
-| `npm run build` / `build:desktop` | Production renderer build to `dist/` (alias of each other) |
-| `npm run package:dir` | Unpacked dev build under `dist-electron/` (no installer, no codesign) |
-| `npm run package:mac` | macOS `.app`, ad-hoc / unsigned for local dev |
-| `npm run lint` | ESLint over the project |
-| `npm test` | Vitest in watch mode (`npm test -- --run` for one pass) |
-| `npm run test:e2e` | Playwright desktop smoke test against the built `dist/` (run `npm run build` first) |
-
-`package:dir` and `package:mac` are dev-only — no DMG, no notarization, no signing. `electron-builder` config lives in the `build` field of `package.json`; output goes to gitignored `dist-electron/`.
-
-**Windows dev note.** Running `package:*` from Windows requires Developer Mode (Settings → Privacy & Security → For Developers) or an admin shell — `electron-builder`'s first run extracts a 7z cache containing symlinks, which Windows refuses to create otherwise.
-
-## Project structure
-
-```text
-electron/
-  main/
-    main.cjs                       BrowserWindow lifecycle + did-finish-load boot push
-    ipc.cjs / ipcHandlers.cjs      typed IPC handlers (workspace, git, agents, checks)
-    bootPayload.cjs                pure factory for the BOOT_PAYLOAD_CHANNEL message
-    menu.cjs / menuTemplate.cjs    desktop menu + commands
-    windowConfig.cjs               BrowserWindow defaults
-    services/
-      processService.cjs           guarded execFile runner (argv arrays only, cwd pinned)
-      workspaceService.cjs         workspace pick / restore / persist
-      gitService.cjs               getSnapshot / getBranches / checkout / commit
-      workspaceChecks.cjs          runs declared npm scripts as CheckResult[]
-    agents/
-      AgentAdapter.cjs             the AgentProvider contract base class
-      CliAgentAdapter.cjs          shared CLI-wrapping implementation
-      ClaudeAdapter.cjs            real claude flags + JSON-result streamEvents
-      CodexAdapter.cjs             same shape, codex CLI
-      agentManager.cjs             registry + dispatcher + run history
-      detect.cjs                   PATH probe for claude / codex / gh
-      parseUnifiedDiff.cjs         git diff parser
-      constants.cjs                AGENT_EVENT_CHANNEL + BOOT_PAYLOAD_CHANNEL
-  preload/
-    preload.cjs                    isolated window.citybase bridge
-
-src/
-  App.jsx                          top-level shell + view switching
-  app/
-    citybaseApi.js                 renderer facade — desktop bridge re-export (throws if missing)
-    useWorkspace.js                workspace + Git snapshot state
-    useAgentDetect.js              hook reading the boot payload, IPC fallback
-    useApprovalRequests.js         pending-approval channel for write-capable runs
-    useRunHistory.js               Run History data via agents.listRuns
-  data/
-    seed.js                        test fixtures only — not imported by production paths
-  game/
-    palette.js / hex.js            non-component primitives (Fast Refresh-safe)
-    theme.jsx                      UI primitives
-    useTweaks.js                   runtime-toggles hook
-    map.jsx, kanban.jsx,
-    analysis.jsx (RunHistoryPanel,
-      CommitResultCard),
-    panels.jsx, modals.jsx,
-    command.jsx, branchSelector.jsx,
-    tweaks.jsx                     view + panel components
-    data.js                        slim re-export (SKILL_DEFS / hpFromContext / fmtTokens)
-  tests/
-    setup.js                       Vitest setup
-    *.test.{js,jsx}                unit + smoke tests under jsdom
-```
-
-## Safety model
-
-- **No shell access from the renderer.** `webPreferences` sets `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. The renderer talks to the main process only through the typed `window.citybase` object exposed by `preload.cjs`.
-- **Allow-listed IPC channels.** Every channel in `ipcHandlers.cjs` validates inputs (workspace ids must be known, paths must resolve under workspace root) and returns plain serializable objects. The renderer can never pass arbitrary command strings.
-- **`processService.run` is the single execFile site.** Argv arrays only — no shell strings, no string concatenation. cwd is required and pinned to a workspace path. Timeouts and max-buffer caps are enforced.
-- **Mutating Git surfaces validate before they touch the world.** `gitService.checkout` refuses unknown branches (no `-b` auto-create); `gitService.commit` rejects empty messages; both return `{ ok: false, error }` instead of throwing into the main process.
-- **`--permission-mode bypassPermissions` is used only for non-interactive Claude runs** so the CLI doesn't hang waiting for an approval surface that doesn't exist yet. When the renderer's approval routing lands, this flips to `auto` or `default` and prompts pump through `useApprovalRequests`.
-
-## Troubleshooting
-
-| Symptom | Likely cause | Fix |
+| Skill | What the crew does | Reward condition |
 |---|---|---|
-| "claude CLI not found on PATH" | `claude` isn't installed, or Citybase was launched from Finder on macOS without the right `PATH`. | Install per Anthropic's docs, then relaunch Citybase from a terminal so it inherits the right `PATH`. The processService augments `PATH` with `/opt/homebrew/bin` and `/usr/local/bin` on macOS but won't find a binary that lives somewhere else. |
-| Claude run fails immediately with "not authenticated" | The CLI hasn't logged in yet. | Run `claude login` once in a terminal, confirm `claude --print --output-format json -p "hi"` works, then retry inside Citybase. |
-| `openPR` throws "no upstream" or "branch not pushed" | The head branch hasn't been pushed to the remote. v1 deliberately doesn't auto-push — that side effect is deferred to v1.1. | `git push -u origin <branch>` from a terminal, then call openPR again. |
-| `openPR` throws "GraphQL: must have admin rights" or similar | `gh` is authenticated as the wrong account, or doesn't have permission on the remote. | `gh auth status` to inspect; `gh auth login` to re-auth. |
-| `dev:desktop` hangs at "waiting for http://localhost:5173" | Vite couldn't bind 5173 — usually Docker. | Stop the conflicting process or change `server.port` in `vite.config.js` (and `dev:desktop`'s `wait-on` URL). `strictPort: true` is on purpose so a port collision fails loud. |
-| Commit hook rejects "subject does not match the project convention" | Non-conventional subject. | See [CONTRIBUTING.md](./CONTRIBUTING.md). Format is `<type>(<scope>)?<!>?: <description>`, ≤72 chars, lowercase after the colon. |
+| Surveying | Read files and return a field report | Successful process plus actual assistant output |
+| Crafting | Build something in the selected project | Successful process plus changed repository fingerprint |
+| Mending | Work on a requested repair | Successful process plus changed repository fingerprint |
 
-## Testing & verification
+Survey jobs earn 40 XP; Crafting and Mending earn 60 XP. Every 100 XP raises the crew’s overall level; every 100 XP in a skill raises that skill’s level. Receipts are saved per repository and run ID, so stamping twice cannot grant duplicate rewards.
 
-`npm test -- --run` runs the Vitest suite (jsdom; the per-file baseline lives in VERIFICATION.md Stage 2). The canonical release checklist is [VERIFICATION.md](./VERIFICATION.md) — a six-stage V&V protocol covering static review, automated tests, the manual desktop walkthrough, adversarial checks, and the hard product constraints (renderer isolation, IPC allow-list, approval boundaries). Run it before any release or after any large refactor.
+**These are game records.** Levels describe the crew’s history in this shop; they do not train or improve the underlying models. A verified crafting outcome proves that repository state changed during a successful job. It does not prove correctness or exclusive agent authorship. Bounded proof withholds rewards when files are too large, unreadable, unchanged, or the job fails. See [runtime details](docs/runtime-findings.md).
 
-## Roadmap
+## Real work, local boundaries
 
-The full vision and phased plan live in [ROADMAP.md](./ROADMAP.md). Phase 5 is complete and the v1 ship-gate items are addressed across PRs #36 / #37 / #38 / #40 / #41. Remaining v1.1 work and deferred items are listed there.
+The renderer has no Node or shell access. Electron’s main process resolves remembered workspace IDs, spawns the installed provider with argument arrays, and streams real process output through an isolated preload bridge. Work orders require approval before dispatch; recall terminates the child process.
 
-## Contributing
+Survey uses Codex’s read-only sandbox or Claude’s restricted read tools. Craft/Mend can change files in the selected working tree after approval. **Citybase does not create a worktree or a branch for each job.** Use a separate Git branch/worktree yourself when you want that isolation.
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) and [AGENTS.md](./AGENTS.md). Short version: AI agents propose changes via PRs; CI gates the merge.
+Building inspection rejects traversal, symlink escapes, Git internals and non-regular files. Text previews are limited to 128 KiB and diffs to 256 KiB. Reading changes never stages or resets the index. A diff is the current workspace against HEAD, not a historical per-agent diff.
 
-Work is tracked in the project-cycle files: defects in [bugs.md](./bugs.md), scoped features in [features.md](./features.md), shipped/fixed history in [CHANGELOG.md](./CHANGELOG.md). File a `BUG-NNN` / `FEAT-NNN` entry before fixing or building; migrate it to the changelog when it lands. The full lifecycle is described in [AGENTS.md](./AGENTS.md).
+The skyline shows up to 64 representative files per neighborhood; every file remains searchable in the Atlas. Very large repositories can exceed the comfortable scale of this prototype. Run history is bounded to 100 records, with 60 compact events per record. Older records without workspace identity are not mixed into another city’s ledger.
+
+## Checks and screenshots
+
+```sh
+npm run lint
+npm test -- --run --maxWorkers=1 --testTimeout=30000
+npm run build
+npm run test:e2e
+```
+
+Playwright launches real Electron in isolated profiles. Its fixtures test opening Git repositories, source/diff inspection, staged and unstaged changes, file refresh, workspace restoration, agent approval, streaming, recall, persistent history and skill receipts. The deterministic test provider is explicitly labeled in the fixture; authenticated Codex was also checked separately against disposable repositories.
+
+To capture the **real current repository** with an isolated desktop profile:
+
+```sh
+npm run build
+node scripts/capture-city.mjs
+# Or keep the real desktop preview open:
+node scripts/capture-city.mjs --keep-open
+```
+
+Local evidence is written to the ignored `artifacts/` directory. `CITYBASE_CAPTURE_WORKSPACE` can point the capture script at a different real Git repository. No screenshot assets or fabricated data are used to render the playable city.
+
+## Where things live
+
+- `src/App.jsx`: world state, first shift, crew assignment and reward collection.
+- `src/city/`: procedural Three.js scene, repository layout, paper UI, guild progression.
+- `src/app/`: workspace, agent-detection, event and approval hooks.
+- `electron/main/services/`: guarded Git/workspace services and bounded file inspection.
+- `electron/main/agents/`: Claude/Codex adapters, stream lifecycle, persistence and quest outcome proof.
+- `e2e/`: isolated Electron journeys and sandbox checks.
+
+The older project roadmap and legacy view components remain available for reference. The new slice focuses on play and real local work; a conventional editor, branch/commit/PR UI, full historical diffs, automatic agent isolation and production packaging are future work. Local builds are unsigned and are not a distribution release.
+
+The model-shop art direction was refined using a read-only critique from Claude Fable 5.1; Fable also authored the final Electron icon wiring. The app includes a matching SVG/PNG icon, favicon and native macOS ICNS asset. Three.js is the one new runtime dependency, selected for actual geometry, lighting, camera control and efficient instancing—not a stack migration.

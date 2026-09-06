@@ -8,6 +8,21 @@ const terminal = (over = {}) => ({
 });
 
 describe('sanitizeRun', () => {
+  it('retains bounded build proof and never restores read-only crafting credit', () => {
+    const outcome = { kind: 'build', verified: true, filesChanged: 2, evidence: 'repository-fingerprint', before: 'a'.repeat(64), after: 'b'.repeat(64) };
+    expect(sanitizeRun(terminal({ questSkill: 'craft', skill: 'refactor', outcome })).outcome).toEqual(outcome);
+    expect(sanitizeRun(terminal({ questSkill: 'craft', readOnly: true, outcome })).outcome.verified).toBe(false);
+    expect(sanitizeRun(terminal({ questSkill: 'repair', status: 'failed', outcome })).outcome.verified).toBe(false);
+    expect(sanitizeRun(terminal({ questSkill: 'craft', outcome: { ...outcome, after: outcome.before } })).outcome.verified).toBe(false);
+  });
+  it('persists bounded quest identity and changed-file event metadata', () => {
+    const out = sanitizeRun(terminal({
+      workspaceId: 'city', rootPath: '/repo', prompt: 'Scout city', readOnly: true,
+      events: [{ runId: 'r1', t: '00:00', kind: 'edit', text: 'read city', payload: { path: 'city.js', tool: 'Read', arbitrary: 'omit' } }],
+    }));
+    expect(out).toMatchObject({ workspaceId: 'city', rootPath: '/repo', prompt: 'Scout city', readOnly: true });
+    expect(out.events[0].payload).toEqual({ path: 'city.js', tool: 'Read' });
+  });
   it('keeps terminal runs and a flat shape', () => {
     const out = sanitizeRun(terminal());
     expect(out).toMatchObject({ runId: 'r1', status: 'done', provider: 'claude', historical: true });

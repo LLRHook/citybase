@@ -145,37 +145,58 @@ A failure in this stage is a hard block.
   Expected: one `<script>` and one `<link>` line.
 - [ ] 2.2 Full unit/component suite, single pass:
   ```bash
-  npm test -- --run
+  npm test -- --run --maxWorkers=1 --testTimeout=30000
   ```
-  Expected: `Test Files  30 passed (30)`, `Tests  393 passed (393)`, exit 0.
+  Expected: `Test Files  37 passed (37)`, `Tests  441 passed (441)`, exit 0.
 - [ ] 2.3 Test-count baseline matches the collector:
   ```bash
-  npx vitest list | wc -l   # expect: 393
+  npx vitest list --maxWorkers=1 | wc -l   # expect: 441
   ```
   A mismatch with the table below means tests appeared or disappeared without
   a deliberate decision — investigate before ticking, then update the table
   in the same change as the run.
 
-**Baseline (2026-06-18, SHA `31c4014`, v3.0.0 + post-cut hardening): 30 test files / 393 test cases — all Vitest (jsdom). The desktop launch path is covered by the Playwright smoke (2.4); the real-`claude` agent path (incl. non-blocking streaming dispatch + persistence) by the integration harnesses (Appendix F).**
+**Current collector baseline (2026-09-05, FEAT-022): 37 test files / 441 cases, collected with `npx vitest list --json --maxWorkers=1`. The full 435-case suite passed before the six camera regressions were added; those six and all subsequently changed component tests passed in targeted runs. The four Electron journeys cover the built Model Shop and isolated agent lifecycle; separate authenticated Codex runs verify survey and crafting outcomes. This is scoped feature verification, not a renewed pass of every historical protocol stage below.**
 
-| Test file | Cases | | Test file | Cases |
-|---|---|---|---|---|
-| `AgentDetectError.test.jsx` | 5 | | `iso.test.js` | 8 |
-| `agentAdapter.test.js` | 13 | | `menuTemplate.test.js` | 8 |
-| `agentManager.test.js` | 43 | | `parseBranchList.test.js` | 8 |
-| `AppAutoBoot.test.jsx` | 9 | | `parseFiles.test.js` | 12 |
-| `ApprovalModal.test.jsx` | 10 | | `parseUnifiedDiff.test.js` | 10 |
-| `bootPayload.test.js` | 8 | | `preload.contract.test.js` | 3 |
-| `BranchSelector.test.jsx` | 12 | | `processService.test.js` | 13 |
-| `ClaudeAdapter.test.js` | 31 | | `resolveProvider.test.js` | 7 |
-| `CliAgentAdapter.test.js` | 19 | | `runCity.test.js` | 17 |
-| `cityModel.test.js` | 9 | | `runStore.test.js` | 9 |
-| `CityView.test.jsx` | 8 | | `useAgentDetect.test.jsx` | 8 |
-| `citybaseApi.test.js` | 2 | | `useRunHistory.test.jsx` | 6 |
-| `CodexAdapter.test.js` | 25 | | `windowConfig.test.js` | 10 |
-| `detectAgentBinaries.test.js` | 19 | | `workspaceChecks.test.js` | 13 |
-| `gitMutations.test.js` | 14 | | | |
-| `ipcHandlers.test.js` | 34 | | | |
+| Test file | Cases |
+|---|---:|
+| `agentAdapter.test.js` | 13 |
+| `AgentDetectError.test.jsx` | 5 |
+| `agentManager.test.js` | 46 |
+| `AppAutoBoot.test.jsx` | 9 |
+| `ApprovalModal.test.jsx` | 10 |
+| `bootPayload.test.js` | 8 |
+| `BranchSelector.test.jsx` | 12 |
+| `citybaseApi.test.js` | 2 |
+| `cityModel.test.js` | 9 |
+| `CityView.test.jsx` | 8 |
+| `ClaudeAdapter.test.js` | 32 |
+| `CliAgentAdapter.test.js` | 19 |
+| `CodexAdapter.test.js` | 28 |
+| `detectAgentBinaries.test.js` | 19 |
+| `gitMutations.test.js` | 14 |
+| `guildProgress.test.js` | 3 |
+| `ipcHandlers.test.js` | 37 |
+| `iso.test.js` | 8 |
+| `menuTemplate.test.js` | 8 |
+| `parseBranchList.test.js` | 8 |
+| `parseFiles.test.js` | 12 |
+| `parseUnifiedDiff.test.js` | 10 |
+| `preload.contract.test.js` | 4 |
+| `processService.test.js` | 13 |
+| `questOutcomes.test.js` | 12 |
+| `repositoryFiles.test.js` | 9 |
+| `resolveProvider.test.js` | 7 |
+| `runCity.test.js` | 17 |
+| `runStore.test.js` | 11 |
+| `useAgentDetect.test.jsx` | 8 |
+| `useApprovalRequests.test.jsx` | 2 |
+| `useRunHistory.test.jsx` | 6 |
+| `useWorkspace.test.jsx` | 3 |
+| `windowConfig.test.js` | 10 |
+| `workspaceChecks.test.js` | 13 |
+| `WorldCanvas.test.jsx` | 1 |
+| `worldView.test.js` | 5 |
 
 - [ ] 2.4 Desktop E2E smoke (Playwright `_electron`, FEAT-001) — requires a
   fresh `dist/`:
@@ -183,7 +204,9 @@ A failure in this stage is a hard block.
   npm run build
   npm run test:e2e
   ```
-  Expected: `1 passed` — window opens titled "Citybase", `window.citybase`
+  Expected: `4 passed` — real Git inspection/refresh/restore, invalid-folder recovery,
+  explicit fixture-agent approval/streaming/recall/persistent rewards, and window
+  opens titled "Citybase", `window.citybase`
   bridge alive (`app.getVersion()` resolves over real IPC), renderer sandboxed
   (`require`/`process` undefined), agent detection answers with boolean shape.
 

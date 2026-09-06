@@ -8,8 +8,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import process from 'node:process';
-import { test, expect, _electron as electron } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { createDesktopHarness } from './desktopHarness.js';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const distIndex = path.join(repoRoot, 'dist', 'index.html');
@@ -26,10 +26,9 @@ test('desktop shell opens with a live bridge and a sandboxed renderer', async ()
   // --no-sandbox only on CI: ubuntu-24.04 runners restrict unprivileged user
   // namespaces, which breaks Electron's OS-level sandbox helper. The renderer
   // sandbox under test (webPreferences sandbox: true) is unaffected.
-  const launchArgs = process.env.CI ? ['.', '--no-sandbox'] : ['.'];
-  const app = await electron.launch({ args: launchArgs, cwd: repoRoot });
+  const harness = await createDesktopHarness();
   try {
-    const window = await app.firstWindow();
+    const window = harness.window;
     await window.waitForLoadState('domcontentloaded');
 
     await expect(window).toHaveTitle('Citybase');
@@ -53,6 +52,6 @@ test('desktop shell opens with a live bridge and a sandboxed renderer', async ()
     expect(typeof detect.codex.found, 'detect must answer with boolean shape').toBe('boolean');
     expect(typeof detect.claude.found, 'detect must answer with boolean shape').toBe('boolean');
   } finally {
-    await app.close();
+    await harness.close();
   }
 });

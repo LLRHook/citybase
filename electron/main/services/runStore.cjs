@@ -17,6 +17,27 @@ function isTerminal(status) {
   return status === 'done' || status === 'failed' || status === 'cancelled';
 }
 
+function sanitizeOutcome(outcome, run) {
+  if (!outcome || typeof outcome !== 'object') return null;
+  const kind = ['scout', 'build'].includes(outcome.kind) ? outcome.kind : null;
+  const filesChanged = Number.isInteger(outcome.filesChanged) && outcome.filesChanged > 0 && outcome.filesChanged <= 64 ? outcome.filesChanged : 0;
+  const digest = (value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value) ? value : null;
+  const before = digest(outcome.before);
+  const after = digest(outcome.after);
+  const proofMatches = kind === 'scout'
+    ? run.questSkill === 'survey' && outcome.evidence === 'assistant-output'
+    : kind === 'build' && ['craft', 'repair'].includes(run.questSkill) && run.readOnly !== true
+      && filesChanged > 0 && before && after && before !== after && outcome.evidence === 'repository-fingerprint';
+  return {
+    kind,
+    verified: run.status === 'done' && outcome.verified === true && !!proofMatches,
+    filesChanged,
+    ...(typeof outcome.reason === 'string' ? { reason: outcome.reason.slice(0, 120) } : {}),
+    ...(typeof outcome.evidence === 'string' ? { evidence: outcome.evidence.slice(0, 80) } : {}),
+    ...(before && after ? { before, after } : {}),
+  };
+}
+
 // Reduce a run record to the persistable, capped shape.
 function sanitizeRun(r) {
   if (!r || typeof r !== 'object' || typeof r.runId !== 'string') return null;
@@ -25,6 +46,11 @@ function sanitizeRun(r) {
     ? r.events.slice(-MAX_EVENTS_PER_RUN).map((e) => ({
         runId: e.runId, t: e.t, kind: e.kind,
         text: typeof e.text === 'string' ? e.text.slice(0, 2000) : '',
+        ...(e.payload && typeof e.payload === 'object' ? { payload: {
+          ...(typeof e.payload.path === 'string' ? { path: e.payload.path.slice(0, 4096) } : {}),
+          ...(typeof e.payload.tool === 'string' ? { tool: e.payload.tool.slice(0, 80) } : {}),
+          ...(typeof e.payload.status === 'string' ? { status: e.payload.status.slice(0, 80) } : {}),
+        } } : {}),
       }))
     : [];
   return {
@@ -35,6 +61,13 @@ function sanitizeRun(r) {
     provider: r.provider ?? null,
     branch: r.branch ?? null,
     startedAt: r.startedAt ?? null,
+    workspaceId: typeof r.workspaceId === 'string' ? r.workspaceId : null,
+    rootPath: typeof r.rootPath === 'string' ? r.rootPath : null,
+    prompt: typeof r.prompt === 'string' ? r.prompt.slice(0, 8000) : '',
+    readOnly: r.readOnly === true,
+    skill: typeof r.skill === 'string' ? r.skill.slice(0, 40) : null,
+    questSkill: ['survey', 'craft', 'repair'].includes(r.questSkill) ? r.questSkill : null,
+    outcome: sanitizeOutcome(r.outcome, r),
     events,
     historical: true,
   };

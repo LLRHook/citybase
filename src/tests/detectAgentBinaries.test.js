@@ -124,9 +124,11 @@ describe('detectAgentBinaries — default fsExists hits the real filesystem', ()
     const claudeFile = join(binDir, `claude${ext}`);
     writeFileSync(claudeFile, '');
     try {
-      // Override env.PATH only — leave fsExists unset so the default kicks in.
+      // Exercise the real filesystem, with no platform-specific fallback dirs.
+      // macOS's /opt/homebrew/bin may contain the developer's actual CLIs.
       const out = detectAgentBinaries({
         env: { PATH: binDir },
+        platform: process.platform === 'win32' ? 'win32' : 'linux',
       });
       expect(out.claude.found).toBe(true);
       expect(out.claude.path).toBe(claudeFile);
@@ -136,12 +138,10 @@ describe('detectAgentBinaries — default fsExists hits the real filesystem', ()
     }
   });
 
-  it('returns not-found cleanly when the default fsExists throws (e.g. permission denied)', () => {
-    // Spy on Node's fs.existsSync via the test boundary: the function's
-    // default catches and returns false, so even a thrown probe doesn't
-    // explode detection.
+  it('returns not-found cleanly for a missing injected PATH', () => {
     const out = detectAgentBinaries({
       env: { PATH: '/nonexistent/path/that/cannot/exist' },
+      platform: process.platform === 'win32' ? 'win32' : 'linux',
     });
     expect(out).toEqual({ codex: { found: false }, claude: { found: false } });
   });
