@@ -1,7 +1,7 @@
 // Electron main entry. Owns BrowserWindow, app lifecycle, and IPC registration.
 // All native capabilities live in the main process. The renderer talks to us
 // only through the typed `window.citybase` API exposed by preload.cjs.
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, nativeImage } = require('electron');
 const path = require('node:path');
 const { buildMenu } = require('./menu.cjs');
 const { registerIpc } = require('./ipc.cjs');
@@ -12,6 +12,20 @@ const { buildBootPayload } = require('./bootPayload.cjs');
 const { BOOT_PAYLOAD_CHANNEL } = require('./agents/constants.cjs');
 
 let mainWindow = null;
+
+// App icon. Built/packaged runs read dist/icon.png; running from source
+// falls back to public/icon.png. createFromPath yields an empty image for
+// a missing or undecodable file, so isEmpty() doubles as the existence check.
+function loadAppIcon() {
+  const root = path.join(__dirname, '..', '..');
+  for (const file of [path.join(root, 'dist', 'icon.png'), path.join(root, 'public', 'icon.png')]) {
+    const image = nativeImage.createFromPath(file);
+    if (!image.isEmpty()) return image;
+  }
+  return null;
+}
+
+const appIcon = loadAppIcon();
 
 function createWindow() {
   const target = resolveLaunchTarget({
@@ -24,6 +38,7 @@ function createWindow() {
     ...WINDOW_BOUNDS,
     backgroundColor: '#070914',
     title: 'Citybase',
+    ...(appIcon ? { icon: appIcon } : {}),
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.cjs'),
       contextIsolation: true,
@@ -95,6 +110,8 @@ if (process.platform === 'win32' && typeof app.setAppUserModelId === 'function')
 }
 
 app.whenReady().then(async () => {
+  // macOS only: app.dock is undefined on other platforms.
+  if (appIcon && app.dock) app.dock.setIcon(appIcon);
   registerIpc({ getMainWindow });
   buildMenu({ getMainWindow });
   createWindow();

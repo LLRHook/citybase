@@ -48,9 +48,9 @@ _Filed 2026-06-11 from [docs/srs-and-plan-of-action.md](./docs/srs-and-plan-of-a
 (SRS v0.1, baseline `main` @ `1356437`). Finding ids (M/R/T-series) and workstream
 ids (WS) reference that document._
 
-### Re-groom 2026-06-18 — disposition (verified against `main` @ `31c4014`)
+### Historical re-groom 2026-06-18 — disposition (verified against `main` @ `31c4014`)
 
-A 15-agent adversarial re-verification of this backlog against current `main`
+A 15-agent adversarial re-verification of this backlog against the then-current `main`
 (post v1-wave / v2.0 / v3.0 / BUG-025..029). Every "resolved/obsolete" verdict was
 independently challenged before acting — the challenge **overturned BUG-003** from
 resolved to partial (CodexAdapter still synthesizes a fabricated event trail). Most
@@ -75,39 +75,11 @@ tickets predate the rebuilds; several premises reference files that no longer ex
 | BUG-018 | partial (low) | R11/R18/R19 obsolete (deleted files); residual = R12 toast-timer leak, R20 bare `HH:MM`, R21 `wrapperRef` TDZ ordering, M17 live-overlay `getEvents` backstop |
 | BUG-019 | partial (med) | V&V (baseline 380→393) + this re-groom satisfy the core ask; residual = AGENTS.md "npm run dev" + README `src/game/data.js` doc drift |
 
-Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win — lints the tier just changed), **BUG-005** (security), **BUG-013** (reuses the BUG-026 pattern), **BUG-007** (ship-gate FR-V9), **BUG-009**.
+Implementation-ready at that historical baseline (not the current queue): **BUG-015** (quick win — lints the tier just changed), **BUG-005** (security), **BUG-013** (reuses the BUG-026 pattern), **BUG-007** (ship-gate FR-V9), **BUG-009**.
 
-### [BUG-003] Agent runs block until exit, fabricate events, cancel unreachable, killed at 15 s
-- [ ] **Severity:** high
-- **Area:** agents
-- **File(s):** electron/main/agents/CliAgentAdapter.cjs, electron/main/agents/ClaudeAdapter.cjs, electron/main/agents/CodexAdapter.cjs
-- **Observation:** `CliAgentAdapter.cjs:94-131` runs the whole CLI to completion inside
-  the IPC call via buffered `execFile` with the 15 s / 4 MB defaults — every real agent
-  run is SIGTERM'd at 15 s (SRS M4); the runId exists only after completion so
-  `cancel` is unreachable mid-run (M7); `streamEvents` replays a synthesized 3–4 event
-  trail with fabricated future timestamps claiming edits were applied regardless of
-  outcome (M8, `CliAgentAdapter.cjs:33-51`).
-- **Expected:** agent-runtime contract: cancellable within seconds, events derived from
-  real output, no artificial truncation (docs/agent-runtime.md; NFR-3).
-- **Repro / Notes:** depends on FEAT-004 (streaming runner). Register the run *before*
-  spawning; configurable/disabled timeout for agent runs; delete the fabricated trail.
-  Acceptance per WS0.3: a long-running fake CLI cancels within seconds; events reflect
-  the actual exit state; checks tolerate slow test suites.
-- **Status:** open
-
-### [BUG-005] `agent.startRun` spawns in arbitrary renderer-supplied cwd
-- [ ] **Severity:** high
-- **Area:** ipc, agents
-- **File(s):** electron/main/ipcHandlers.cjs, electron/main/agents/CliAgentAdapter.cjs
-- **Observation:** `ipcHandlers.cjs:103` accepts an arbitrary `repoUrl` as the spawn
-  cwd for the CLI (and later `git diff` / `npm run`) — not validated against known
-  workspaces, contradicting the IPC contract comment in `ipc.cjs:3-6` (SRS M6).
-- **Expected:** IPC inputs validated against known workspace ids, symmetric with the
-  git handlers (NFR-1).
-- **Repro / Notes:** WS0.5 — accept `workspaceId`, resolve via
-  `workspaceService.getWorkspaceById`, reject unknown ids. Handler test rejects an
-  arbitrary path.
-- **Status:** open
+The table above preserves the June baseline. On 2026-09-05, FEAT-022 closed
+BUG-003, BUG-005 and BUG-007 for the shipping runtime and renderer; their verified
+fixes and acceptance limits are recorded under **Migrated to changelog** below.
 
 ### [BUG-006] Windows spawn broken: `.cmd` shims and `npm` cannot spawn via `execFile`
 - [ ] **Severity:** high
@@ -124,26 +96,6 @@ Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win �
   shell-escaping of prompt text); `npm.cmd`/`npm` per platform via the same mechanism.
   Acceptance: detection → run → checks pass on Windows with npm-installed CLIs. Soft
   dependency on FEAT-004.
-- **Status:** open
-
-### [BUG-007] Workspace/git error states never rendered; dead `git.refresh()`; hook strands in `loading`
-- [ ] **Severity:** high
-- **Area:** renderer
-- **File(s):** src/App.jsx, src/app/useWorkspace.js, src/game/map.jsx, electron/main/ipcHandlers.cjs, electron/preload/preload.cjs
-- **Observation:** App reads neither `workspace.status === 'error'`, `workspace.error`,
-  nor `snapshot.error` — a non-repo folder shows a connected, empty city (SRS R1).
-  `useWorkspace.refresh()` calls `git.refresh()` with no workspaceId → always throws in
-  main, swallowed; the channel shares the `getSnapshot` handler, so the freshness logic
-  is dead code (R4, `useWorkspace.js:66`). `refresh`/hydrate/`close` have no try/catch
-  around `getCurrent`/`forget` — an IPC failure strands `status: 'loading'` forever
-  (R5).
-- **Expected:** Phase 2 DoD: empty states for no workspace, invalid repo, and missing
-  Git; ship gate FR-V9.
-- **Repro / Notes:** WS0.7 — add a `WorkspaceStatusBanner` driven by error states with
-  retry/pick affordances; exclude errored snapshots from the "linked" pill; wrap the
-  hook bodies in try/catch routing to the error state; delete the dead `git.refresh()`
-  call and channel (or make it take the id and use its return value). Tests: non-repo
-  folder, missing git, failed refresh.
 - **Status:** open
 
 ### [BUG-009] Git C-quoted (unicode) paths corrupt the status and diff parsers
@@ -316,6 +268,108 @@ Implementation-ready now (clearly current, unblocked): **BUG-015** (quick win �
 ---
 
 ## Migrated to changelog
+
+### [BUG-003] Agent runs block until exit, fabricate events, cancel unreachable, killed at 15 s
+- [x] **Severity:** high
+- **Area:** agents
+- **File(s):** electron/main/agents/CliAgentAdapter.cjs, electron/main/agents/ClaudeAdapter.cjs, electron/main/agents/CodexAdapter.cjs
+- **Observation:** `CliAgentAdapter.cjs:94-131` runs the whole CLI to completion inside
+  the IPC call via buffered `execFile` with the 15 s / 4 MB defaults — every real agent
+  run is SIGTERM'd at 15 s (SRS M4); the runId exists only after completion so
+  `cancel` is unreachable mid-run (M7); `streamEvents` replays a synthesized 3–4 event
+  trail with fabricated future timestamps claiming edits were applied regardless of
+  outcome (M8, `CliAgentAdapter.cjs:33-51`).
+- **Expected:** agent-runtime contract: cancellable within seconds, events derived from
+  real output, no artificial truncation (docs/agent-runtime.md; NFR-3).
+- **Repro / Notes:** depends on FEAT-004 (streaming runner). Register the run *before*
+  spawning; configurable/disabled timeout for agent runs; delete the fabricated trail.
+  Acceptance per WS0.3: a long-running fake CLI cancels within seconds; events reflect
+  the actual exit state; checks tolerate slow test suites.
+- **Fix:** 2026-09-05, FEAT-022 — the existing non-blocking spawn runner registers a
+  running run before process completion and supports child-process cancellation;
+  task execution uses the configurable 30-minute default rather than the buffered
+  runner's 15-second default. Codex now invokes `exec --json` and streams parsed
+  assistant messages, commands, file changes, usage and failure events. Both
+  registered production providers (Claude and Codex) override the base event
+  fallback; neither emits fabricated edit/test/PR successes. Runtime regressions,
+  real Electron approval/streaming/recall checks, and an authenticated Codex scout
+  verify the shipping journey (`artifacts/runtime-scout.json`).
+- **Acceptance limits:** The unregistered generic `CliAgentAdapter` still retains
+  its synthetic fallback; it was not deleted and must not be used as a new provider
+  without a real-output parser. This checkpoint did not rerun slow-check-suite or
+  Windows process-tree acceptance; those broader process/check limits remain in
+  BUG-006/BUG-010. Output and task execution remain deliberately bounded.
+- **Status:** fixed-pending-migration
+
+### [BUG-005] `agent.startRun` spawns in arbitrary renderer-supplied cwd
+- [x] **Severity:** high
+- **Area:** ipc, agents
+- **File(s):** electron/main/ipcHandlers.cjs, electron/main/agents/CliAgentAdapter.cjs
+- **Observation:** `ipcHandlers.cjs:103` accepts an arbitrary `repoUrl` as the spawn
+  cwd for the CLI (and later `git diff` / `npm run`) — not validated against known
+  workspaces, contradicting the IPC contract comment in `ipc.cjs:3-6` (SRS M6).
+- **Expected:** IPC inputs validated against known workspace ids, symmetric with the
+  git handlers (NFR-1).
+- **Repro / Notes:** WS0.5 — accept `workspaceId`, resolve via
+  `workspaceService.getWorkspaceById`, reject unknown ids. Handler test rejects an
+  arbitrary path.
+- **Fix:** 2026-09-05, FEAT-022 — `agent.startRun` requires a string `workspaceId`,
+  resolves it through `workspaceService.getWorkspaceById`, and rejects unknown ids
+  before calling the manager. The main process supplies the saved root path after
+  spreading renderer parameters, so a supplied `repoUrl` cannot redirect the CLI.
+  `ipcHandlers.test.js` verifies missing/unknown identities never start a run and
+  a conflicting renderer path is replaced by the registered workspace root. Real
+  desktop quest dispatch uses the workspace identity through this IPC boundary.
+- **Status:** fixed-pending-migration
+
+### [BUG-007] Workspace/git error states never rendered; dead `git.refresh()`; hook strands in `loading`
+- [x] **Severity:** high
+- **Area:** renderer
+- **File(s):** src/App.jsx, src/app/useWorkspace.js, electron/main/ipcHandlers.cjs, electron/preload/preload.cjs, src/tests/useWorkspace.test.jsx, e2e/city.journey.spec.js
+- **Observation:** App reads neither `workspace.status === 'error'`, `workspace.error`,
+  nor `snapshot.error` — a non-repo folder shows a connected, empty city (SRS R1).
+  `useWorkspace.refresh()` calls `git.refresh()` with no workspaceId → always throws in
+  main, swallowed; the channel shares the `getSnapshot` handler, so the freshness logic
+  is dead code (R4, `useWorkspace.js:66`). `refresh`/hydrate/`close` have no try/catch
+  around `getCurrent`/`forget` — an IPC failure strands `status: 'loading'` forever
+  (R5).
+- **Expected:** Phase 2 DoD: empty states for no workspace, invalid repo, and missing
+  Git; ship gate FR-V9.
+- **Repro / Notes:** WS0.7 — add a `WorkspaceStatusBanner` driven by error states with
+  retry/pick affordances; exclude errored snapshots from the "linked" pill; wrap the
+  hook bodies in try/catch routing to the error state; delete the dead `git.refresh()`
+  call and channel (or make it take the id and use its return value). Tests: non-repo
+  folder, missing git, failed refresh.
+- **Fix:** 2026-09-05, FEAT-022 — the Model Shop renders workspace and snapshot
+  errors with a folder-selection recovery action and keeps refresh available.
+  `useWorkspace.refresh()` passes the workspace id and adopts the returned fresh
+  snapshot without a duplicate scan. Startup, refresh and close catch IPC failures
+  and leave a recoverable error state; stale request tokens prevent superseded
+  results from replacing the current city. Hook regressions cover startup recovery,
+  failed refresh and the corrected refresh contract. A real Electron journey opens
+  a non-Git folder, sees the error, then recovers to a valid repository.
+- **Acceptance limits:** Missing-Git behavior was exercised through an injected
+  `Git unavailable` refresh failure, not by removing Git from the real desktop
+  environment. The close-error catch was reviewed but has no dedicated new
+  regression case in this checkpoint.
+- **Status:** fixed-pending-migration
+
+### [BUG-030] Quest lifecycle and identity can misreport the crew state
+
+- **Area:** agents / renderer
+- **Severity:** high
+- [x] Fixed in FEAT-022.
+- **Evidence:** Live approval handling discarded nested prompt/mode/path; final stream events could arrive before run status settled, leaving the city running after process exit; rejection emitted no terminal event. Runs did not retain their city or prompt.
+- **Fix:** Normalize live approval summaries, preserve read-only mode/path/prompt, emit final status after outcome proof, emit rejection/cancellation transitions, avoid cancelling an adapter before spawning, persist workspace and quest identity. Dedicated hook/runtime tests and real Electron lifecycle checks cover these paths.
+
+### [BUG-031] First-shift inspection and visual refresh lose current state
+
+- **Area:** renderer / docs
+- **Severity:** medium
+- [x] Fixed in FEAT-022.
+- **Evidence:** A selected clean file remained stale after an external edit+commit; topology changes recreated the camera; README described the removed City/Work interface and nonexistent files.
+- **Fix:** Refresh inspector contents with each Git snapshot; retain camera/scout pose during topology rebuild; document the Model Shop workflow and its actual limits. Desktop tests cover external commit refresh, new buildings and restoration.
+
 
 Entries below have been ticked off and copied as a one-liner into `CHANGELOG.md`.
 They are kept here so each `BUG-NNN` stays resolvable.

@@ -26,6 +26,7 @@ const { AgentAdapter, validateStartTaskParams } = require('./AgentAdapter.cjs');
 const { detectAgentBinaries } = require('./detect.cjs');
 const { parseUnifiedDiff } = require('./parseUnifiedDiff.cjs');
 const { runWorkspaceChecks } = require('../services/workspaceChecks.cjs');
+const { createQuestOutcomes } = require('./questOutcomes.cjs');
 
 // `gh pr create` prints a few lines of progress and ends with the new
 // PR URL on its own line, e.g.
@@ -98,6 +99,7 @@ class CliAgentAdapter extends AgentAdapter {
     taskTimeoutMs,
     taskMaxBuffer,
     now,
+    questOutcomes,
   } = {}) {
     super();
     if (!binaryName) throw new TypeError('CliAgentAdapter: binaryName is required');
@@ -118,6 +120,7 @@ class CliAgentAdapter extends AgentAdapter {
     this._taskTimeoutMs = Number.isFinite(taskTimeoutMs) ? taskTimeoutMs : DEFAULT_TASK_TIMEOUT_MS;
     this._taskMaxBuffer = Number.isFinite(taskMaxBuffer) ? taskMaxBuffer : DEFAULT_TASK_MAX_BUFFER;
     this._now = typeof now === 'function' ? now : () => Date.now();
+    this._questOutcomes = questOutcomes || createQuestOutcomes({ run: (...args) => processService.run(...args) });
     // runId -> { run, cwd, skill, stdout, stderr, exitState, cancelled }
     this._runs = new Map();
   }
@@ -168,6 +171,8 @@ class CliAgentAdapter extends AgentAdapter {
       contextUsed: 0,
       maxContext: 200_000,
       branch: params.branch,
+      skill: params.skill,
+      questSkill: params.questSkill ?? null,
     };
     const entry = {
       run, cwd, skill, stdout: '', stderr: '', exitState: null, cancelled: false,
@@ -176,7 +181,12 @@ class CliAgentAdapter extends AgentAdapter {
       // streamEvents drains it live. The base leaves it empty and synthesizes a
       // trail on completion instead (see streamEvents).
       events: [], eventWaiters: [], eventsEnded: false, lineBuf: '',
+      questSkill: params.questSkill,
+      readOnly: params.readOnly === true,
     };
+    if (['craft', 'repair'].includes(params.questSkill) && !entry.readOnly) {
+      entry.outcomeBaseline = await this._questOutcomes.capture(cwd);
+    }
     this._runs.set(runId, entry);
 
     const handle = this._processService.spawnStream(binary, args, {
@@ -192,7 +202,7 @@ class CliAgentAdapter extends AgentAdapter {
     });
     entry.handle = handle;
     entry.donePromise = Promise.resolve(handle.done).then(
-      (result) => {
+      async (result) => {
         entry.stdout = result.stdout || '';
         entry.stderr = result.stderr || '';
         // entry.cancelled means the *user* cancelled; a timeout also kills the
@@ -204,12 +214,28 @@ class CliAgentAdapter extends AgentAdapter {
         entry.exitState = exitState;
         entry.run.status = exitState === 'pass' ? 'done' : exitState === 'cancelled' ? 'cancelled' : 'failed';
         try { this._finalize(entry); } catch { /* ignore */ }
+        const terminalStatus = entry.run.status;
+        // Leave the quest active while its bounded proof is calculated. Its
+        // final status and reward proof become visible together.
+        if (terminalStatus === 'done') entry.run.status = 'running';
+        try {
+          entry.run.outcome = await this._questOutcomes.verify({
+            questSkill: entry.questSkill, readOnly: entry.readOnly,
+            successful: terminalStatus === 'done', hasAssistantOutput: entry.hasAssistantOutput === true,
+            cwd, before: entry.outcomeBaseline,
+          });
+        } catch { entry.run.outcome = { verified: false, filesChanged: 0, reason: 'inspection-unavailable' }; }
+        if (entry.cancelled) {
+          entry.run.status = 'cancelled';
+          entry.run.outcome = { ...entry.run.outcome, verified: false, reason: 'run-cancelled' };
+        } else entry.run.status = terminalStatus;
         this._endEvents(entry);
       },
       () => {
         entry.exitState = entry.cancelled ? 'cancelled' : 'fail';
         entry.run.status = entry.cancelled ? 'cancelled' : 'failed';
         try { this._finalize(entry); } catch { /* ignore */ }
+        entry.run.outcome = { verified: false, filesChanged: 0, reason: 'run-not-successful' };
         this._endEvents(entry);
       },
     );

@@ -70,6 +70,9 @@ function createAgentManager({
       run: {
         runId: r.runId, questId: r.questId, adventurerId: r.adventurerId,
         status: r.status, branch: r.branch, contextUsed: 0, maxContext: 0,
+        workspaceId: r.workspaceId ?? null, rootPath: r.rootPath ?? null,
+        prompt: r.prompt ?? '', readOnly: r.readOnly === true,
+        skill: r.skill ?? null, questSkill: r.questSkill ?? null, outcome: r.outcome ?? null,
       },
       provider: r.provider,
       startedAt: r.startedAt,
@@ -88,6 +91,13 @@ function createAgentManager({
       provider: e.provider,
       branch: e.run.branch,
       startedAt: e.startedAt,
+      workspaceId: e.run.workspaceId ?? null,
+      rootPath: e.run.rootPath ?? null,
+      prompt: e.run.prompt ?? '',
+      readOnly: e.run.readOnly === true,
+      skill: e.run.skill ?? null,
+      questSkill: e.run.questSkill ?? null,
+      outcome: e.run.outcome ?? null,
       events: Array.isArray(e.events) ? e.events : [],
     }));
   }
@@ -153,6 +163,14 @@ function createAgentManager({
       ? await resolveAuto()
       : requestedProvider;
     const adapter = getProvider(provider);
+    const identity = {
+      workspaceId: typeof rest.workspaceId === 'string' ? rest.workspaceId : null,
+      rootPath: typeof rest.repoUrl === 'string' ? rest.repoUrl : null,
+      prompt: typeof rest.promptContext === 'string' ? rest.promptContext.slice(0, 8000) : '',
+      readOnly: rest.readOnly === true,
+      skill: rest.skill ?? null,
+      questSkill: rest.questSkill ?? null,
+    };
 
     // Approval boundary (BUG-004): for approvalMode 'ask' the run must be
     // explicitly approved before the adapter spawns a file-changing CLI. We
@@ -172,6 +190,7 @@ function createAgentManager({
         contextUsed: 0,
         maxContext: 0,
         branch: rest.branch,
+        ...identity,
       };
       inFlight.set(preRunId, { provider, adapter, run: placeholder });
       history.set(preRunId, { run: { ...placeholder }, provider, startedAt: now() });
@@ -180,6 +199,8 @@ function createAgentManager({
       const summary = {
         skill: rest.skill,
         branch: rest.branch,
+        readOnly: identity.readOnly,
+        rootPath: identity.rootPath,
         // `text` is what ApprovalModal renders as the human-readable prompt.
         text: promptText,
       };
@@ -198,6 +219,10 @@ function createAgentManager({
         // never reached), but the cancelled record should survive a restart to
         // match the in-session history rather than vanishing.
         doPersist();
+        if (typeof emitEvent === 'function') emitEvent({
+          runId: preRunId,
+          event: { runId: preRunId, t: hhmm(now()), kind: 'error', text: 'quest cancelled before dispatch', payload: { status: 'cancelled' } },
+        });
         const err = new Error('run rejected by user');
         err.code = 'REJECTED';
         throw err;
@@ -218,6 +243,7 @@ function createAgentManager({
     if (!run || !run.runId) {
       throw new Error(`agentManager.startRun: adapter '${provider}' did not return an AgentRun`);
     }
+    Object.assign(run, identity);
     if (inFlight.has(run.runId)) {
       throw new Error(`agentManager.startRun: runId collision: ${run.runId}`);
     }
@@ -236,9 +262,22 @@ function createAgentManager({
   // When a non-blocking run settles, record its event trail on the history
   // entry and persist the run history so it survives a restart (FEAT-008).
   function captureWhenDone(runId) {
+    function settled(events) {
+      const h = history.get(runId);
+      if (h && Array.isArray(events)) h.events = events;
+      doPersist();
+      // Provider turn output can precede process exit and outcome verification.
+      // Wake history subscribers only after the shared run has truly settled.
+      if (h && ['done', 'failed', 'cancelled'].includes(h.run.status) && typeof emitEvent === 'function') {
+        emitEvent({
+          runId,
+          event: { runId, t: hhmm(now()), kind: h.run.status === 'done' ? 'plan' : 'error', text: `quest ${h.run.status}`, payload: { status: h.run.status } },
+        });
+      }
+    }
     getEvents(runId).then(
-      (events) => { const h = history.get(runId); if (h) h.events = events; doPersist(); },
-      () => { doPersist(); },
+      settled,
+      () => settled(),
     );
   }
 
@@ -358,26 +397,34 @@ function createAgentManager({
    * doesn't await a request that the user has implicitly answered.
    */
   async function cancel(runId) {
+    const wasAwaitingApproval = inFlight.get(runId)?.run.status === 'awaiting-approval';
     const adapter = adapterFor(runId);
     if (pendingApprovals.has(runId)) {
       const entry = pendingApprovals.get(runId);
       pendingApprovals.delete(runId);
       entry.resolve('rejected');
     }
-    await adapter.cancel(runId);
+    // A pre-flight placeholder has no adapter process to cancel. Rejecting its
+    // gate resumes startRun, which persists and emits the terminal outcome.
+    if (!wasAwaitingApproval) await adapter.cancel(runId);
     // Guarantee the cancelled status on the shared run reference (the real
     // adapter also does this; this makes the manager correct regardless).
     const histEntry = history.get(runId);
     if (histEntry && histEntry.run) histEntry.run.status = 'cancelled';
     inFlight.delete(runId);
+    doPersist();
+    if (!wasAwaitingApproval && typeof emitEvent === 'function') emitEvent({
+      runId,
+      event: { runId, t: hhmm(now()), kind: 'error', text: 'quest cancelled', payload: { status: 'cancelled' } },
+    });
   }
 
   /**
    * Recent runs for the Run History panel. Newest-first. Each entry is
    * a flat shape suitable for IPC — no adapter / closure references.
    */
-  function listRuns({ limit = 50 } = {}) {
-    const entries = [...history.values()];
+  function listRuns({ limit = 50, workspaceId } = {}) {
+    const entries = [...history.values()].filter((entry) => !workspaceId || entry.run.workspaceId === workspaceId);
     // history Map insertion order is oldest-first; reverse to render
     // most recent runs at the top of the panel.
     entries.reverse();
@@ -391,6 +438,14 @@ function createAgentManager({
       maxContext: entry.run.maxContext,
       provider: entry.provider,
       startedAt: entry.startedAt,
+      workspaceId: entry.run.workspaceId ?? null,
+      rootPath: entry.run.rootPath ?? null,
+      prompt: entry.run.prompt ?? '',
+      readOnly: entry.run.readOnly === true,
+      historical: entry.historical === true,
+      skill: entry.run.skill ?? null,
+      questSkill: entry.run.questSkill ?? null,
+      outcome: entry.run.outcome ?? null,
     }));
   }
 

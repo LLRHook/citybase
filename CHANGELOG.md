@@ -12,7 +12,22 @@ sections under each release/date heading.
 
 ## Unreleased
 
+### Added
+
+- FEAT-022 Citybase Model Shop: procedural 3D model town with balsa base and drafting props, Pip walking/ground travel/hopping, camera orbit/zoom and day/lamp controls, a four-step playable first shift, painted Claude/Codex crew tokens, building assignment and real local work orders.
+- Survey/Craft/Mend skill ledgers with persisted, idempotent reward receipts. Survey rewards require real assistant output; crafting rewards require observed repository change. Game levels do not change model capabilities.
+- Custom Model Shop icon in SVG/PNG, matching favicon and native macOS ICNS; Electron window and Dock use the icon.
+- Read-only, bounded real-file inspection and HEAD diffs, including staged/unstaged changes and untracked files. Fonts are bundled for offline operation.
+
+### Changed
+
+- Three.js 0.185.1 supplies real depth, lighting, camera controls and instanced architecture. React/Electron, renderer isolation and local CLI execution remain the foundation.
+- The primary interface is now the playable model shop. Legacy branch/commit/PR/check panels are not part of the new game loop.
+
+
 ### Verified
+
+- 2026-09-05 FEAT-022 checkpoint: lint and production build pass; the full 435-case / 35-file suite passed, followed by 6 new camera regression cases and targeted changed-component checks. The current collector contains 441 cases across 37 files. Four real Electron journeys pass; the final approval/streaming/reward/reject/recall journey was rechecked after icon and dialog integration (1 passed in 19.9 seconds), using isolated Git repositories and an explicitly labeled CLI test fixture for repeatable approval/streaming/recall/reward persistence. Separate authenticated Codex runs verified a real survey and one-file crafting outcome. The final Model Shop was visually inspected in Electron against the actual repository, including loaded local fonts and app icon. Three.js retains an advisory bundle-size warning; this checkpoint does not claim a new full historical V&V protocol or signed release packaging pass.
 
 - 2026-06-18 V&V pass (SHA `31c4014`, v3.0.0 + post-cut hardening): Stages 0–5
   green. 393 Vitest cases across 30 files, 1 Playwright desktop smoke, lint +
@@ -25,6 +40,12 @@ sections under each release/date heading.
   multi-agent review of the v3 changes and fixed this cycle (BUG-025..029).
 
 ### Fixed
+
+- BUG-003 Codex activity now comes from parsed real JSON events; fabricated successful edits/tests/PR trails are gone.
+- BUG-005 Agent execution resolves a remembered workspace ID in the main process instead of trusting a renderer-supplied path.
+- BUG-007 Workspace hydration/refresh errors remain visible and refresh passes the correct workspace ID.
+- BUG-030 Approval summaries, terminal status notifications, rejection/cancellation and persistent quest identity now agree between live play and restored history.
+- BUG-031 Selected file content and camera state survive Git refreshes, and README matches the new playable interface.
 
 - BUG-008 Verified resolved by the v2.0 city rebuild (FEAT-014) and closed during the
   2026-06-18 re-groom: districts seat at 6.2 world units against a ≤4.7 footprint (no

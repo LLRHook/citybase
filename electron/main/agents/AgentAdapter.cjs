@@ -104,6 +104,12 @@ function validateStartTaskParams(params) {
   if (params.model !== undefined && !isNonEmptyString(params.model)) {
     throw new TypeError('startTask: model must be a non-empty string when provided');
   }
+  if (params.questSkill !== undefined && !['survey', 'craft', 'repair'].includes(params.questSkill)) {
+    throw new TypeError('startTask: questSkill must be survey, craft, or repair');
+  }
+  if (params.readOnly !== undefined && typeof params.readOnly !== 'boolean') {
+    throw new TypeError('startTask: readOnly must be a boolean');
+  }
 }
 
 /**

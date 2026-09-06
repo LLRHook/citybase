@@ -14,6 +14,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import {
   AGENT_EVENT_CHANNEL,
   BOOT_PAYLOAD_CHANNEL,
@@ -46,4 +47,23 @@ describe('preload.cjs — channel literals stay in sync with constants.cjs', () 
   it('embeds the same BOOT_PAYLOAD_CHANNEL string the main process exports', () => {
     expect(PRELOAD_SOURCE).toContain(`'${BOOT_PAYLOAD_CHANNEL}'`);
   });
+});
+
+it('forwards building inspection and workspace identity through the sandbox bridge', async () => {
+  const calls = [];
+  let bridge;
+  runInNewContext(PRELOAD_SOURCE, {
+    require: () => ({
+      contextBridge: { exposeInMainWorld: (_name, api) => { bridge = api; } },
+      ipcRenderer: { on: () => {}, invoke: (...args) => { calls.push(args); return Promise.resolve({}); } },
+    }),
+  });
+  await bridge.workspace.readFile('ws', 'src/city.js');
+  await bridge.git.getFileDiff('ws', 'src/city.js');
+  await bridge.agents.startRun({ workspaceId: 'ws', promptContext: 'Scout city' });
+  expect(calls).toEqual([
+    ['citybase:workspace.readFile', 'ws', 'src/city.js'],
+    ['citybase:git.getFileDiff', 'ws', 'src/city.js'],
+    ['citybase:agent.startRun', { workspaceId: 'ws', promptContext: 'Scout city' }],
+  ]);
 });

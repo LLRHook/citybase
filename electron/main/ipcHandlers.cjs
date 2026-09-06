@@ -13,6 +13,7 @@
 //     awaiting, but tests can call it directly to assert fan-out.
 
 const { AGENT_EVENT_CHANNEL } = require('./agents/constants.cjs');
+const repositoryFiles = require('./services/repositoryFiles.cjs');
 
 function createIpcHandlers({
   app,
@@ -23,6 +24,7 @@ function createIpcHandlers({
   sendAgentEvent,
   getMainWindow,
   runWorkspaceChecks,
+  fileService = repositoryFiles,
 } = {}) {
   if (!app || typeof app.getVersion !== 'function') {
     throw new TypeError('createIpcHandlers: app is required');
@@ -81,6 +83,17 @@ function createIpcHandlers({
     'citybase:workspace.setCurrent': (_evt, id) => workspaceService.setCurrentWorkspace(id),
     'citybase:workspace.listRecent': () => workspaceService.listRecentWorkspaces(),
     'citybase:workspace.forget': (_evt, id) => workspaceService.forgetWorkspace(id),
+    'citybase:workspace.readFile': async (_evt, workspaceId, relativePath) => {
+      const ws = await workspaceService.getWorkspaceById(workspaceId);
+      if (!ws) throw new Error(`unknown workspace id: ${workspaceId}`);
+      return fileService.readFile(ws, relativePath);
+    },
+
+    'citybase:git.getFileDiff': async (_evt, workspaceId, relativePath) => {
+      const ws = await workspaceService.getWorkspaceById(workspaceId);
+      if (!ws) throw new Error(`unknown workspace id: ${workspaceId}`);
+      return fileService.getFileDiff(ws, relativePath);
+    },
 
     'citybase:git.getSnapshot': handleGitSnapshot,
     'citybase:git.refresh': handleGitSnapshot,
@@ -119,7 +132,12 @@ function createIpcHandlers({
     'citybase:agents.list': () => agentManager.listProviders(),
 
     'citybase:agent.startRun': async (_evt, params) => {
-      const run = await agentManager.startRun(params);
+      if (!params || typeof params.workspaceId !== 'string') throw new TypeError('startRun: workspaceId is required');
+      const ws = await workspaceService.getWorkspaceById(params.workspaceId);
+      if (!ws) throw new Error(`unknown workspace id: ${params.workspaceId}`);
+      // The renderer identifies a remembered workspace; only the main process
+      // supplies its path. A supplied repoUrl can never redirect agent writes.
+      const run = await agentManager.startRun({ ...params, repoUrl: ws.rootPath, workspaceId: ws.id });
       // Non-blocking dispatch returns a 'running' run immediately. Tell the
       // renderer right away so it reflects the live run and the city starts
       // animating; the full event trail streams via pumpAgentEvents once the
