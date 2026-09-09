@@ -416,7 +416,7 @@ describe('ClaudeAdapter — produceDiff / runChecks / openPR / cancel', () => {
     const run = await adapter.startTask(VALID_PARAMS);
     await adapter.runChecks(run.runId);
     const npmCalls = ps.run.mock.calls
-      .filter(([cmd]) => cmd === 'npm')
+      .filter(([cmd]) => /(^|[/\\])npm(?:\.cmd)?$/i.test(cmd))
       .map(([, argv]) => argv);
     expect(npmCalls.find(a => a[1] === 'lint')).toEqual(['run', 'lint', '--silent']);
     expect(npmCalls.find(a => a[1] === 'test')).toEqual(['run', 'test', '--silent', '--', '--run']);

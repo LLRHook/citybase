@@ -13,8 +13,13 @@ extends Node3D
 #   CITYBASE_SPIKE_OUT       autotest: screenshot dir; self-quits when done
 #   CITYBASE_SPIKE_RUN=1     autotest: dispatch a real (cheap) claude run
 #   CITYBASE_REDUCED_MOTION=1  disable tweens/hover/day-cycle animation
+#   CITYBASE_NODE            explicit Node executable override for dev runs
+#   CITYBASE_CORE_USERDATA   separate state directory for concurrent instances
 
-const CORE_PORT := 43117
+const CORE_START_TIMEOUT_MS := 15000
+# The measured small-project diff is ~92 KiB encoded. Keep a bounded 1 MiB
+# allowance for RPC bursts; oversize responses must fail visibly.
+const RPC_BUFFER_BYTES := 1024 * 1024
 
 # Preloads (not class_name globals): the global class cache only exists after
 # an editor import pass, which CLI/autotest runs never perform.
@@ -25,11 +30,14 @@ const Workbench := preload("res://workbench.gd")
 const LivingLayer := preload("res://living_layer.gd")
 
 var _core_pid := -1
+var _core_port := 0
+var _core_connection_file := ""
 var _token := ""
 var _repo_root := ""
-var _ws := WebSocketPeer.new()
+var _ws := _new_ws_peer()
 var _ws_connected := false
 var _reconnecting := false
+var _connection_failed := false
 var _next_id := 0
 var _pending := {}
 var _log_label: RichTextLabel
@@ -50,6 +58,8 @@ var _sun: DirectionalLight3D
 var _bench: Workbench
 var _living: LivingLayer
 var _last_snapshot: Dictionary = {}
+var _last_runs: Array = []
+var _autotest_run_dispatched := false
 
 func _ready() -> void:
 	_spike_out = OS.get_environment("CITYBASE_SPIKE_OUT")
@@ -59,24 +69,28 @@ func _ready() -> void:
 		_repo_root = ProjectSettings.globalize_path("res://").get_base_dir().get_base_dir()
 	_build_stage()
 	_log("citybase v4 · repo root: %s" % _repo_root)
-	_spawn_core()
-	_connect_ws()
+	await _spawn_core()
+	if _core_port > 0:
+		_connect_ws()
 
 func _exit_tree() -> void:
-	if _core_pid > 0:
-		OS.kill(_core_pid)
+	_stop_core()
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_CLOSE_REQUEST and _core_pid > 0:
-		OS.kill(_core_pid)
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_stop_core()
 
 # ── Core daemon ──
 
 func _spawn_core() -> void:
 	var crypto := Crypto.new()
 	_token = crypto.generate_random_bytes(24).hex_encode()
+	_core_connection_file = OS.get_user_data_dir().path_join("core-%s.json" % crypto.generate_random_bytes(12).hex_encode())
 	OS.set_environment("CITYBASE_CORE_TOKEN", _token)
-	OS.set_environment("CITYBASE_CORE_PORT", str(CORE_PORT))
+	# Let the OS bind a free port while the core keeps the socket open. The
+	# private per-launch file reports readiness without exposing the token.
+	OS.set_environment("CITYBASE_CORE_PORT", "0")
+	OS.set_environment("CITYBASE_CORE_CONNECTION_FILE", _core_connection_file)
 	# Packaged builds ship a self-contained core (Node SEA binary) in the app
 	# bundle — no node install, no repo checkout needed (FEAT-027). Dev runs
 	# fall back to node + the repo's core/server.cjs.
@@ -84,28 +98,81 @@ func _spawn_core() -> void:
 	if FileAccess.file_exists(bundled):
 		_core_pid = OS.create_process(bundled, [])
 		_log("core spawned (bundled) · pid %d" % _core_pid)
-		return
-	var server := _repo_root.path_join("core/server.cjs")
-	var node_bin := _find_node()
-	if node_bin == "":
-		_log("[color=red]FAIL: no bundled core and no node binary found[/color]")
-		return
-	_core_pid = OS.create_process(node_bin, [server])
-	_log("core spawned (dev) · pid %d" % _core_pid)
+	else:
+		var server := _repo_root.path_join("core/server.cjs")
+		var node_bin := _find_node()
+		if node_bin == "":
+			_core_start_failed("No bundled core and no Node executable found. Add Node to PATH or set CITYBASE_NODE.")
+			return
+		_core_pid = OS.create_process(node_bin, [server])
+		_log("core spawned (dev) · pid %d" % _core_pid)
+	var deadline := Time.get_ticks_msec() + CORE_START_TIMEOUT_MS
+	while _core_pid > 0 and Time.get_ticks_msec() < deadline:
+		if FileAccess.file_exists(_core_connection_file):
+			var connection: Variant = JSON.parse_string(FileAccess.get_file_as_string(_core_connection_file))
+			if connection is Dictionary and int(connection.get("pid", -1)) == _core_pid:
+				if connection.has("error"):
+					_core_start_failed(String(connection["error"]))
+					return
+				var port := int(connection.get("port", 0))
+				if port > 0 and port <= 65535:
+					_core_port = port
+					_remove_core_connection_file()
+					_log("core ready · port %d" % _core_port)
+					return
+		if not OS.is_process_running(_core_pid):
+			break
+		await get_tree().create_timer(0.05).timeout
+	_core_start_failed("The core exited or did not report readiness within 15 seconds.")
+
+func _remove_core_connection_file() -> void:
+	if _core_connection_file != "":
+		for path in [_core_connection_file, _core_connection_file + ".tmp"]:
+			if FileAccess.file_exists(path):
+				DirAccess.remove_absolute(path)
+
+func _stop_core() -> void:
+	if _core_pid > 0:
+		if OS.is_process_running(_core_pid):
+			OS.kill(_core_pid)
+		_core_pid = -1
+	_core_port = 0
+	_remove_core_connection_file()
+
+func _core_start_failed(message: String) -> void:
+	_stop_core()
+	_log("[color=red]FAIL: %s[/color]" % message)
+	_bench.show_error("CORE STARTUP FAILED", message)
 
 func _find_node() -> String:
-	for candidate in ["/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"]:
+	var override := OS.get_environment("CITYBASE_NODE").strip_edges().trim_prefix('"').trim_suffix('"')
+	if override != "":
+		return override if FileAccess.file_exists(override) else ""
+	var windows := OS.get_name() == "Windows"
+	var executable := "node.exe" if windows else "node"
+	for directory in OS.get_environment("PATH").split(";" if windows else ":", false):
+		var candidate := directory.strip_edges().trim_prefix('"').trim_suffix('"').path_join(executable)
 		if FileAccess.file_exists(candidate):
 			return candidate
-	var out := []
-	if OS.execute("/usr/bin/which", ["node"], out) == 0 and out.size() > 0:
-		return String(out[0]).strip_edges()
+	if not windows:
+		for candidate in ["/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"]:
+			if FileAccess.file_exists(candidate):
+				return candidate
 	return ""
 
 # ── WebSocket JSON-RPC client ──
 
+func _new_ws_peer() -> WebSocketPeer:
+	var peer := WebSocketPeer.new()
+	peer.inbound_buffer_size = RPC_BUFFER_BYTES
+	peer.outbound_buffer_size = RPC_BUFFER_BYTES
+	return peer
+
 func _connect_ws() -> void:
-	var url := "ws://127.0.0.1:%d/?token=%s" % [CORE_PORT, _token]
+	_ws = _new_ws_peer()
+	_ws_connected = false
+	_connection_failed = false
+	var url := "ws://127.0.0.1:%d/?token=%s" % [_core_port, _token]
 	var err := _ws.connect_to_url(url)
 	if err != OK:
 		_log("[color=red]ws connect error %d[/color]" % err)
@@ -125,19 +192,42 @@ func _process(delta: float) -> void:
 			_log("[color=green]connected to citybase-core[/color]")
 		while _ws.get_available_packet_count() > 0:
 			_on_message(_ws.get_packet().get_string_from_utf8())
-	elif state == WebSocketPeer.STATE_CLOSED and not _ws_connected and not _reconnecting:
+	elif state == WebSocketPeer.STATE_CLOSED and _ws_connected:
+		var message := "Connection closed (%d): %s" % [_ws.get_close_code(), _ws.get_close_reason()]
+		if _ws.get_close_code() == 1009:
+			message += " The RPC buffer limit is 1 MiB."
+		_connection_lost(message)
+	elif state == WebSocketPeer.STATE_CLOSED and _core_port > 0 and not _connection_failed and not _reconnecting:
 		_reconnecting = true
 		await get_tree().create_timer(0.5).timeout
-		_ws = WebSocketPeer.new()
 		_connect_ws()
 		_reconnecting = false
+
+func _connection_lost(message: String) -> void:
+	# A local send failure can leave the socket open. Close that peer while
+	# retaining the owned core so Retry can attach with the same token.
+	if _ws.get_ready_state() == WebSocketPeer.STATE_OPEN:
+		_ws.close()
+	_ws_connected = false
+	_connection_failed = true
+	# Losing an acknowledgement does not tell us whether an action ran. Clear
+	# callbacks without reporting a provider failure or replaying a mutation.
+	_pending.clear()
+	_log("[color=red]%s[/color]" % message)
+	_bench.show_error("CORE CONNECTION LOST", message + "\nRetry to reload the current state. Pending actions are not replayed.")
 
 # on_result receives the result, or null when the call errored (the error is
 # logged); on_error (optional) receives the message.
 func _call_rpc(method: String, params: Array, on_result: Callable, on_error: Callable = Callable()) -> void:
+	if _ws.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		if on_error.is_valid():
+			on_error.call("Core is disconnected. Retry the connection first.")
+		return
 	_next_id += 1
 	_pending[_next_id] = { "ok": on_result, "err": on_error }
-	_ws.send_text(JSON.stringify({"id": _next_id, "method": method, "params": params}))
+	var error := _ws.send_text(JSON.stringify({"id": _next_id, "method": method, "params": params}))
+	if error != OK:
+		_connection_lost("Could not send request (%d). The RPC buffer limit is 1 MiB." % error)
 
 func _on_message(raw: String) -> void:
 	var msg: Variant = JSON.parse_string(raw)
@@ -205,14 +295,13 @@ func _load_snapshot(workspace_id: String) -> void:
 		_log("city built · %d districts · %d buildings" % [stats["districts"], stats["buildings"]])
 		_refresh_quests()
 		_refresh_runs()
-		_call_rpc("agent.listRuns", [{}], func(runs: Variant) -> void:
-			_living.update_snapshot(s, runs if runs is Array else []))
 		_shot("city-01-built")
 		_shot_after("city-04-living", 2.5)
-		if OS.get_environment("CITYBASE_SPIKE_RUN") == "1":
+		if OS.get_environment("CITYBASE_SPIKE_RUN") == "1" and not _autotest_run_dispatched:
+			_autotest_run_dispatched = true
 			_bench.set_work_visible(true)
 			_dispatch_run("Read the file README.md and reply with its first line only. Do not create, modify, or delete anything.")
-		elif _spike_out != "":
+		elif _spike_out != "" and not _autotest_run_dispatched:
 			# Give the living layer (ambient motes, flicker, vitals) time to
 			# appear in the city-04 shot before the idle autotest exits.
 			_quit_soon(4.5))
@@ -228,7 +317,15 @@ func _refresh_quests() -> void:
 func _refresh_runs() -> void:
 	_call_rpc("agent.listRuns", [{}], func(runs: Variant) -> void:
 		if runs is Array:
-			_bench.set_runs(runs))
+			_last_runs = runs
+			_bench.set_runs(runs)
+			_living.update_snapshot(_last_snapshot, _last_runs)
+			# A run may settle while disconnected. Reconcile the form only from
+			# authoritative history, without inferring an outcome from socket loss.
+			for run: Dictionary in runs:
+				var status := String(run.get("status", ""))
+				if String(run.get("runId", "")) == _run_id and status in ["done", "failed", "cancelled"]:
+					_bench.run_settled(status))
 
 # ── Live run → avatar + glow ──
 
@@ -313,8 +410,10 @@ func _on_run_settled(status: String) -> void:
 	# Dirty state changed on disk — refresh highlighting from a new snapshot.
 	if _workspace_id != "":
 		_call_rpc("git.getSnapshot", [_workspace_id], func(snap: Variant) -> void:
-			if snap is Dictionary:
-				_city.set_dirty((snap as Dictionary).get("files", [])))
+			if snap is Dictionary and not (snap as Dictionary).get("error"):
+				_last_snapshot = snap
+				_city.set_dirty((snap as Dictionary).get("files", []))
+				_living.update_snapshot(_last_snapshot, _last_runs))
 	# The no-code review surface: diff + checks feed the Outcome panel.
 	# Checks run the repo's real npm scripts and can take ~30s+, so the
 	# autotest quits after the outcome lands (with a generous backstop).
@@ -357,9 +456,16 @@ func _touched_path(event: Dictionary) -> String:
 
 func _to_repo_relative(p: String) -> String:
 	var norm := p.replace("\\", "/")
-	var root := _repo_root.replace("\\", "/")
-	if norm.begins_with(root):
-		return norm.substr(root.length()).trim_prefix("/")
+	# The host checkout launches the core; activity belongs to the selected
+	# workspace, which may be elsewhere or nested inside that checkout.
+	var root := String(_last_snapshot.get("rootPath", "")).replace("\\", "/")
+	if root == "":
+		return norm
+	var prefix := root.trim_suffix("/") + "/"
+	var compared_path := norm.to_lower() if OS.get_name() == "Windows" else norm
+	var compared_prefix := prefix.to_lower() if OS.get_name() == "Windows" else prefix
+	if compared_path.begins_with(compared_prefix):
+		return norm.substr(prefix.length())
 	return norm
 
 # ── Stage, UI, evidence ──
@@ -470,7 +576,18 @@ func _on_open_workspace(dir: String) -> void:
 			_bench.show_error("WORKSPACE REGISTRATION FAILED", emsg))
 
 func _on_retry() -> void:
-	if _workspace_id != "":
+	if _connection_failed:
+		if _core_pid > 0 and OS.is_process_running(_core_pid):
+			_bench.hide_error()
+			_connect_ws()
+			return
+		_stop_core()
+	if _core_port == 0 and _core_pid <= 0:
+		_bench.hide_error()
+		await _spawn_core()
+		if _core_port > 0:
+			_connect_ws()
+	elif _workspace_id != "":
 		_load_snapshot(_workspace_id)
 
 func _log(line: String) -> void:
@@ -511,6 +628,5 @@ func _quit_soon(delay: float) -> void:
 	await get_tree().create_timer(delay).timeout
 	_log("fps after warmup: %d" % Engine.get_frames_per_second())
 	await _shot("city-99-final")
-	if _core_pid > 0:
-		OS.kill(_core_pid)
+	_stop_core()
 	get_tree().quit()

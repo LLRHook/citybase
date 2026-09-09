@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import realProcessService from '../../electron/main/services/processService.cjs';
 import {
   runWorkspaceChecks,
   buildNpmArgv,
+  resolveNpmCommand,
   WANTED_SCRIPTS,
 } from '../../electron/main/services/workspaceChecks.cjs';
 
@@ -44,6 +49,36 @@ describe('runWorkspaceChecks — argument shape', () => {
       readFileSync: () => '{}',
     })).rejects.toThrow(/processService\.run is required/);
   });
+});
+
+describe('resolveNpmCommand', () => {
+  it.each(['linux', 'darwin'])('keeps the native npm executable on %s', (platform) => {
+    expect(resolveNpmCommand({ platform })).toBe('npm');
+  });
+
+  it('resolves a quoted Windows PATH entry to the absolute npm shim', () => {
+    const expected = 'C:\\Program Files\\nodejs\\npm.cmd';
+    expect(resolveNpmCommand({
+      platform: 'win32', env: { PATH: 'C:\\missing;"C:\\Program Files\\nodejs"' },
+      existsSync: (file) => file === expected,
+    })).toBe(expected);
+  });
+});
+
+describe('runWorkspaceChecks — real npm process', () => {
+  it('executes declared checks from a workspace path containing spaces', async () => {
+    const rootPath = mkdtempSync(join(tmpdir(), 'citybase checks '));
+    try {
+      writeFileSync(join(rootPath, 'package.json'), JSON.stringify({
+        private: true, scripts: { lint: 'node check.cjs', test: 'node check.cjs' },
+      }));
+      writeFileSync(join(rootPath, 'check.cjs'), "require('node:assert/strict').equal(2 + 2, 4);\n");
+      const checks = await runWorkspaceChecks({ workspace: { rootPath }, processService: realProcessService });
+      expect(checks.map(({ state }) => state)).toEqual(['pass', 'pass']);
+    } finally {
+      rmSync(rootPath, { recursive: true, force: true });
+    }
+  }, 20000);
 });
 
 describe('runWorkspaceChecks — script discovery', () => {
