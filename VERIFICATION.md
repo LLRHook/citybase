@@ -6,14 +6,17 @@ time you suspect a regression. It is **executable from a cold start** — every
 command is written verbatim, every expected output is named, and every
 "manual" step has unambiguous accept / reject criteria.
 
-Citybase is a two-tier Electron desktop app: a React 19 + Vite 8 renderer
-(`src/`, ESM `.js`/`.jsx`) and an Electron 42 main/preload tier
-(`electron/`, CommonJS `.cjs`). The renderer is sandboxed, runs only inside
-Electron (the browser-only path was removed), and talks to the
-main process only through the typed `window.citybase` preload bridge. Agent
-work is dispatched to local `claude` / `codex` CLIs behind the provider-neutral
-`AgentProvider` contract. There is no backend, no database, and no container;
-persistent state is a single `workspaces.json` under Electron `userData`.
+Citybase v4 has a Godot 4.7 frontend (`godot/`) and a local Node daemon
+(`core/`) using the existing CommonJS services in `electron/main/`. The
+legacy React 19 + Vite 8 renderer and Electron 42 shell remain available.
+Both transports use the same handler map and local `claude` / `codex`
+adapters. State lives in `workspaces.json` and `runs.json` in the selected
+user-data directory. There is no database or container.
+
+The walkthrough below retains the legacy Electron checks. The Godot
+regression command is in Stage 2.5; the v4 manual parity gates remain in
+`docs/v4-game-engine.md`. Passing the automated checks alone does not
+establish Windows packaging or full v4 release parity.
 
 See also: [`bugs.md`](./bugs.md), [`features.md`](./features.md),
 [`CHANGELOG.md`](./CHANGELOG.md), [`README.md`](./README.md).
@@ -148,16 +151,16 @@ A failure in this stage is a hard block.
   ```bash
   npm test -- --run
   ```
-  Expected: `Test Files  36 passed (36)`, `Tests  440 passed (440)`, exit 0.
+  Expected: `Test Files  40 passed (40)`, `Tests  464 passed (464)`, exit 0.
 - [ ] 2.3 Test-count baseline matches the collector:
   ```bash
-  npx vitest list | wc -l   # expect: 440
+  npx vitest list | wc -l   # expect: 464
   ```
   A mismatch with the table below means tests appeared or disappeared without
   a deliberate decision — investigate before ticking, then update the table
   in the same change as the run.
 
-**Baseline (2026-07-10, v1-gate closure + v4 phase A/B waves): 36 test files / 440 test cases — all Vitest (jsdom). The desktop launch path is covered by the Playwright smoke (2.4); the real-`claude` agent path (incl. non-blocking streaming dispatch + persistence) by the integration harnesses (Appendix F).**
+**Baseline (2026-09-09, Windows multi-instance validation): 40 test files / 464 test cases, all Vitest. The desktop launch path is covered by the Playwright smoke (2.4), and GDScript behavior by the separate Godot regression checks (2.5). Generated `build/` output and disposable fixture projects are excluded from Citybase's lint and test collection.**
 
 | Test file | Cases | | Test file | Cases |
 |---|---|---|---|---|
@@ -176,9 +179,11 @@ A failure in this stage is a hard block.
 | `CodexAdapter.test.js` | 25 | | `useAgentDetect.test.jsx` | 8 |
 | `coreProtocol.test.js` | 2 | | `useRunHistory.test.jsx` | 6 |
 | `coreRpcServer.test.js` | 7 | | `windowConfig.test.js` | 10 |
-| `detectAgentBinaries.test.js` | 19 | | `workspaceChecks.test.js` | 13 |
+| `detectAgentBinaries.test.js` | 19 | | `workspaceChecks.test.js` | 17 |
 | `gitMutations.test.js` | 14 | | `WorkspaceErrorStates.test.jsx` | 6 |
 | `ipcHandlers.test.js` | 36 | | `workspaceServiceCore.test.js` | 9 |
+| `parseLsTreeSizes.test.js` | 4 | | `questService.test.js` | 6 |
+| `coreStartup.test.js` | 5 | | `coreUserDataLock.test.js` | 5 |
 
 - [ ] 2.4 Desktop E2E smoke (Playwright `_electron`, FEAT-001) — requires a
   fresh `dist/`:
@@ -189,6 +194,17 @@ A failure in this stage is a hard block.
   Expected: `1 passed` — window opens titled "Citybase", `window.citybase`
   bridge alive (`app.getVersion()` resolves over real IPC), renderer sandboxed
   (`require`/`process` undefined), agent detection answers with boolean shape.
+
+- [ ] 2.5 Godot regressions (requires Godot 4.7 and Node on PATH):
+  ```bash
+  godot --headless --path godot --script res://tests/regression.gd
+  ```
+  Expected: `REGRESSION_FAILURES=0`, exit 0. This exercises actual GDScript
+  Node discovery, level thresholds, and vitals refresh after settlement.
+  Synthetic formula inputs are regression fixtures, not evidence of live
+  agent completions. `coreStartup.test.js` separately launches real core
+  processes to verify distinct ports, authentication, state-directory
+  ownership, readiness failures, and recovery after forced termination.
 
 A failure in this stage is a hard block.
 
