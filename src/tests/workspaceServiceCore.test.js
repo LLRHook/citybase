@@ -2,6 +2,7 @@
 // Guards the extraction: register/pick/current flows against an injected fs,
 // no Electron anywhere.
 import { describe, expect, it, vi } from 'vitest';
+import { join } from 'node:path';
 import { createWorkspaceService } from '../../electron/main/services/workspaceServiceCore.cjs';
 
 function makeFakeFs({ dirs = [], files = {} } = {}) {
@@ -67,9 +68,11 @@ describe('createWorkspaceService — atomic, serialized writes (BUG-013)', () =>
     const fs = makeFakeFs({ dirs: ['/a'] });
     const svc = createWorkspaceService({ ...OPTS, fs });
     await svc.registerWorkspacePath('/a');
-    expect(fs.rename).toHaveBeenCalledWith('/data/workspaces.json.tmp', '/data/workspaces.json');
-    expect(fs.store.has('/data/workspaces.json.tmp')).toBe(false);
-    expect(JSON.parse(fs.store.get('/data/workspaces.json')).workspaces).toHaveLength(1);
+    const stateFile = join(OPTS.getUserDataDir(), 'workspaces.json');
+    const tempFile = `${stateFile}.tmp`;
+    expect(fs.rename).toHaveBeenCalledWith(tempFile, stateFile);
+    expect(fs.store.has(tempFile)).toBe(false);
+    expect(JSON.parse(fs.store.get(stateFile)).workspaces).toHaveLength(1);
   });
 
   it('concurrent mutations do not lose updates (read-modify-write is serialized)', async () => {

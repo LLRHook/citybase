@@ -44,11 +44,20 @@ Area tags for this project:
 
 ## Open
 
+### [BUG-037] XP is calculated from a truncated run-history window
+- [ ] **Severity:** med
+- **Area:** agents
+- **File(s):** `godot/living_layer.gd`, `godot/main.gd`, `electron/main/agents/agentManager.cjs`, `electron/main/services/runStore.cjs`
+- **Observation:** Godot derives XP from `agent.listRuns` with its default 50-run limit. Fifty successful runs yield only 1,250 XP (level 6); newer unsuccessful runs can displace successful ones and reduce the level. Persisted history is also capped at 100 terminal records.
+- **Expected:** Earned progression should remain stable as history is pruned. This needs durable aggregate progression independent of the activity-list limit.
+- **Repro / Notes:** Boundary checks are separate from the live eight-task Minecraft trials. This validation does not implement a new progression store.
+- **Status:** open
+
+### Re-groom 2026-06-18 — disposition (verified against `main` @ `31c4014`)
+
 _Filed 2026-06-11 from [docs/srs-and-plan-of-action.md](./docs/srs-and-plan-of-action.md)
 (SRS v0.1, baseline `main` @ `1356437`). Finding ids (M/R/T-series) and workstream
 ids (WS) reference that document._
-
-### Re-groom 2026-06-18 — disposition (verified against `main` @ `31c4014`)
 
 A 15-agent adversarial re-verification of this backlog against current `main`
 (post v1-wave / v2.0 / v3.0 / BUG-025..029). Every "resolved/obsolete" verdict was
@@ -120,25 +129,6 @@ the V&V run, fixed in-pass, migrated. What remains, re-verified and ordered:
   Acceptance per WS0.3: a long-running fake CLI cancels within seconds; events reflect
   the actual exit state; checks tolerate slow test suites.
 - **Status:** open
-
-
-### [BUG-006] Windows spawn broken: `.cmd` shims and `npm` cannot spawn via `execFile`
-- [ ] **Severity:** high
-- **Area:** electron, agents
-- **File(s):** electron/main/agents/detect.cjs, electron/main/services/workspaceChecks.cjs, electron/main/services/processService.cjs
-- **Observation:** `.cmd` shims (`claude.cmd`, `npm.cmd`) cannot be spawned via
-  `execFile` without a shell since Node 20.12 (EINVAL, CVE-2024-27980 hardening), and
-  there is no `npm.exe` — agent runs and checks are structurally broken on Windows,
-  the development platform (SRS M5; `detect.cjs:16`, `workspaceChecks.cjs:67`).
-- **Expected:** spawn semantics work on macOS and Windows (NFR-2).
-- **Repro / Notes:** on Windows, `checks.run` → spawn failure (mislabeled "exited 0"
-  per BUG-010). Fix per WS0.6: resolve `.cmd` shims to their underlying
-  `node …/cli.js` invocation (preferred over `shell: true`, which would force
-  shell-escaping of prompt text); `npm.cmd`/`npm` per platform via the same mechanism.
-  Acceptance: detection → run → checks pass on Windows with npm-installed CLIs. Soft
-  dependency on FEAT-004.
-- **Status:** open
-
 
 
 ### [BUG-010] `processService` error envelope misclassifies failures as "exited 0"
@@ -213,6 +203,106 @@ the V&V run, fixed in-pass, migrated. What remains, re-verified and ordered:
 ---
 
 ## Migrated to changelog
+
+### [BUG-006] Windows spawn broken: `.cmd` shims and `npm` cannot spawn via `execFile`
+- [x] **Severity:** high
+- **Area:** electron, agents
+- **File(s):** electron/main/agents/detect.cjs, electron/main/services/workspaceChecks.cjs, electron/main/services/processService.cjs
+- **Observation:** `.cmd` shims (`claude.cmd`, `npm.cmd`) cannot be spawned via
+  `execFile` without a shell since Node 20.12 (EINVAL, CVE-2024-27980 hardening), and
+  there is no `npm.exe` — agent runs and checks are structurally broken on Windows,
+  the development platform (SRS M5; `detect.cjs:16`, `workspaceChecks.cjs:67`).
+- **Expected:** spawn semantics work on macOS and Windows (NFR-2).
+- **Repro / Notes:** on Windows, `checks.run` → spawn failure (mislabeled "exited 0"
+  per BUG-010). Fix per WS0.6: resolve `.cmd` shims to their underlying
+  `node …/cli.js` invocation (preferred over `shell: true`, which would force
+  shell-escaping of prompt text); `npm.cmd`/`npm` per platform via the same mechanism.
+  Acceptance: detection → run → checks pass on Windows with npm-installed CLIs. Soft
+  dependency on FEAT-004.
+- **Status:** fixed-pending-migration
+- **Fix:** Resolve the Windows npm shim to its absolute PATH location before using the existing guarded process wrapper. Real npm checks pass from a workspace path containing spaces; adapter fixtures accept native npm launchers.
+
+### [BUG-032] Filesystem tests assume Unix paths on Windows
+- [x] **Severity:** med
+- **Area:** tests
+- **File(s):** `src/tests/detectAgentBinaries.test.js`, `src/tests/workspaceServiceCore.test.js`
+- **Observation:** The Windows baseline at `f19b76e` passes 448 of 450 cases. The real-filesystem detection test splits a Windows drive path as a Linux PATH; the atomic-write test expects literal forward slashes from the host path API.
+- **Expected:** Both tests should exercise the same filesystem behavior on Windows and Unix hosts.
+- **Repro / Notes:** `npm test -- --run`; evidence in `build/minecraft-validation-20260909/baseline-vitest.json`.
+- **Status:** fixed-pending-migration
+- **Fix:** Use host-compatible paths in the real-filesystem detection fixture and native joins for atomic workspace-state assertions. Both original Windows failures now pass.
+
+### [BUG-033] Godot cannot discover Node on Windows
+- [x] **Severity:** high
+- **Area:** renderer
+- **File(s):** `godot/main.gd`
+- **Observation:** `_find_node` checks Unix installation paths and invokes `/usr/bin/which`. A standard Windows Node installation is never found, preventing the development frontend from starting its core.
+- **Expected:** The Godot app should discover Node on Windows as well as macOS/Linux.
+- **Repro / Notes:** Launch the Godot frontend on Windows with Node installed at `C:\Program Files\nodejs\node.exe`.
+- **Status:** fixed-pending-migration
+- **Fix:** Discover Node through the host PATH or CITYBASE_NODE. Real Godot 4.7.2 Windows startup now launches and authenticates its core; startup errors have a working Retry action.
+
+### [BUG-034] Godot instances compete for one fixed core port
+- [x] **Severity:** high
+- **Area:** renderer
+- **File(s):** `godot/main.gd`, `core/server.cjs`
+- **Observation:** Each frontend forces its child core to port 43117 and connects with a newly minted token. A second frontend cannot start an independent core on that port.
+- **Expected:** Multiple frontend instances should start their own cores without a port collision.
+- **Repro / Notes:** Launch two Godot frontends concurrently with separate test user-data directories.
+- **Status:** fixed-pending-migration
+- **Fix:** Let each core bind an OS-assigned port and publish readiness through a private, exclusive per-launch file without writing the token. Two real frontends connect concurrently; ownership cleanup preserves existing files.
+
+### [BUG-035] Public setup documentation still describes the legacy frontend
+- [x] **Severity:** low
+- **Area:** docs
+- **File(s):** `README.md`, `VERIFICATION.md`
+- **Observation:** After the v4 cutover commits, README still leads with v3 Electron and includes deleted seed-file paths. VERIFICATION lists 440 cases, while the current collector executes 450.
+- **Expected:** Document the Godot development path and current validation baseline, while retaining the supported Electron fallback instructions.
+- **Repro / Notes:** Compare these documents with `docs/v4-game-engine.md`, `package.json`, and the 2026-09-09 baseline report.
+- **Status:** fixed-pending-migration
+- **Fix:** Document the Godot development path, real workbench scope, separate concurrent profiles, current approval behavior, legacy Electron fallback, and macOS-only packaging. Refresh the verification baseline to 464 tests in 40 files.
+
+### [BUG-036] Godot level display does not refresh when a run settles
+- [x] **Severity:** med
+- **Area:** renderer
+- **File(s):** `godot/main.gd`, `godot/living_layer.gd`
+- **Observation:** `_on_run_settled` refreshes workbench history and dirty buildings without updating the living-layer vitals. Completed runs therefore do not immediately update displayed XP or level.
+- **Expected:** The displayed XP and level should reflect settled run history without restarting the app.
+- **Repro / Notes:** Complete the second successful run in a fresh profile; the displayed level should change from 1 to 2 at 50 XP.
+- **Status:** fixed-pending-migration
+- **Fix:** Refresh living-layer vitals with run history and current snapshot after settlement. Actual GDScript checks verify the level-2 transition with either response order.
+
+### [BUG-038] Concurrent cores can overwrite shared run history
+- [x] **Severity:** high
+- **Area:** agents
+- **File(s):** `core/server.cjs`, `electron/main/services/runStore.cjs`
+- **Observation:** Each core loads run history once and persists its own full copy. Two live cores using the same default user-data directory can erase each other's new runs and XP. Separate network ports alone do not isolate this state.
+- **Expected:** Refuse simultaneous core ownership of one state directory, or coordinate writes. Explicitly separate state directories must support concurrent instances.
+- **Repro / Notes:** Two stores initialized from the same empty directory each save their own new run; the last save removes the first run. The Minecraft trials deliberately use separate directories.
+- **Status:** fixed-pending-migration
+- **Fix:** Acquire a per-profile ownership claim before reading persisted state. Reject another live core with an actionable frontend error, reclaim dead process claims, and allow parallel cores with separate profiles.
+
+### [BUG-039] Project checks include ignored build artifacts
+- [x] **Severity:** med
+- **Area:** tests
+- **File(s):** `eslint.config.js`, `vite.config.js`
+- **Observation:** The tracked configuration omits `build/` from lint and test exclusions even though it is the ignored v4 output directory. Creating standalone validation fixtures there makes `npm run lint` inspect their unrelated Node/browser scripts (12 errors in the live trial) and exposes their test files to Vitest collection.
+- **Expected:** Project checks should cover Citybase source and exclude generated build output and disposable validation projects.
+- **Repro / Notes:** `npm run lint` after creating the Minecraft trial fixtures; captured in `build/minecraft-validation-20260909/lint-generated-baseline.txt`.
+- **Status:** fixed-pending-migration
+- **Fix:** Exclude generated build output and standalone fixture projects from ESLint and Vitest. The ordinary npm lint and test commands pass with both trial projects present.
+
+### [BUG-040] Godot resolves agent file activity against the application checkout
+- [x] **Severity:** med
+- **Area:** renderer
+- **File(s):** `godot/main.gd`
+- **Observation:** `_to_repo_relative` strips the Citybase source directory from absolute tool paths instead of the selected workspace root. A separate project therefore fails to map touched files to its city buildings.
+- **Expected:** Activity paths should resolve relative to the open Git workspace, including Windows drive-letter case differences.
+- **Repro / Notes:** Select a Minecraft trial fixture and pass an absolute path to one of its source files through `_touched_path`.
+- **Status:** fixed-pending-migration
+- **Fix:** Resolve streamed file paths against the selected workspace root, with Windows case handling and a directory boundary. Six GDScript regressions cover external/nested roots, relative paths, and neighboring prefixes.
+
+
 
 Entries below have been ticked off and copied as a one-liner into `CHANGELOG.md`.
 They are kept here so each `BUG-NNN` stays resolvable.
