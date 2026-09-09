@@ -44,6 +44,15 @@ Area tags for this project:
 
 ## Open
 
+### [BUG-042] Default Godot camera clips the edge of a small city
+- [ ] **Severity:** low
+- **Area:** renderer
+- **File(s):** `godot/camera_rig.gd`, `godot/main.gd`
+- **Observation:** At the default 1480×960 viewport, the final 23-file Minecraft trial cities have three and four districts respectively, but part of the outer `core` district falls below the bottom edge on initial load. The complete level/XP HUD remains visible. This occurred in both concurrent frontend captures using the unmodified production camera.
+- **Expected:** Initial framing should contain the complete small city within the viewport, with room for its HUD.
+- **Repro / Notes:** Open either completed 23-file trial workspace with its copied eight-run profile. Default screenshots are preserved under `build/minecraft-validation-20260909/godot/final-a-20260909-015927-shots/city-99-final.png` and `final-b-20260909-015927-shots/city-99-final.png`. Seven steps of the existing wheel-zoom-out control bring the district platforms into the viewport; separately labeled `city-zoomed-out.png` captures preserve that workaround. The `frame_radius()` distance factor is a suspected cause, not a confirmed diagnosis. No production camera changes were made during validation.
+- **Status:** open
+
 ### [BUG-037] XP is calculated from a truncated run-history window
 - [ ] **Severity:** med
 - **Area:** agents
