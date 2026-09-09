@@ -17,6 +17,9 @@ extends Node3D
 #   CITYBASE_CORE_USERDATA   separate state directory for concurrent instances
 
 const CORE_START_TIMEOUT_MS := 15000
+# The measured small-project diff is ~92 KiB encoded. Keep a bounded 1 MiB
+# allowance for RPC bursts; oversize responses must fail visibly.
+const RPC_BUFFER_BYTES := 1024 * 1024
 
 # Preloads (not class_name globals): the global class cache only exists after
 # an editor import pass, which CLI/autotest runs never perform.
@@ -31,9 +34,10 @@ var _core_port := 0
 var _core_connection_file := ""
 var _token := ""
 var _repo_root := ""
-var _ws := WebSocketPeer.new()
+var _ws := _new_ws_peer()
 var _ws_connected := false
 var _reconnecting := false
+var _connection_failed := false
 var _next_id := 0
 var _pending := {}
 var _log_label: RichTextLabel
@@ -55,6 +59,7 @@ var _bench: Workbench
 var _living: LivingLayer
 var _last_snapshot: Dictionary = {}
 var _last_runs: Array = []
+var _autotest_run_dispatched := false
 
 func _ready() -> void:
 	_spike_out = OS.get_environment("CITYBASE_SPIKE_OUT")
@@ -157,7 +162,16 @@ func _find_node() -> String:
 
 # ── WebSocket JSON-RPC client ──
 
+func _new_ws_peer() -> WebSocketPeer:
+	var peer := WebSocketPeer.new()
+	peer.inbound_buffer_size = RPC_BUFFER_BYTES
+	peer.outbound_buffer_size = RPC_BUFFER_BYTES
+	return peer
+
 func _connect_ws() -> void:
+	_ws = _new_ws_peer()
+	_ws_connected = false
+	_connection_failed = false
 	var url := "ws://127.0.0.1:%d/?token=%s" % [_core_port, _token]
 	var err := _ws.connect_to_url(url)
 	if err != OK:
@@ -178,19 +192,42 @@ func _process(delta: float) -> void:
 			_log("[color=green]connected to citybase-core[/color]")
 		while _ws.get_available_packet_count() > 0:
 			_on_message(_ws.get_packet().get_string_from_utf8())
-	elif state == WebSocketPeer.STATE_CLOSED and _core_port > 0 and not _ws_connected and not _reconnecting:
+	elif state == WebSocketPeer.STATE_CLOSED and _ws_connected:
+		var message := "Connection closed (%d): %s" % [_ws.get_close_code(), _ws.get_close_reason()]
+		if _ws.get_close_code() == 1009:
+			message += " The RPC buffer limit is 1 MiB."
+		_connection_lost(message)
+	elif state == WebSocketPeer.STATE_CLOSED and _core_port > 0 and not _connection_failed and not _reconnecting:
 		_reconnecting = true
 		await get_tree().create_timer(0.5).timeout
-		_ws = WebSocketPeer.new()
 		_connect_ws()
 		_reconnecting = false
+
+func _connection_lost(message: String) -> void:
+	# A local send failure can leave the socket open. Close that peer while
+	# retaining the owned core so Retry can attach with the same token.
+	if _ws.get_ready_state() == WebSocketPeer.STATE_OPEN:
+		_ws.close()
+	_ws_connected = false
+	_connection_failed = true
+	# Losing an acknowledgement does not tell us whether an action ran. Clear
+	# callbacks without reporting a provider failure or replaying a mutation.
+	_pending.clear()
+	_log("[color=red]%s[/color]" % message)
+	_bench.show_error("CORE CONNECTION LOST", message + "\nRetry to reload the current state. Pending actions are not replayed.")
 
 # on_result receives the result, or null when the call errored (the error is
 # logged); on_error (optional) receives the message.
 func _call_rpc(method: String, params: Array, on_result: Callable, on_error: Callable = Callable()) -> void:
+	if _ws.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		if on_error.is_valid():
+			on_error.call("Core is disconnected. Retry the connection first.")
+		return
 	_next_id += 1
 	_pending[_next_id] = { "ok": on_result, "err": on_error }
-	_ws.send_text(JSON.stringify({"id": _next_id, "method": method, "params": params}))
+	var error := _ws.send_text(JSON.stringify({"id": _next_id, "method": method, "params": params}))
+	if error != OK:
+		_connection_lost("Could not send request (%d). The RPC buffer limit is 1 MiB." % error)
 
 func _on_message(raw: String) -> void:
 	var msg: Variant = JSON.parse_string(raw)
@@ -260,10 +297,11 @@ func _load_snapshot(workspace_id: String) -> void:
 		_refresh_runs()
 		_shot("city-01-built")
 		_shot_after("city-04-living", 2.5)
-		if OS.get_environment("CITYBASE_SPIKE_RUN") == "1":
+		if OS.get_environment("CITYBASE_SPIKE_RUN") == "1" and not _autotest_run_dispatched:
+			_autotest_run_dispatched = true
 			_bench.set_work_visible(true)
 			_dispatch_run("Read the file README.md and reply with its first line only. Do not create, modify, or delete anything.")
-		elif _spike_out != "":
+		elif _spike_out != "" and not _autotest_run_dispatched:
 			# Give the living layer (ambient motes, flicker, vitals) time to
 			# appear in the city-04 shot before the idle autotest exits.
 			_quit_soon(4.5))
@@ -281,7 +319,13 @@ func _refresh_runs() -> void:
 		if runs is Array:
 			_last_runs = runs
 			_bench.set_runs(runs)
-			_living.update_snapshot(_last_snapshot, _last_runs))
+			_living.update_snapshot(_last_snapshot, _last_runs)
+			# A run may settle while disconnected. Reconcile the form only from
+			# authoritative history, without inferring an outcome from socket loss.
+			for run: Dictionary in runs:
+				var status := String(run.get("status", ""))
+				if String(run.get("runId", "")) == _run_id and status in ["done", "failed", "cancelled"]:
+					_bench.run_settled(status))
 
 # ── Live run → avatar + glow ──
 
@@ -532,6 +576,12 @@ func _on_open_workspace(dir: String) -> void:
 			_bench.show_error("WORKSPACE REGISTRATION FAILED", emsg))
 
 func _on_retry() -> void:
+	if _connection_failed:
+		if _core_pid > 0 and OS.is_process_running(_core_pid):
+			_bench.hide_error()
+			_connect_ws()
+			return
+		_stop_core()
 	if _core_port == 0 and _core_pid <= 0:
 		_bench.hide_error()
 		await _spawn_core()

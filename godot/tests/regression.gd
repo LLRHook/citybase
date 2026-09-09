@@ -26,6 +26,16 @@ func _run() -> void:
 	OS.set_environment("CITYBASE_NODE", original_override)
 	main._on_retry()
 	check(main.startup_attempts == 1 and main.connection_attempts == 1, "Retry restarts a failed core and reconnects")
+	var action_failed := [false]
+	main._pending[99] = {"err": func(_message: String): action_failed[0] = true}
+	main._connection_lost("fixture lost acknowledgement")
+	check(main._connection_failed and main._pending.is_empty() and not action_failed[0] and main._core_port == 43210, "disconnect preserves core and does not misreport pending action outcome")
+	main._run_id = "fixture-run"
+	main._bench.run_started(main._run_id)
+	main._refresh_runs()
+	main.respond("agent.listRuns", [{"runId": "fixture-run", "status": "done"}])
+	check(not main._bench._run_button.disabled and main._bench._status_label.text == "run settled · done", "history reconciles a run that settled while disconnected")
+	main._run_id = ""
 	main._repo_root = "C:/Projects/Citybase"
 	main._last_snapshot = {"rootPath": "D:/Game Projects/Minecraft"}
 	check(main._touched_path({"payload": {"path": "D:\\Game Projects\\Minecraft\\src\\world.js"}}) == "src/world.js", "external workspace tool path uses selected snapshot root")

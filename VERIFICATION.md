@@ -200,7 +200,21 @@ A failure in this stage is a hard block.
   godot --headless --path godot --script res://tests/regression.gd
   ```
   Expected: `REGRESSION_FAILURES=0`, exit 0. This exercises actual GDScript
-  Node discovery, level thresholds, and vitals refresh after settlement.
+  Node discovery, level thresholds, vitals refresh after settlement,
+  selected-workspace paths, and disconnected-run form recovery (24 checks
+  on Windows; the case-insensitive path check is Windows-only).
+  Run the real loopback transport checks as well, setting `GODOT_BIN` to
+  the installed Godot executable:
+  ```bash
+  GODOT_BIN=/absolute/path/to/godot node scripts/test-godot-transport.mjs
+  ```
+  In PowerShell, use `$env:GODOT_BIN = 'C:\path\to\godot.exe'` and then
+  `node scripts/test-godot-transport.mjs`.
+  Expected: 13 assertions pass, `TRANSPORT_FAILURES=0`, exit 0. These cover
+  128 KiB responses, the visible 1 MiB limit, pending acknowledgements,
+  and explicit reconnection without replay. The intentional outbound
+  overflow emits an engine buffer-space error; the assertion and exit
+  status establish the expected handling.
   Synthetic formula inputs are regression fixtures, not evidence of live
   agent completions. `coreStartup.test.js` separately launches real core
   processes to verify distinct ports, authentication, state-directory
