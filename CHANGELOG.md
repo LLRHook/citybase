@@ -42,8 +42,9 @@ sections under each release/date heading.
 ### Verified
 
 - 2026-09-09 Windows source validation: 464 Vitest cases across 40 files,
-  22 GDScript regression checks, ESLint, the Vite production build, and
-  the Electron smoke pass. Real Godot windows connected concurrently on
+  24 GDScript regression checks, 13 real WebSocket transport checks,
+  ESLint, the Vite production build, and the Electron smoke pass.
+  Real Godot windows connected concurrently on
   separate ports. Shared-profile rejection, retry after closing the owner,
   and forced-termination recovery were exercised. Windows packaging and
   full v4 release parity are not covered by this validation.
@@ -89,6 +90,9 @@ sections under each release/date heading.
   projects from Citybase's lint and test collection.
 - BUG-040: Resolve agent activity paths against the selected workspace,
   including Windows case differences and directory-prefix boundaries.
+- BUG-041: Allow real project diffs through bounded 1 MiB Godot buffers;
+  display connection failures and reconnect to the live core without
+  replaying actions. Restore a settled run's form from refreshed history.
 
 - BUG-009 Git runs with `-c core.quotePath=false` on the path-parsing
   surfaces (status snapshot, produceDiff), so unicode/accented filenames reach

@@ -302,6 +302,16 @@ the V&V run, fixed in-pass, migrated. What remains, re-verified and ordered:
 - **Status:** fixed-pending-migration
 - **Fix:** Resolve streamed file paths against the selected workspace root, with Windows case handling and a directory boundary. Six GDScript regressions cover external/nested roots, relative paths, and neighboring prefixes.
 
+### [BUG-041] Godot disconnects while reviewing a real generated project
+- [x] **Severity:** high
+- **Area:** renderer
+- **File(s):** `godot/main.gd`, `godot/tests/regression.gd`, `godot/tests/transport.gd`, `scripts/test-godot-transport.mjs`
+- **Observation:** A real approved Godot README run completed and persisted successfully in a copied Minecraft trial profile, but the frontend remained on the old XP and running row with no outcome. The generated project's 91,964-byte diff response exceeded Godot's default 65,535-byte inbound buffer and closed the connection with code 1009 while the core remained alive.
+- **Expected:** Settlement, history, XP, and the generated project's diff should reach the frontend without losing the connection. Disconnects should be visible and recoverable without replaying actions or claiming an unknown action failed.
+- **Repro / Notes:** QA run `bb869cd7` reproduced the stale UI. After the fix, real approved run `39173683` advanced the HUD from 75 to 100 XP, showed the done row and Outcome, and exited successfully. These QA runs use copied profiles and are separate from the two eight-task game trials.
+- **Status:** fixed-pending-migration
+- **Fix:** Set bounded 1 MiB inbound/outbound buffers on every WebSocket peer; surface oversized messages, server closure, and local send failures. Retry retains the live core, reloads state without replaying mutations, and reconciles the active run form from terminal history. Actual GDScript and 13 loopback transport assertions cover successful 128 KiB responses, explicit failure above the bound, pending acknowledgements, peer replacement, and reconnection.
+
 
 
 Entries below have been ticked off and copied as a one-liner into `CHANGELOG.md`.
