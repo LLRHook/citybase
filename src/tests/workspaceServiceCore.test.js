@@ -100,6 +100,60 @@ describe('createWorkspaceService — atomic, serialized writes (BUG-013)', () =>
   });
 });
 
+describe('createWorkspaceService — failed state reads', () => {
+  describe.each(['unreadable', 'corrupt', 'invalid-shape'])('%s registry', (failure) => {
+    it.each(['register', 'setCurrent', 'forget'])('rejects %s without replacing existing state', async (mutation) => {
+      const fs = makeFakeFs({ dirs: ['/a', '/b'] });
+      const svc = createWorkspaceService({ ...OPTS, fs });
+      const original = await svc.registerWorkspacePath('/a');
+      const file = '/data/workspaces.json';
+      if (failure === 'unreadable') {
+        const error = Object.assign(new Error('permission denied'), { code: 'EACCES' });
+        fs.readFile.mockRejectedValueOnce(error);
+      } else if (failure === 'corrupt') {
+        fs.store.set(file, '{broken json');
+      } else {
+        fs.store.set(file, JSON.stringify({ workspaces: null }));
+      }
+      const before = fs.store.get(file);
+      fs.writeFile.mockClear();
+      fs.rename.mockClear();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const action = mutation === 'register' ? () => svc.registerWorkspacePath('/b')
+          : mutation === 'setCurrent' ? () => svc.setCurrentWorkspace(original.id)
+          : () => svc.forgetWorkspace(original.id);
+        const expectedError = failure === 'unreadable' ? 'permission denied'
+          : failure === 'corrupt' ? SyntaxError : /invalid workspace state/;
+        await expect(action()).rejects.toThrow(expectedError);
+        expect(fs.writeFile).not.toHaveBeenCalled();
+        expect(fs.rename).not.toHaveBeenCalled();
+        expect(fs.store.get(file)).toBe(before);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+  });
+
+  it('recovers after a transient read failure without losing registered workspaces', async () => {
+    const fs = makeFakeFs({ dirs: ['/a', '/b'] });
+    const svc = createWorkspaceService({ ...OPTS, fs });
+    await svc.registerWorkspacePath('/a');
+    fs.readFile.mockRejectedValueOnce(Object.assign(new Error('read failed'), { code: 'EIO' }));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await expect(svc.registerWorkspacePath('/b')).rejects.toThrow('read failed');
+    } finally {
+      warn.mockRestore();
+    }
+
+    await svc.registerWorkspacePath('/b');
+    const restarted = createWorkspaceService({ ...OPTS, fs });
+    expect((await restarted.listRecentWorkspaces()).map((w) => w.rootPath)).toEqual(['/b', '/a']);
+    expect(await restarted.getCurrentWorkspace()).toMatchObject({ rootPath: '/b' });
+  });
+});
+
 describe('createWorkspaceService — headless mode', () => {
   it('pickWorkspace throws a clear error when no dialog is injected', async () => {
     const svc = createWorkspaceService({ ...OPTS, fs: makeFakeFs() });

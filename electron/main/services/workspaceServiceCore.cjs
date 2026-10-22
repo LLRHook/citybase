@@ -25,17 +25,23 @@ function createWorkspaceService({
     return path.join(getUserDataDir(), STATE_FILENAME);
   }
 
-  async function readState() {
+  async function readState({ forMutation = false } = {}) {
     try {
       const raw = await fs.readFile(statePath(), 'utf8');
       const parsed = JSON.parse(stripBom(raw));
-      if (!parsed || typeof parsed !== 'object') return emptyState();
+      if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.workspaces)) {
+        if (forMutation) throw new Error('invalid workspace state: expected a workspaces array');
+        return emptyState();
+      }
       return {
         currentId: typeof parsed.currentId === 'string' ? parsed.currentId : null,
-        workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces.filter(isValidWorkspace) : [],
+        workspaces: parsed.workspaces.filter(isValidWorkspace),
       };
     } catch (err) {
       if (err && err.code === 'ENOENT') return emptyState();
+      // A read-only boot can fall back to an empty view. A mutation must
+      // preserve the saved registry when its contents cannot be read.
+      if (forMutation) throw err;
       console.warn('citybase: failed to read workspace state, starting empty', err);
       return emptyState();
     }
@@ -77,7 +83,7 @@ function createWorkspaceService({
       throw new Error(`not a directory: ${real}`);
     }
     return enqueueMutation(async () => {
-      const state = await readState();
+      const state = await readState({ forMutation: true });
       const id = workspaceIdFor(real);
       const stamp = now();
       const existing = state.workspaces.find(w => w.id === id);
@@ -113,7 +119,7 @@ function createWorkspaceService({
 
   async function setCurrentWorkspace(id) {
     return enqueueMutation(async () => {
-      const state = await readState();
+      const state = await readState({ forMutation: true });
       const found = state.workspaces.find(w => w.id === id);
       if (!found) throw new Error(`unknown workspace id: ${id}`);
       state.currentId = id;
@@ -131,7 +137,7 @@ function createWorkspaceService({
 
   async function forgetWorkspace(id) {
     return enqueueMutation(async () => {
-      const state = await readState();
+      const state = await readState({ forMutation: true });
       state.workspaces = state.workspaces.filter(w => w.id !== id);
       if (state.currentId === id) state.currentId = null;
       await writeState(state);

@@ -217,6 +217,50 @@ the V&V run, fixed in-pass, migrated. What remains, re-verified and ordered:
 Entries below have been ticked off and copied as a one-liner into `CHANGELOG.md`.
 They are kept here so each `BUG-NNN` stays resolvable.
 
+### [BUG-032] A malformed saved event discards the entire run history
+- [x] **Severity:** high
+- **Area:** agents, electron
+- **File(s):** electron/main/services/runStore.cjs, src/tests/runStore.test.js
+- **Observation:** one null event in a terminal run makes `sanitizeRun` throw.
+  Both load paths catch the exception and return an empty history, dropping all
+  otherwise valid runs; saving the same trail also rejects the whole snapshot.
+- **Expected:** malformed event entries are skipped, valid runs and events survive
+  save/load, and the event cap counts valid events.
+- **Repro / Notes:** `npx vitest run src/tests/runStore.test.js`; regressions use
+  a real temporary `runs.json` for async and synchronous boot restoration.
+- **Fix:** discard malformed event entries before applying the valid-event cap;
+  preserve every valid run through async load, synchronous boot load, and save.
+- **Status:** fixed-pending-migration
+
+### [BUG-033] Workspace mutations overwrite existing state after a failed read
+- [x] **Severity:** high
+- **Area:** electron, git
+- **File(s):** electron/main/services/workspaceServiceCore.cjs, src/tests/workspaceServiceCore.test.js
+- **Observation:** `readState` treats permission, I/O, and JSON parse failures as
+  an empty registry. Registering or forgetting a workspace then atomically replaces
+  the existing file with incomplete state, losing the saved workspace list.
+- **Expected:** mutations reject unreadable or corrupt state without writing;
+  a subsequent successful read can recover without losing registered workspaces.
+- **Repro / Notes:** `npx vitest run src/tests/workspaceServiceCore.test.js`;
+  cover register/set-current/forget with EACCES, invalid JSON/state shape, and EIO recovery.
+- **Fix:** mutation reads reject I/O, JSON, and registry-shape failures before
+  writing; the serialized queue remains usable after a failed read.
+- **Status:** fixed-pending-migration
+
+### [BUG-034] Automated verification baseline omits two existing test files
+- [x] **Severity:** low
+- **Area:** docs
+- **File(s):** VERIFICATION.md
+- **Observation:** Stage 2 still lists 36 files / 440 cases, omitting the already
+  tracked parseLsTreeSizes (4) and questService (6) tests. The fetched baseline
+  contains 38 test files / 450 cases before this sprint's 13 regressions.
+- **Expected:** the baseline lists every root test file and its current case count.
+- **Repro / Notes:** Vitest's JSON report enumerates 38 root test files / 463 cases;
+  this local checkout contains a separate nested worktree that must be excluded.
+- **Fix:** update the baseline/table and document the local nested-worktree filter;
+  no test-discovery configuration or assertions are disabled.
+- **Status:** fixed-pending-migration
+
 ### [BUG-001] Preload bridge dead under `sandbox: true` — desktop degrades to browser stub
 - [x] **Severity:** high
 - **Area:** ipc, electron
