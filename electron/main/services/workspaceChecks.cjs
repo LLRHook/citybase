@@ -12,6 +12,17 @@ const fs = require('node:fs');
 
 const WANTED_SCRIPTS = ['lint', 'test', 'typecheck'];
 
+function resolveNpmCommand({ platform = process.platform, env = process.env, existsSync = fs.existsSync } = {}) {
+  if (platform !== 'win32') return 'npm';
+  for (const entry of (env.PATH || env.Path || '').split(';')) {
+    const directory = entry.trim().replace(/^"|"$/g, '');
+    if (!path.win32.isAbsolute(directory)) continue;
+    const candidate = path.win32.join(directory, 'npm.cmd');
+    if (existsSync(candidate)) return candidate;
+  }
+  return 'npm.cmd';
+}
+
 function defaultReadFileSync(p, enc) {
   return fs.readFileSync(p, enc);
 }
@@ -41,13 +52,14 @@ function stateFor(result) {
 }
 
 /**
- * @param {{ workspace: { rootPath: string }, processService: { run: Function }, readFileSync?: Function }} args
+ * @param {{ workspace: { rootPath: string }, processService: { run: Function }, readFileSync?: Function, platform?: string }} args
  * @returns {Promise<Array<{ name: string, state: 'pass'|'fail'|'warn', meta: string }>>}
  */
 async function runWorkspaceChecks({
   workspace,
   processService,
   readFileSync = defaultReadFileSync,
+  platform = process.platform,
 } = {}) {
   if (!workspace || typeof workspace.rootPath !== 'string') return [];
   if (!processService || typeof processService.run !== 'function') {
@@ -64,7 +76,12 @@ async function runWorkspaceChecks({
   const results = [];
   for (const script of WANTED_SCRIPTS) {
     if (typeof scripts[script] !== 'string') continue;
-    const result = await processService.run('npm', buildNpmArgv(script), { cwd: workspace.rootPath });
+    // Windows installs npm as a command shim, which processService wraps
+    // using its existing .cmd invocation path. A bare npm cannot be spawned.
+    // Resolve the shim absolutely so cmd expands its %~dp0 to the npm
+    // installation directory, even when the workspace path contains spaces.
+    const npm = resolveNpmCommand({ platform });
+    const result = await processService.run(npm, buildNpmArgv(script), { cwd: workspace.rootPath });
     results.push({
       name: `${script} · npm run ${script}`,
       state: stateFor(result),
@@ -74,4 +91,4 @@ async function runWorkspaceChecks({
   return results;
 }
 
-module.exports = { runWorkspaceChecks, buildNpmArgv, WANTED_SCRIPTS };
+module.exports = { runWorkspaceChecks, buildNpmArgv, resolveNpmCommand, WANTED_SCRIPTS };

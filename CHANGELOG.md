@@ -41,6 +41,14 @@ sections under each release/date heading.
 
 ### Verified
 
+- 2026-09-09 Windows source validation: 464 Vitest cases across 40 files,
+  24 GDScript regression checks, 13 real WebSocket transport checks,
+  ESLint, the Vite production build, and the Electron smoke pass.
+  Real Godot windows connected concurrently on
+  separate ports. Shared-profile rejection, retry after closing the owner,
+  and forced-termination recovery were exercised. Windows packaging and
+  full v4 release parity are not covered by this validation.
+
 - 2026-07-10 V&V pass (v1-gate closure + v4 phase A/B waves): Stages 0–5
   green after two in-pass fixes. 440 Vitest cases across 36 files, Playwright
   desktop smoke, lint zero-error across the renderer/electron/core/scripts
@@ -63,6 +71,28 @@ sections under each release/date heading.
   multi-agent review of the v3 changes and fixed this cycle (BUG-025..029).
 
 ### Fixed
+
+- BUG-006: Resolve the Windows npm shim to its absolute PATH location;
+  workspace checks now execute from paths containing spaces.
+- BUG-032: Use native paths in the real-filesystem detection and atomic
+  workspace-state test fixtures, fixing both Windows baseline failures.
+- BUG-033: Discover Node on Windows through PATH or CITYBASE_NODE and
+  allow Retry to recover from a failed Godot core startup.
+- BUG-034: Allocate an independent core port per Godot launch and report
+  readiness through a private file without writing the session token.
+- BUG-035: Document the Godot development path, supported workbench,
+  separate concurrent profiles, legacy fallback, and current test baseline.
+- BUG-036: Refresh displayed XP and level when runs settle, regardless of
+  the order in which history and snapshot responses arrive.
+- BUG-038: Prevent concurrent cores from overwriting one profile's history;
+  separate profiles can run in parallel and reclaim dead process claims.
+- BUG-039: Exclude generated build output and disposable validation
+  projects from Citybase's lint and test collection.
+- BUG-040: Resolve agent activity paths against the selected workspace,
+  including Windows case differences and directory-prefix boundaries.
+- BUG-041: Allow real project diffs through bounded 1 MiB Godot buffers;
+  display connection failures and reconnect to the live core without
+  replaying actions. Restore a settled run's form from refreshed history.
 
 - BUG-009 Git runs with `-c core.quotePath=false` on the path-parsing
   surfaces (status snapshot, produceDiff), so unicode/accented filenames reach
