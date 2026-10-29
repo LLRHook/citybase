@@ -148,16 +148,21 @@ A failure in this stage is a hard block.
   ```bash
   npm test -- --run
   ```
-  Expected: `Test Files  36 passed (36)`, `Tests  440 passed (440)`, exit 0.
+  Expected: `Test Files  38 passed (38)`, `Tests  463 passed (463)`, exit 0.
 - [ ] 2.3 Test-count baseline matches the collector:
   ```bash
-  npx vitest list | wc -l   # expect: 440
+  npx vitest list | wc -l   # expect: 463
   ```
   A mismatch with the table below means tests appeared or disappeared without
   a deliberate decision — investigate before ticking, then update the table
   in the same change as the run.
 
-**Baseline (2026-07-10, v1-gate closure + v4 phase A/B waves): 36 test files / 440 test cases — all Vitest (jsdom). The desktop launch path is covered by the Playwright smoke (2.4); the real-`claude` agent path (incl. non-blocking streaming dispatch + persistence) by the integration harnesses (Appendix F).**
+If a local checkout contains other checkouts under `.claude/worktrees`, add
+`--exclude '.claude/worktrees/**'` to the Vitest run/list command so those separate
+checkouts (including their Playwright suites) are not collected as root tests.
+The CI checkout does not contain these local worktrees.
+
+**Baseline (2026-10-22, persistence regression fixes): 38 test files / 463 test cases — all Vitest (jsdom). The desktop launch path is covered by the Playwright smoke (2.4); the real-`claude` agent path (incl. non-blocking streaming dispatch + persistence) by the integration harnesses (Appendix F).**
 
 | Test file | Cases | | Test file | Cases |
 |---|---|---|---|---|
@@ -172,13 +177,14 @@ A failure in this stage is a hard block.
 | `CliAgentAdapter.test.js` | 19 | | `reviewModel.test.js` | 9 |
 | `cityModel.test.js` | 9 | | `RunDetail.test.jsx` | 7 |
 | `CityView.test.jsx` | 8 | | `runCity.test.js` | 17 |
-| `citybaseApi.test.js` | 2 | | `runStore.test.js` | 9 |
+| `citybaseApi.test.js` | 2 | | `runStore.test.js` | 12 |
 | `CodexAdapter.test.js` | 25 | | `useAgentDetect.test.jsx` | 8 |
 | `coreProtocol.test.js` | 2 | | `useRunHistory.test.jsx` | 6 |
 | `coreRpcServer.test.js` | 7 | | `windowConfig.test.js` | 10 |
 | `detectAgentBinaries.test.js` | 19 | | `workspaceChecks.test.js` | 13 |
 | `gitMutations.test.js` | 14 | | `WorkspaceErrorStates.test.jsx` | 6 |
-| `ipcHandlers.test.js` | 36 | | `workspaceServiceCore.test.js` | 9 |
+| `ipcHandlers.test.js` | 36 | | `workspaceServiceCore.test.js` | 19 |
+| `parseLsTreeSizes.test.js` | 4 | | `questService.test.js` | 6 |
 
 - [ ] 2.4 Desktop E2E smoke (Playwright `_electron`, FEAT-001) — requires a
   fresh `dist/`:

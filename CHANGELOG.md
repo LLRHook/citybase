@@ -41,6 +41,13 @@ sections under each release/date heading.
 
 ### Verified
 
+- 2026-10-22 Persistence regression validation: 463 Vitest cases across 38 root
+  test files passed (13 new cases), ESLint clean, production renderer build clean.
+  The existing nested `.claude/worktrees` checkout was excluded from this local
+  Vitest run because its Playwright suite is outside the root unit-test suite.
+  This is an automated gate pass; desktop/real-agent release walkthroughs were
+  not rerun.
+
 - 2026-07-10 V&V pass (v1-gate closure + v4 phase A/B waves): Stages 0–5
   green after two in-pass fixes. 440 Vitest cases across 36 files, Playwright
   desktop smoke, lint zero-error across the renderer/electron/core/scripts
@@ -63,6 +70,15 @@ sections under each release/date heading.
   multi-agent review of the v3 changes and fixed this cycle (BUG-025..029).
 
 ### Fixed
+
+- BUG-032 Malformed saved event entries no longer erase otherwise valid run
+  history during async/synchronous restoration or reject an entire history save;
+  the trail cap retains the latest 60 valid events.
+- BUG-033 Workspace mutations reject unreadable/corrupt saved state before any
+  write, preserving the existing registry and allowing recovery after transient
+  read failures without losing prior workspaces.
+- BUG-034 Stage 2's automated-test baseline includes the previously omitted
+  parseLsTreeSizes/questService tests and this sprint's persistence regressions.
 
 - BUG-009 Git runs with `-c core.quotePath=false` on the path-parsing
   surfaces (status snapshot, produceDiff), so unicode/accented filenames reach
