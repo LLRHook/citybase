@@ -211,3 +211,17 @@ Active work only. Format and rules: [`.cycle/TRACKERS.md`](.cycle/TRACKERS.md). 
 - **Repro / Notes:** Native Windows Godot walkthrough at ff9e150: start a fresh profile, reject one fixture run, restart; screenshots and cancelled runs.json are in the verification evidence.
 - **Bump:** patch
 - **Status:** open
+
+### [BUG-1793652065] Cycle hooks are not fully active across platforms
+- [x] **Severity:** med
+- **Area:** build
+- **File(s):** hooks/pre-commit, hooks/commit-msg
+- **Observation:** The newly installed pre-commit hook is indexed as 100644, so Unix Git ignores it. The appended cycle commit guard follows the existing unconditional exit and is unreachable.
+- **Expected:** The pre-commit hook is executable in Git and the cycle guard runs before successful exit, while preserving conventional commit validation.
+- **Req:** CB-NFR-005; maintained cycle setup
+- **Depends on:** none
+- **Repro / Notes:** Inspect git ls-files --stage hooks/pre-commit and the tail of hooks/commit-msg after the maintained installer. Validate syntax and good/bad conventional messages after composing the hooks.
+- **Bump:** patch
+- **Status:** fixed-pending-migration
+- **Fix:** Track pre-commit as executable and compose the cycle guard before the conventional validator exits successfully. Hook syntax and valid/invalid conventional subjects pass.
+- **Docs:** AGENTS.md, CONTRIBUTING.md, docs/FOUNDATION.md

@@ -10,8 +10,10 @@ release or a claim that every historical feature and native parity gate is done.
 - PR #71's conflicting legacy bug IDs became BUG-043 through BUG-045; #70's
   BUG-032 through BUG-034 retain their distinct meanings. Its new Windows test
   fixture uses the actual native state-file path.
-- PR #68 needs the supported Node baseline established here before its jsdom 30
-  update can be verified and merged. Its original CI used Node 20 and ran no tests.
+- PR #68's dependency upgrades are integrated into this foundation branch and
+  validated with the supported Node baseline. Its original CI used Node 20 and
+  ran no tests. Close #68 as superseded only after the combined foundation PR
+  passes CI and merges; do not leave its changes unlanded.
 - PR #69 is pending an explicit product-direction decision: its Electron-only
   model-shop proposal conflicts with the current Godot charter. Its branch and
   work remain preserved.
@@ -46,13 +48,14 @@ On Windows with Node 24.15.0 and checksum-verified Godot 4.7.2:
 | Check | Observed result |
 |---|---|
 | Integrated Vitest suite | 477/477, 40 files, zero skips: Node 404/30 files, renderer 73/10 files |
-| V8 coverage | 72.39% lines, 70.19% statements, 67.86% branches, 67.18% functions; no invented threshold |
+| V8 coverage after dependency integration | 72.85% lines, 70.83% statements, 69.17% branches, 68.21% functions; no invented threshold |
 | Lint / production renderer build | Pass |
 | Real Electron smoke | Pass; host-inherited ELECTRON_RUN_AS_NODE is removed by the test launcher |
 | Unpacked Windows Electron artifact | Explicit unsigned verification package launches; zero duplicate React package entries in app.asar |
 | Godot regressions | 24 checks pass |
 | Real Godot/WS transport | 13 checks pass, including oversized results, disconnect and explicit reconnect without replay |
 | Fresh committed checkout | All automated layers pass at `ff9e1505d5e0`; same 477 cases, no skips, tracker lint and local Markdown links clean |
+| Integrated dependency candidate | Fresh checkout at `1d5b431`: all automated layers and the Electron 43.3 unpacked artifact/smoke pass; zero duplicate React entries |
 | Native Godot GUI | Actual source city, fixture selection, WORK, approval/reject, cancelled history and selected workspace restored after restart; fixture Git tree unchanged |
 
 Raw logs and machine reports are kept in private verification evidence, and the
