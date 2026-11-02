@@ -1,3 +1,7 @@
+<!-- historical-baseline -->
+
+> Historical prototype review, retained unchanged below. Current requirements: [SRS.md](SRS.md); architecture and contracts are linked in [the documentation index](README.md).
+
 # Citybase — Software Requirements Specification & Plan of Action
 
 | | |

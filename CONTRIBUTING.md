@@ -1,92 +1,67 @@
-# Contributing
+# Contributing to Citybase
 
-Thanks for working on Citybase. This file covers how PRs are opened, what CI checks must pass, and what's currently out of scope.
+Read [AGENTS.md](AGENTS.md) and the [documentation index](docs/README.md).
+Godot is the primary frontend; Electron is a legacy fallback. Changes should
+preserve shared service behavior and the provider-neutral harness.
 
 ## Workflow
 
-1. Branch from `main`. Use a descriptive name (`phase-0a-foundation`, `fix/timeline-flake`, `feat/jira-adapter`, etc.).
-2. Make focused commits — one concern per commit when practical.
-3. Open a PR. Fill in the PR template ([.github/pull_request_template.md](./.github/pull_request_template.md)).
-4. Wait for CI to go green. Do not merge red PRs.
+1. Branch from current `main`. Preserve other writers' changes and use an
+   isolated checkout for concurrent work.
+2. Scope/file the ticket with the maintained tracker writer before coding.
+   Use groom, implement or a cohesive implement-batch, doc-sync, then V&V.
+3. Make focused conventional commits. Open a PR with problem, behavior,
+   validation at the tested SHA, risks and actual limitations.
+4. Fix failing CI and substantive review findings. CI gates merge; CodeRabbit
+   advice does not itself block it. Use the repository's squash-merge convention.
 
-## CI must pass
+Never push directly to `main`, skip hooks/checks, override Git identity, or
+rewrite someone else's history. The global `/commit` skill is not appropriate
+for this project's subject convention.
 
-Every PR runs:
+## Local gate
 
-```bash
+```sh
 npm ci
+python .cycle/trackers.py install
 npm run lint
 npm run build
-npm test -- --run
+npm test
+npm run test:coverage
+npm run test:e2e
+npm run test:godot
+python .cycle/trackers.py lint
+node scripts/check-doc-links.mjs
 ```
 
-All four must succeed. CI definition is in [.github/workflows/ci.yml](./.github/workflows/ci.yml).
+Node and jsdom test projects have distinct environments; production fixtures
+are prohibited. Tests live in `src/tests/`, Electron smoke in `e2e/`, GDScript
+regressions in `godot/tests/`. Use real-system boundary tests for persistence,
+processes and transport. Label deterministic provider fixtures honestly.
 
-If a check fails because of a flaky test or environmental issue, fix the root cause — don't disable the check.
+CI uses the supported `.nvmrc` runtime, coverage/static checks, Linux desktop
+smoke/packaging, Windows/macOS smoke, and checksum-pinned Godot headless checks.
+The full manual/native release procedure remains [VERIFICATION.md](VERIFICATION.md).
 
-## Commit messages
+## Commits and style
 
-This project enforces **conventional commits** via the [hooks/commit-msg](./hooks/commit-msg) script. The hook is activated automatically when you run `npm install` (which sets `git config core.hooksPath hooks` via the postinstall script).
+Subject: `<type>(<scope>)?: <description>`, at most 72 characters. Use a lowercase
+imperative description without final `.`, `!` or `?`. Types: feat, fix, refactor,
+docs, test, chore, ci, style, perf, build, revert. Optional `!` marks breaking
+changes. `hooks/commit-msg` is authoritative, including its Git-generated merge,
+revert and fixup exemptions.
 
-### Format
+Match the owning module. Keep JavaScript/JSX and CJS conventions; do not migrate
+TypeScript incidentally. Preserve the Electron isolation/bridge boundary and
+keep production subprocesses in the process service. Frontend changes do not
+authorize a styling-system swap, new backend, cloud infrastructure or unreviewed
+runtime dependency. React is a development dependency bundled by Vite; `ws` is
+the core's runtime dependency.
 
-```text
-<type>(<scope>)?<!>?: <imperative description>
+## Documentation and release
 
-Optional body explaining why, not what.
-```
-
-### Rules (enforced by the hook)
-
-- **Type prefix is required.** Allowed types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `ci`, `style`, `perf`, `build`, `revert`.
-- **Description starts with a lowercase letter** and does **not** end with `.` `!` or `?`.
-- **Subject must be 72 characters or fewer**, including the type prefix.
-- **Scope is optional and lowercase** — e.g. `fix(lint): drop unused imports`.
-- **Breaking-change marker `!` is optional** — e.g. `feat!: drop legacy data shim`.
-
-### Examples
-
-```text
-feat: add agent-runtime adapter contract
-fix(lint): drop unused React imports
-refactor: centralize mock data into src/data/seed.js
-ci: wire CodeRabbit review config
-docs: add domain-model and agent-runtime
-test: add App and QuestBoard smoke tests
-```
-
-### Inside Claude Code
-
-A second layer — [.claude/hooks/validate-commit-msg.sh](./.claude/hooks/validate-commit-msg.sh) — runs as a `PreToolUse` hook on `Bash`. It intercepts `git commit -m "..."` calls inside the session before they execute, so a malformed subject is rejected immediately rather than after the commit attempt.
-
-**Don't use the global `/commit` skill on this repo** — its output (branch name as subject) will be rejected by the hook. Use `git commit -m "<type>: ..."` directly.
-
-## Code style
-
-- Match the patterns already in [src/game/](./src/game/).
-- Inline styles are fine for now (the design system is built with `Panel`, `NeonBar`, `Title`, etc. in `theme.jsx`).
-- Don't introduce CSS-in-JS libraries, Tailwind, or styled-components in this phase.
-- Prefer functional React with hooks; no class components.
-
-## Testing
-
-- New behavior gets a test if it's feasibly testable in jsdom.
-- Tests live in `src/tests/`.
-- Use Vitest + React Testing Library. See existing smoke tests for the pattern.
-
-## What's out of scope right now
-
-- TypeScript migration (planned later; don't migrate files as a side effect).
-- New runtime dependencies (require justification in the PR description).
-- Visual / styling overhauls.
-- Backend, database, hosting, real Jira/Bitbucket integration — see [ROADMAP.md](./ROADMAP.md) for phase boundaries.
-
-## AI-generated PRs
-
-AI agents are welcome contributors. They follow the same rules as humans:
-
-- One feature branch per PR.
-- CI must be green.
-- The PR description should describe the change in human terms, not just the diff.
-
-See [AGENTS.md](./AGENTS.md) for the full agent handbook.
+Update living docs caused by the change and file other drift as a docs defect.
+Preserve dated evidence. Record meaningful test counts/skips and platform limits;
+never equate CI, source checks, provider output quality and a full release gate.
+The owner decides milestone/version and publication after the concrete release
+candidate and required native validation are ready.

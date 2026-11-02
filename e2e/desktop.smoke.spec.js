@@ -26,8 +26,12 @@ test('desktop shell opens with a live bridge and a sandboxed renderer', async ()
   // --no-sandbox only on CI: ubuntu-24.04 runners restrict unprivileged user
   // namespaces, which breaks Electron's OS-level sandbox helper. The renderer
   // sandbox under test (webPreferences sandbox: true) is unaffected.
-  const launchArgs = process.env.CI ? ['.', '--no-sandbox'] : ['.'];
-  const app = await electron.launch({ args: launchArgs, cwd: repoRoot });
+  const executablePath = process.env.CITYBASE_ELECTRON_EXECUTABLE;
+  const launchArgs = executablePath ? [] : ['.'];
+  if (process.env.CI) launchArgs.push('--no-sandbox');
+  const env = { ...process.env };
+  delete env.ELECTRON_RUN_AS_NODE;
+  const app = await electron.launch({ args: launchArgs, cwd: repoRoot, executablePath, env });
   try {
     const window = await app.firstWindow();
     await window.waitForLoadState('domcontentloaded');

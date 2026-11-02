@@ -1,321 +1,53 @@
-# Citybase Desktop - Roadmap
-
-Citybase is a downloadable desktop code editor shell with a game-like visual interface. The HTML/React prototype is the visual reference, not the final runtime target.
-
-The product is not a cloud SaaS agent platform and not a replacement for Codex or Claude Code. It is a local-first UI layer over a single Git workspace and a pluggable AI agent harness. The user should be able to open the app, pick one software project, connect Git, choose an agent provider, and drive work through a visual city instead of staring at code by default.
-
-## Status — v3.0 "Real-Time City" (current)
-
-v2.0 made the repo a living isometric city; v3.0 makes the workbench **real-time
-and durable**. Agent dispatch is non-blocking and streaming (the UI never freezes;
-runs show `running` immediately; cancel terminates the process for real), the city
-animates live as the agent works (agent presence + completion ripple), and run
-history is **persisted across restarts**. See [CHANGELOG.md](./CHANGELOG.md)
-(FEAT-004 / FEAT-008 / FEAT-019) and [features.md](./features.md). Optional v3.x
-deepening: live token-by-token events via claude `--output-format stream-json`
-(FEAT-005) and an incrementally-streaming run detail (FEAT-020).
-
-v2.0 shipped the visual city — the founding promise — as the default view,
-projected from real Git state and fused with live agent runs, plus the
-approval-boundary safety gate (BUG-004).
-
-## Product Boundary
-
-Citybase v1 should do these things well:
-
-- Run as an installed desktop application on macOS first, with Windows and Linux kept in mind.
-- Open one local Git repository at a time.
-- Read branch, status, file tree, commit history, and recent changes from Git.
-- Render the repository as the city: folders are districts, files are buildings, project state is visual.
-- Connect to a local agent harness through adapters. The first adapters should target Codex CLI and Claude Code.
-- Send simple work requests to the selected agent and stream progress back into the UI.
-- Hide source code by default. Users see visual status, summaries, changed areas, confidence, risks, and outcomes.
-- Keep explicit approval boundaries before any agent changes files, runs commands, commits, or pushes.
-
-Citybase v1 should not do these things yet:
-
-- Host team SaaS accounts.
-- Require Jira, Bitbucket, GitHub, or any remote issue tracker.
-- Run its own cloud sandboxes.
-- Pretend to be the coding agent.
-- Display raw code diffs as the primary experience.
-- Manage multiple repos at once.
-- Build a plugin marketplace or custom agent framework.
-
-## Demoable v1 Sentence
-
-"I open Citybase, choose a local Git repository, see the project as a city, connect Codex or Claude Code, ask for one task, watch the agent work through visual progress, review a no-code summary of what changed, then approve or reject the result."
-
-## Recommended Stack Direction
-
-The current prototype should stay React + Vite while we build the real app shell around it.
-
-Preferred v0.3/v1 path:
-
-- Desktop shell: Electron for the first real app slice.
-- Frontend: React + TypeScript + Vite.
-- Local bridge: Electron main process with typed IPC.
-- Git integration: start by shelling out to the user's installed `git` binary, then add a Git library only if needed.
-- Agent integration: adapter interface over local CLIs first, with Codex CLI and Claude Code as the initial targets.
-- Process streaming: run agent commands in the desktop main process, stream structured events to the renderer.
-- State: local project/session store in the app data directory, plus in-memory UI state while the prototype matures.
-- Packaging: app bundles for macOS first; Windows/Linux after the bridge works.
-
-Tauri remains a good later option if bundle size and native hardening matter more than fastest integration. Electron is the pragmatic first choice because this project needs reliable child processes, local CLI orchestration, IPC, and packaging quickly.
-
-## Architecture Sketch
-
-```text
-Citybase Desktop App
-
-React/Vite renderer
-  - city map
-  - quest board
-  - visual analysis
-  - action controls
-  - settings
-
-Typed IPC boundary
-  - never expose arbitrary shell access to the renderer
-  - every command has an explicit allow-list and approval state
-
-Desktop main process
-  - workspace picker
-  - Git service
-  - agent adapter manager
-  - process runner
-  - event normalizer
-  - local session store
-
-Local tools
-  - git
-  - codex
-  - claude
-```
-
-## Adapter Contract
-
-> **Superseded:** the sketch below is the original planning shape. The
-> canonical, implemented contract (seven methods, event kinds, approval
-> payload) lives in [docs/agent-runtime.md](./docs/agent-runtime.md) — when
-> the two disagree, agent-runtime.md wins.
-
-The UI should not know whether Codex or Claude Code is running. It should talk to a small provider-neutral contract:
-
-```ts
-type AgentProvider = "codex" | "claude";
-
-type AgentRequest = {
-  workspacePath: string;
-  provider: AgentProvider;
-  prompt: string;
-  mode: "plan" | "edit" | "review" | "test";
-  approvalMode: "ask" | "read-only" | "workspace-write";
-};
-
-type AgentEvent =
-  | { type: "started"; runId: string }
-  | { type: "status"; label: string; detail?: string }
-  | { type: "changed-area"; path: string; changeKind: "added" | "modified" | "deleted" }
-  | { type: "needs-approval"; action: string; reason: string }
-  | { type: "completed"; summary: string }
-  | { type: "failed"; message: string };
-```
-
-Raw terminal output can be retained in logs for debugging, but the main app experience should translate it into game-state events.
-
-## Phase 0A - Stabilization (complete)
-
-**Goal.** Carve a small, low-risk slice out of Phase 0 so the prototype has a documented, tested, CI-backed shell before any real-data work begins.
-
-**Landed.** Foundation merged across [PR #1](https://github.com/LLRHook/citybase/pull/1), [#6](https://github.com/LLRHook/citybase/pull/6), [#7](https://github.com/LLRHook/citybase/pull/7), [#8](https://github.com/LLRHook/citybase/pull/8); commits squash-merged into `main`.
-
-- [x] Repo spine: [README](./README.md), [AGENTS.md](./AGENTS.md), [CONTRIBUTING.md](./CONTRIBUTING.md), [CLAUDE.md](./CLAUDE.md), `.github/pull_request_template.md`, `.github/dependabot.yml`.
-- [x] CI: [.github/workflows/ci.yml](./.github/workflows/ci.yml) runs `install -> lint -> build -> test`, least-privilege token, SHA-pinned actions, `pull_request` trigger only.
-- [x] Mock data centralized in [src/data/seed.js](./src/data/seed.js); `src/game/data.js` and `sagas.js` are thin re-export shims so component imports keep working.
-- [x] Component split for Fast Refresh: [palette.js](./src/game/palette.js), [hex.js](./src/game/hex.js), [useTweaks.js](./src/game/useTweaks.js); [theme.jsx](./src/game/theme.jsx) is components-only.
-- [x] Tests: Vitest + React Testing Library + jsdom wired; smoke tests against `<App />` cover render and seed-data flow.
-- [x] Lint zero-error: `react-refresh/only-export-components` at error severity, no `react-hooks/refs` violations, no unused `React` imports.
-- [x] Domain model + agent-runtime contract: [docs/domain-model.md](./docs/domain-model.md), [docs/agent-runtime.md](./docs/agent-runtime.md).
-- [x] Commit discipline: [hooks/commit-msg](./hooks/commit-msg) canonical validator + [.claude/hooks/validate-commit-msg.sh](./.claude/hooks/validate-commit-msg.sh) PreToolUse wrapper.
-- [x] AI review wired: [.coderabbit.yaml](./.coderabbit.yaml) in advisory mode.
-- [x] Claude Code project setup: [.claude/settings.json](./.claude/settings.json) with permissions allowlist + PreToolUse hook.
-
-## Phase 0 - Reframe The Prototype
-
-Goal: make the current prototype clearly describe the desktop app we are building.
-
-Definition of done:
-
-- README says Citybase is a desktop app, not a website.
-- Roadmap says v1 is local Git + agent harness, not Jira/Bitbucket SaaS.
-- UI copy stops implying a live Bitbucket/Jira connection.
-- Analysis view is redesigned conceptually as visual results instead of code diffs.
-- Lint/build status is known and tracked.
-
-## Phase 1 - Desktop Shell
-
-Goal: wrap the current visual prototype in a real downloadable app shell.
-
-Definition of done:
-
-- Electron app opens the existing React UI.
-- App can be launched from the OS like a normal desktop app.
-- Basic app menu exists: Open Workspace, Settings, Quit.
-- Workspace path is stored locally and restored on restart.
-- No web server is required for normal app use.
-
-Work items:
-
-- Add Electron main/preload processes.
-- Keep renderer isolated from Node APIs.
-- Add a typed IPC helper.
-- Add packaging script for macOS development builds.
-- Add a "desktop mode" smoke test that opens the app window.
-
-## Phase 2 - Local Git Connection
-
-Goal: connect the city to the selected repository.
-
-Definition of done:
-
-- User picks a local folder.
-- App verifies it is a Git repository.
-- Top bar shows real repo name, branch, and dirty/clean state.
-- City districts are generated from the real folder tree.
-- Activity feed shows recent commits and working-tree changes.
-
-Work items:
-
-- Implement Git service in the desktop main process.
-- Add workspace picker and repo validation.
-- Build a pure `repoTree -> cityModel` projector.
-- Replace static `REPO`, `DISTRICTS`, and `BUILDINGS` fixtures for the connected path.
-- Add empty states for no workspace, invalid repo, and missing Git.
-
-## Phase 3 - Agent Harness Basics
-
-Goal: call Codex CLI or Claude Code from the desktop app without building a new agent.
-
-Definition of done:
-
-- Settings screen detects installed `codex` and `claude` binaries.
-- User can select provider per workspace.
-- A simple request can be sent to the selected provider.
-- The UI receives progress events and completion/failure state.
-- All file-changing modes require approval.
-
-Work items:
-
-- Create `AgentAdapter` interface.
-- Implement `CodexCliAdapter`.
-- Implement `ClaudeCodeAdapter`.
-- Normalize stdout/stderr into `AgentEvent` values.
-- Store runs locally with timestamps, provider, prompt, and final result.
-- Add failure states for missing binary, auth needed, cancelled run, and timeout.
-
-## Phase 4 - No-Code Work Review (complete)
-
-Goal: make the result screen match the product promise: visual first, no raw source by default.
-
-Definition of done:
-
-- [x] Analysis screen no longer renders raw code hunks as the primary view.
-- [x] Changed files are shown as affected buildings/districts.
-- [x] Results summarize intent, areas changed, tests/checks run, risk level, and next action.
-- [x] A raw log/debug drawer exists only for advanced troubleshooting.
-
-Work items:
-
-- [x] Replace "Code Changes" with "Changed Districts" and "Outcome" — RunDetail's
-  terminal view leads with an Outcome panel (agent summary + explainable risk
-  level + churn totals) and a Changed Districts panel (files grouped by the
-  city's district convention via the pure `src/app/reviewModel.js`).
-- [x] Add a visual diff summary: files changed, change type, risk, confidence.
-- [x] Approve/reject controls — the pre-flight approval gate (BUG-004) covers
-  approve/reject before any write; post-run next actions are Open PR + commit.
-- [x] Preserve enough hidden run data for debugging — the full agent log and
-  raw diff hunks live in collapsed drawers.
-
-## Phase 5 - Basic Editor Workflows (complete)
-
-Goal: make Citybase useful for a single developer on one project.
-
-**Landed.** Five slices on `main`: [#29](https://github.com/LLRHook/citybase/pull/29), [#31](https://github.com/LLRHook/citybase/pull/31), [#34](https://github.com/LLRHook/citybase/pull/34), [#35](https://github.com/LLRHook/citybase/pull/35), [#38](https://github.com/LLRHook/citybase/pull/38).
-
-Definition of done:
-
-- [x] Open workspace.
-- [x] See Git state.
-- [x] Run an agent task.
-- [x] Review visual result.
-- [x] Run tests or lint through approved actions.
-- [x] Commit through an explicit Git action when the user is ready.
-
-Work items:
-
-- [x] Branch selector/status — slice 1.
-- [x] Staged/unstaged visual state — slice 2.
-- [x] "Run checks" action — slice 3.
-- [x] "Commit result" action with editable message + branch checkout — slice 4.
-- [x] Local run history (real, no seed/mock data) — slice 5.
-
-## v1 Ship Gate
-
-Citybase v1 ships when every item is true:
-
-- Installed desktop app launches without a dev server.
-- **App auto-boots on launch:** the most recent workspace is restored when one exists, agent detection runs, and the user lands in a usable state without intermediate clicks. First-run users see the unlinked shell and a single 'Open Workspace' affordance.
-- User can open one local Git repository.
-- City view is generated from the real repository.
-- Git status, branch, and recent changes are real.
-- **Claude Code adapter** is available when the `claude` CLI is installed and is the default first-run provider. The Codex adapter ships in v1 as well but is not a hard ship requirement — `claude` not installed surfaces a clear settings prompt; v1 does not block on either being present.
-- A read-only agent request and a write-capable approved request both work end to end against Claude Code.
-- The default review surface does not show raw code.
-- App handles missing Git, missing agents, auth failures, and cancelled runs cleanly.
-- Build, lint, typecheck, and smoke tests are green.
-- README includes setup, app architecture, safety model, and troubleshooting.
-
-### Status (post Phase 5)
-
-The structural plumbing for the v1 ship gate is in place. Each gate item below is annotated with the PR(s) that addressed it; items without a PR reference still need work.
-
-- ✅ **Claude Code adapter functional end-to-end against the real `claude` CLI.** The adapter now uses the real flags (`--print --output-format json --model … --permission-mode bypassPermissions` + the prompt as a positional arg) and `streamEvents` yields real Claude output instead of a synthesized trail. [#36](https://github.com/LLRHook/citybase/pull/36).
-- ✅ **App auto-boots on launch.** Main process pushes a one-shot boot payload over `BOOT_PAYLOAD_CHANNEL` once `did-finish-load` fires, carrying `{ detect, workspace }`. The renderer's `useAgentDetect` hook accepts the cached payload and skips the IPC roundtrip; `useWorkspace` restores the recent workspace via `getCurrentWorkspace`. No clicks needed before the city renders. [#37](https://github.com/LLRHook/citybase/pull/37).
-- ✅ **Local run history is real.** `agentManager.listRuns()` surfaces every dispatched run from the in-memory history Map (cancel-survives, FIFO-bounded). The renderer's Run History panel renders rows for real runs and an explicit "no runs yet" empty state instead of seed data. [#38](https://github.com/LLRHook/citybase/pull/38).
-- ✅ **`openPR` via `gh` CLI** — implemented; `CliAgentAdapter.openPR` shells out to `gh pr create` and RunDetail exposes it on terminal runs.
-- ✅ **Token-by-token streaming** — shipped in v3.0 (FEAT-004 `spawnStream` + FEAT-005 stream-json events); FEAT-020 renders the stream live in RunDetail.
-- ✅ **README updates** for setup, packaging, safety model, troubleshooting (FEAT-002, shipped upstream in the operator-guide rewrite).
-- ✅ **Default review surface shows no raw code** — Phase 4 landed: Outcome + Changed Districts primary, hunks/log in collapsed drawers.
-- ✅ **Error states render** — BUG-007: non-repo / git-missing / IPC-failure states surface as an explicit panel with retry/pick affordances (verified live on macOS via `scripts/dev-capture.mjs`).
-- ⏭ **End-to-end manual verification of packaged builds** (`package:dir` artifacts) on macOS / Windows. The dev-mode app is verified live on macOS; the packaged-artifact walkthrough remains a release-checklist item (VERIFICATION.md).
-
-### Out of v1 scope (deferred to v1.1+)
-
-- Codex CLI as a hard ship requirement (the adapter ships, but Codex is not part of the must-pass demo).
-- Multi-workspace switching from inside a running app session (close + relaunch is fine for v1).
-- Push-to-remote action (commit lands locally; the user finishes in their normal Git tool).
-- Any remaining seed/mock data the renderer still imports (`EMPTY_*` stubs in `App.jsx`, `ADV_REPORTS` in `src/data/seed.js`). The renderer already ignores these in production paths thanks to slice 5's run-history surface, but the imports themselves should be deleted in a v1.1 cleanup.
-
-## v4.0 — "The Game" (next major)
-
-Decision 2026-07-08: v4 rebuilds the presentation tier in **Godot 4.7** so
-Citybase can carry the full original vision — the living command-center city
-(ambient life, agent avatars, quest board, vitals, XP) — with every fictional
-system from the founding prototype rebuilt as a real one. The agent harness
-does **not** move: it extracts into a headless Node daemon (`citybase-core`)
-that the Godot frontend drives over a localhost JSON-RPC WebSocket, keeping
-the adapters, the streaming runner, the approval boundary, and the test suite
-intact. The Electron shell keeps working against the same core and retires
-only at parity.
-
-Architecture, phase plan (A–F), and risks: [docs/v4-game-engine.md](./docs/v4-game-engine.md).
-Tickets: FEAT-022 (core extraction), FEAT-023 (Godot spike gate) in
-[features.md](./features.md); later phases are ticketed when the spike passes.
-
-## Open Questions
-
-- Do we want macOS-only for the first downloadable build, or macOS + Windows from the start?
-- ~~Should Codex or Claude Code be the default first-run provider when both are installed?~~ **Decided: Claude Code is the v1 default.**
-- Should Citybase ever include a hidden code editor panel, or should raw code stay outside the main product permanently?
-- ~~Should commit/push be v1, or should v1 stop at local changed files and let users finish in their normal Git tool?~~ **Decided: commit only; push deferred to v1.1.**
+# Citybase roadmap
+
+## Current baseline
+
+Citybase is a local repository-as-city workbench with a Godot frontend and Node
+core. The React/Electron shell remains available while native parity is open.
+`package.json` is still version 3.0.0; v4 names engineering work, not an already
+published release. Current acceptance belongs in [docs/SRS.md](docs/SRS.md).
+
+The original phase plan and its full text are preserved in
+[the pre-foundation roadmap](docs/history/roadmap-2026-11-02.md). Dated v4
+gate evidence remains in [the charter](docs/v4-game-engine.md). Neither historical
+record substitutes for testing a new candidate.
+
+## Delivered implementation
+
+| Milestone | Implementation | Current verification limits |
+|---|---|---|
+| v1 desktop and Git | Live workspace/Git projection, CLI adapters, approvals, checks, commit/PR surfaces | Legacy shell retained; auto-push/per-run worktrees absent |
+| v2/v3 living and durable workbench | Streaming Claude activity, live city, restartable terminal history | Codex event fidelity and older residual findings remain tracked |
+| v4 A/B | Shared authenticated loopback core and Godot spike | Original Mac spike is dated evidence |
+| v4 C/D/E | 3D city/camera, workbench, quests, approvals, outcomes, living layer | Source regressions pass; camera and lifetime XP findings remain |
+| v4 F | macOS arm64 bundled-core/export script and parity checklist | Windows Godot distribution and fresh native parity are not complete |
+| Foundation | Supported Node, separated test environments, coverage, platform CI, maintained trackers and canonical docs | Exact-head evidence and remaining gates in docs/FOUNDATION.md |
+
+## Next work
+
+1. Resolve the PR #69 product-direction decision against the Godot charter.
+2. Finish the dependency PR against the supported Node baseline.
+3. Close correctness and trust gaps: truthful Codex events (BUG-003), durable
+   progression (BUG-037), initial camera framing (BUG-042), renderer
+   navigation/CSP/fonts (FEAT-006), and re-confirm older residual bug findings.
+4. Add focused workspace-hook coverage (FEAT-009) and assess remaining inherited
+   test gaps from actual behavior rather than the historical review alone.
+5. Produce and walk native Godot artifacts on the claimed platforms; complete
+   production packaging/signing/notarization/distribution (FEAT-003).
+6. Run complete V&V at the release SHA, migrate eligible tickets and present the
+   version/changelog/artifacts for the owner's release decision.
+
+No new Electron-only product feature should land without an explicit decision
+revising the v4 direction. A dependency or shared-harness fix may still support
+both frontends. Do not begin a backend/cloud platform, remote issue integration,
+TypeScript migration or styling-system replacement as foundation side effects.
+
+## Product boundary
+
+One selected local Git workspace, installed Claude/Codex through adapters,
+visual progress, explicit run-wide approval, and an outcome-first review are the
+core. A hosted SaaS, cloud sandbox fleet, plugin marketplace, remote tracker
+service and multi-repository orchestration are outside this milestone.
+
+The authoritative backlog is [features.md](features.md) and [bugs.md](bugs.md),
+not an assumption that every historical phase checkbox is a current release pass.
