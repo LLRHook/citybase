@@ -4,10 +4,11 @@ This record covers the November 2, 2026 foundation work. It is not a new product
 release or a claim that every historical feature and native parity gate is done.
 
 Delivery: [foundation PR #72](https://github.com/LLRHook/citybase/pull/72).
-The GitHub merge/check history owns its final status. All five CI jobs passed
-at `eaf02cc` in run `41521776236`: main static/coverage, Linux desktop/package,
-Windows smoke, macOS smoke and Linux Godot. Final bookkeeping commits run the
-same gates before merge.
+It merged on November 2 at `b038fd546820`. All five CI jobs passed at its final
+head `1b98b1d8473a` in [run 41522765014](https://github.com/LLRHook/citybase/actions/runs/41522765014):
+main static/coverage, Linux desktop/package, Windows smoke, macOS smoke and Linux
+Godot. The [post-merge main run 41523339942](https://github.com/LLRHook/citybase/actions/runs/41523339942)
+also passed.
 
 ## Scope and PR disposition
 
@@ -16,13 +17,13 @@ same gates before merge.
 - PR #71's conflicting legacy bug IDs became BUG-043 through BUG-045; #70's
   BUG-032 through BUG-034 retain their distinct meanings. Its new Windows test
   fixture uses the actual native state-file path.
-- PR #68's dependency upgrades are integrated into this foundation branch and
+- PR #68's dependency upgrades are integrated into the merged foundation and
   validated with the supported Node baseline. Its original CI used Node 20 and
-  ran no tests. Close #68 as superseded only after the combined foundation PR
-  passes CI and merges; do not leave its changes unlanded.
-- PR #69 is pending an explicit product-direction decision: its Electron-only
-  model-shop proposal conflicts with the current Godot charter. Its branch and
-  work remain preserved.
+  ran no tests. It is closed as superseded by #72 with its changes landed.
+- The owner approved closing [PR #69](https://github.com/LLRHook/citybase/pull/69)
+  as superseded by the current Godot direction. It closed on November 2 at
+  21:04:47 UTC. Its branch `feat/living-city-reimagined` remains at
+  `688bf5a90f59bcc0216fe09d936044315ef810ac`, preserving the complete proposal.
 - The requested Claude driver was created in an isolated checkout, but its first
   run stopped at the provider's weekly API limit before making changes. The
   primary agent resumed the work; no replacement provider was silently delegated.
