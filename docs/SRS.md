@@ -66,10 +66,12 @@ Godot source/development starts may auto-register the Citybase checkout for an
 empty profile; exported first-run builds show the open prompt. CB-FR-001's
 empty-profile prompt acceptance refers to that packaged-user flow.
 
-## 5. Open decisions and evidence gaps
+## 5. Product decision and evidence gaps
 
-- PR #69's Electron model-shop direction requires an explicit decision against
-  the Godot charter before it can be merged or closed as superseded.
+- On November 2 the owner approved closing
+  [PR #69](https://github.com/LLRHook/citybase/pull/69) as superseded by the Godot
+  direction. Its proposal branch remains preserved; the primary frontend
+  direction is unchanged.
 - Windows Godot distribution and a fresh macOS package are not proven by Windows
   source tests or the legacy Electron smoke.
 - Durable progression, full Codex event fidelity, external-navigation/CSP/fonts,
@@ -84,3 +86,4 @@ empty-profile prompt acceptance refers to that packaged-user flow.
 | 1 | 2026-11-02T15:20:09-05:00 | 44a7ecdcbd86 | ADOPT | Current foundation baseline; historical sources retained |
 | 2 | 2026-11-02T15:22:13-05:00 | 562acebfe691 | REVISION | Normalize partial delivery for requirement indexing |
 | 3 | 2026-11-02T15:34:25-05:00 | 53ec3479d43e | REVISION | Clarify source-development first-run behavior |
+| 4 | 2026-11-02T16:06:08-05:00 | ce1ee2590151 | REVISION | Record owner-approved closure of the superseded Electron proposal |

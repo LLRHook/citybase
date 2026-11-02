@@ -199,6 +199,8 @@ Active work only. Format and rules: [`.cycle/TRACKERS.md`](.cycle/TRACKERS.md). 
 - **Status:** fixed-pending-migration
 - **Fix:** Living instructions, domain/runtime docs, roadmap and verification match the shared Godot/Node and legacy Electron implementation; historical source text is preserved.
 - **Docs:** AGENTS.md, CLAUDE.md, README.md, CONTRIBUTING.md, ROADMAP.md, VERIFICATION.md, docs/domain-model.md, docs/agent-runtime.md
+- **Log:**
+  - 2026-11-02 Docs: Recorded the owner-approved PR #69 closure with its branch preserved, the merged PR #72 final-head/main CI evidence, and the completed #68 disposition in the living roadmap, SRS and foundation record.
 
 ### [BUG-1793651435] Godot reports 100 percent success without completed runs
 - [ ] **Severity:** low

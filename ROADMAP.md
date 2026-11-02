@@ -25,17 +25,21 @@ record substitutes for testing a new candidate.
 
 ## Next work
 
-1. Resolve the PR #69 product-direction decision against the Godot charter.
-2. Maintain the supported dependency/runtime baseline and the cross-platform
+The November 2 PR queue is finished. The owner approved closing
+[PR #69](https://github.com/LLRHook/citybase/pull/69) as superseded by the Godot
+direction; its proposal branch remains preserved. The merged foundation and
+each PR's disposition are recorded in [docs/FOUNDATION.md](docs/FOUNDATION.md).
+
+1. Maintain the supported dependency/runtime baseline and the cross-platform
    gates established by the combined foundation delivery.
-3. Close correctness and trust gaps: truthful Codex events (BUG-003), durable
+2. Close correctness and trust gaps: truthful Codex events (BUG-003), durable
    progression (BUG-037), initial camera framing (BUG-042), renderer
    navigation/CSP/fonts (FEAT-006), and re-confirm older residual bug findings.
-4. Add focused workspace-hook coverage (FEAT-009) and assess remaining inherited
+3. Add focused workspace-hook coverage (FEAT-009) and assess remaining inherited
    test gaps from actual behavior rather than the historical review alone.
-5. Produce and walk native Godot artifacts on the claimed platforms; complete
+4. Produce and walk native Godot artifacts on the claimed platforms; complete
    production packaging/signing/notarization/distribution (FEAT-003).
-6. Run complete V&V at the release SHA, migrate eligible tickets and present the
+5. Run complete V&V at the release SHA, migrate eligible tickets and present the
    version/changelog/artifacts for the owner's release decision.
 
 No new Electron-only product feature should land without an explicit decision
