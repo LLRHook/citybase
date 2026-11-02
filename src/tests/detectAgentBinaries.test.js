@@ -124,12 +124,13 @@ describe('detectAgentBinaries — default fsExists hits the real filesystem', ()
     writeFileSync(claudeFile, '');
     try {
       // Override env.PATH only — leave fsExists unset so the default kicks in.
-      // Pin the platform so the darwin/win32 well-known install dirs
-      // (/opt/homebrew/bin, %APPDATA%\npm, …) can't surface CLIs that are
-      // genuinely installed on the machine running the suite.
+      // Match the host's path syntax, but use linux on POSIX hosts to
+      // avoid probing macOS's fixed Homebrew install dirs. The injected
+      // env omits HOME and Windows profile dirs so installed CLIs cannot
+      // leak into this fixture.
       const out = detectAgentBinaries({
         env: { PATH: binDir },
-        platform: 'linux',
+        platform: process.platform === 'win32' ? 'win32' : 'linux',
       });
       expect(out.claude.found).toBe(true);
       expect(out.claude.path).toBe(claudeFile);
