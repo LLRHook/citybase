@@ -149,7 +149,7 @@ Active work only. Format and rules: [`.cycle/TRACKERS.md`](.cycle/TRACKERS.md). 
 - **Docs:** README.md, AGENTS.md, CONTRIBUTING.md, VERIFICATION.md
 
 ### [FEAT-012] CI ergonomics: concurrency cancellation, macOS leg, OS-matrix decision
-- [ ] **Priority:** low
+- [x] **Priority:** low
 - **Area:** build
 - **File(s):** .github/workflows/ci.yml
 - **Req:** Owner foundation request; v4 charter macOS and Windows support; legacy SRS WS3.5
@@ -166,7 +166,9 @@ Active work only. Format and rules: [`.cycle/TRACKERS.md`](.cycle/TRACKERS.md). 
 - **Out of scope:** release/deploy workflow (FEAT-003).
 - **Bump:** minor
 - **Assignee:** Victor Ivanov
-- **Status:** in-progress
+- **Status:** shipped-pending-migration
+- **Implementation:** CI run 41521776236 passed all five checks at eaf02cc: coverage/static, Linux desktop/package, Windows smoke, macOS smoke and checksum-pinned Linux Godot. Concurrency cancels superseded PR workflow runs; final stacked bookkeeping pushes exercise that gate.
+- **Docs:** CONTRIBUTING.md, VERIFICATION.md, docs/FOUNDATION.md
 
 ### [FEAT-024] v4 Phase C — the real 3D city
 - [x] **Priority:** high
