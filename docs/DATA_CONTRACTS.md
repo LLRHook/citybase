@@ -96,4 +96,4 @@ handler/preload sets and exercise real loopback RPC.
 
 | Rev | Date | Commit | Mode | Summary |
 |---|---|---|---|---|
-| 1 | 2026-11-02 | pending | ADOPT | Existing transport, storage, limits and compatibility |
+| 1 | 2026-11-02T15:20:09-05:00 | 44a7ecdcbd86 | ADOPT | Existing transport, storage, limits and compatibility |
