@@ -99,4 +99,4 @@ Current renderer navigation/CSP gaps remain FEAT-006.
 | Rev | Date | Commit | Mode | Summary |
 |---|---|---|---|---|
 | 1 | 2026-11-02T15:20:09-05:00 | 44a7ecdcbd86 | ADOPT | As-built components, boundaries and supported toolchain |
-| 2 | 2026-11-02 | pending | REVISION | Clarify source-development first-run behavior |
+| 2 | 2026-11-02T15:34:25-05:00 | 53ec3479d43e | REVISION | Clarify source-development first-run behavior |
