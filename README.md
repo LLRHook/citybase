@@ -20,6 +20,18 @@ The Godot workbench currently dispatches Claude Code. The shared core also suppo
 
 ## Quick start
 
+<!-- cycle:tracker-setup begin (written by trackers.py install) -->
+**Once per clone**, set up the tracker merge driver and pre-commit lint (Claude Code sessions do this automatically):
+
+```bash
+python3 .cycle/trackers.py install
+```
+
+```powershell
+python .cycle\trackers.py install
+```
+<!-- cycle:tracker-setup end -->
+
 From the repository root, including on Windows with Godot and Node on `PATH`:
 
 ```bash

@@ -1,42 +1,6 @@
 # Citybase — Feature Tracker
 
-This file is the working list of features to implement. New features are appended
-here as they are scoped. When a feature is shipped, tick its checkbox and migrate
-the entry (with the implementation note) to `CHANGELOG.md` so this file stays
-focused on outstanding work.
-
-## Conventions
-
-Each entry uses the form:
-
-```
-### [<id>] <short title>
-- [ ] **Priority:** crit | high | med | low
-- **Area:** renderer | electron | ipc | agents | git | tests | docs | build
-- **File(s):** comma-separated paths the feature will create or modify
-- **Why:** product / user motivation, with spec section if relevant
-- **Approach:** the design — concrete enough that an implementer doesn't have to ask
-- **Library / dependency notes:** evaluation of any third-party deps,
-  with the recommendation called out explicitly
-- **Acceptance criteria:** bullet checklist of what "done" means
-- **Test plan:** unit / integration / E2E coverage to land with the feature
-- **Out of scope:** explicit "we are NOT doing X in this ticket"
-- **Status:** open | in-progress | shipped-pending-migration
-```
-
-Tick `- [x]` once verified shipped. The implementer also adds an
-`**Implementation:**` line summarising the diff before migrating the entry to
-`CHANGELOG.md`.
-
-Priority guide: crit / high / med / low.
-
-## Lifecycle
-1. **File:** new entries under `## Open` with the full template.
-2. **Implement:** flip status to `in-progress`, write code + tests.
-3. **Verify:** set `shipped-pending-migration`, tick checkbox, add `**Implementation:**` line.
-4. **Migrate:** move to `## Shipped`, append a one-liner to `CHANGELOG.md / Unreleased / Added` (or `Changed`).
-
----
+Active work only. Format and rules: [`.cycle/TRACKERS.md`](.cycle/TRACKERS.md). Write with `python .cycle/trackers.py`, never by hand. Shipped and closed entries are removed; their record is `CHANGELOG.md`, Jira, and `python .cycle/trackers.py show <id>`.
 
 ## Open
 
@@ -44,6 +8,9 @@ Priority guide: crit / high / med / low.
 - [ ] **Priority:** low
 - **Area:** build
 - **File(s):** `package.json` (build config + scripts), CI release workflow (new)
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** `package:dir` / `package:mac` are intentionally dev-only (no DMG, no
   signing, no notarization, no Windows/Linux targets). README's packaging notes
   defer production distribution to a later phase; this ticket is the placeholder
@@ -57,13 +24,17 @@ Priority guide: crit / high / med / low.
 - **Acceptance criteria:** deliberately deferred — to be specified when the
   ticket is pulled into a phase. Do not start from this stub without re-scoping.
 - **Test plan:** smoke-launch each packaged artifact per OS.
-- **Out of scope (now):** everything — this is a tracked deferral, not ready work.
+- **Out of scope:** (now) everything — this is a tracked deferral, not ready work.
+- **Bump:** minor
 - **Status:** open
 
 ### [FEAT-006] Navigation guards, CSP, and self-hosted fonts
 - [ ] **Priority:** med
 - **Area:** electron, build
 - **File(s):** electron/main/main.cjs, electron/main/windowConfig.cjs, index.html, public/
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** NFR-1 requires the window to deny child windows and external navigation —
   no `setWindowOpenHandler` / `will-navigate` guard exists (SRS M9), and dev mode
   loads an env-controlled URL with the full agent-spawning API attached. Google Fonts
@@ -81,12 +52,16 @@ Priority guide: crit / high / med / low.
 - **Test plan:** pure-module tests for the guard policy (windowConfig pattern); manual
   offline launch.
 - **Out of scope:** packaging/signing (FEAT-003).
+- **Bump:** minor
 - **Status:** open
 
 ### [FEAT-007] Toolchain currency: CI Node 22, `engines` pin, react deps out of the asar
 - [ ] **Priority:** med
 - **Area:** build
 - **File(s):** .github/workflows/ci.yml, package.json, README.md
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** CI runs Node 20 (EOL April 2026) and nothing pins local Node — CI/local
   drift is unbounded (SRS T3). `react`/`react-dom` as prod deps are auto-packed into
   the asar although Vite already bundles them — dead-weight double-ship (T6).
@@ -100,12 +75,16 @@ Priority guide: crit / high / med / low.
     FEAT-001's packaging step).
 - **Test plan:** CI run; `package:dir` + smoke launch.
 - **Out of scope:** dependency version upgrades beyond the Node baseline.
+- **Bump:** minor
 - **Status:** open
 
 ### [FEAT-009] `useWorkspace` test suite
 - [ ] **Priority:** med
 - **Area:** tests
 - **File(s):** src/tests/useWorkspace.test.jsx (new), src/app/useWorkspace.js (api injection if needed)
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** the most intricate async code in the renderer has zero tests — would have
   caught R4 and R5 (SRS §6.5, WS3.2).
 - **Approach:** inject `citybaseApi` (same pattern as `useApprovalRequests`); cover the
@@ -115,13 +94,16 @@ Priority guide: crit / high / med / low.
   - Regression cases for R4/R5 are covered; suite green.
 - **Test plan:** this ticket is the test plan.
 - **Out of scope:** behavior changes (BUG-007 owns those).
+- **Bump:** minor
 - **Status:** open
-
 
 ### [FEAT-011] Vitest environment split, coverage, non-watch default
 - [ ] **Priority:** med
 - **Area:** tests, build
 - **File(s):** vite.config.js, package.json, src/tests/
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** all tests — including Node-side Electron service tests — run under jsdom;
   the environment mismatch can mask Node-only bugs (SRS T9). No coverage tooling
   exists; bare `npm test` enters watch mode (NFR-4, WS3.4).
@@ -137,12 +119,16 @@ Priority guide: crit / high / med / low.
     `npm test -- --run` today).
 - **Test plan:** full suite + CI run.
 - **Out of scope:** raising coverage thresholds.
+- **Bump:** minor
 - **Status:** open
 
 ### [FEAT-012] CI ergonomics: concurrency cancellation, macOS leg, OS-matrix decision
 - [ ] **Priority:** low
 - **Area:** build
 - **File(s):** .github/workflows/ci.yml
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** superseded pushes run to completion (no concurrency group); once FEAT-001's
   smoke test lands, a macOS leg becomes meaningful (mac is the first ship target); the
   OS matrix is an open ROADMAP question (SRS WS3.5, Q3).
@@ -153,20 +139,16 @@ Priority guide: crit / high / med / low.
   - Superseded runs are cancelled; macOS leg green.
 - **Test plan:** observe CI behavior on a stacked push.
 - **Out of scope:** release/deploy workflow (FEAT-003).
+- **Bump:** minor
 - **Status:** open
-
----
-
-## v4.0 — "The Game" epic
-
-Decision 2026-07-08 (see [docs/v4-game-engine.md](./docs/v4-game-engine.md)):
-rebuild the presentation tier in Godot 4.7 on top of the extracted Node core.
-Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
 
 ### [FEAT-024] v4 Phase C — the real 3D city
 - [x] **Priority:** high
 - **Area:** godot
 - **File(s):** godot/ (scenes, scripts), docs/v4-game-engine.md
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** the epic centerpiece: replace the spike's block-clusters with the
   living city the original vision promised, driven by real snapshot data.
 - **Approach:** district platforms with real architecture (building meshes
@@ -190,6 +172,8 @@ Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
   already covered by the Vitest suite.
 - **Out of scope:** workbench panels (FEAT-025), quests/XP (FEAT-026),
   packaging (FEAT-027).
+- **Bump:** minor
+- **Status:** shipped-pending-migration
 - **Implementation:** godot/ split into `city_builder.gd` (districts on
   non-overlapping concentric rings; buildings typed by extension — code
   towers with roof lights, doc slabs, config cylinders — heights from real
@@ -204,12 +188,14 @@ Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
   ripple resolves; 60fps vsync / 145fps uncapped with this repo loaded;
   reduced-motion env respected. Staged-green rendering is code-paritied but
   not screenshot-verified (no staged files at capture time).
-- **Status:** shipped-pending-migration
 
 ### [FEAT-025] v4 Phase D — the workbench in-engine
 - [x] **Priority:** high
 - **Area:** godot
 - **File(s):** godot/
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** the Godot app must stand alone for daily work: dispatch, review,
   approve, commit — the whole demo sentence without the Electron shell.
 - **Approach:** quest board fed from `features.md`/`bugs.md` (parsed by the
@@ -224,6 +210,8 @@ Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
 - **Test plan:** extend the autotest to drive one gated run headlessly;
   manual walkthrough per VERIFICATION Stage 3 equivalents.
 - **Out of scope:** ambient/living layer (FEAT-026).
+- **Bump:** minor
+- **Status:** shipped-pending-migration
 - **Implementation:** new core `questService` (pure factory; parses
   features.md/bugs.md open entries) behind an optional `quests.list` channel
   (headless-whitelisted in the conformance test) + unit tests. New
@@ -241,22 +229,27 @@ Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
   workspace diff + checks). Honest gaps: error surface implemented but not
   screenshot-verified against a live non-repo; outcome diff shows the
   workspace diff (v1 produceDiff semantics), not per-run isolation.
-- **Status:** shipped-pending-migration
 
 ### [FEAT-026] v4 Phase E — the living layer
 - [x] **Priority:** med
 - **Area:** godot, core
 - **File(s):** godot/, core/ (vitals + activity RPCs)
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** "no deliberate cuts" — every ambient system from the founding
   prototype returns as a real one.
 - **Approach:** live activity feed (run events + `git log` + branch
   switches); real vitals (checks results, test counts, lint status, commit
   cadence); XP/levels derived from persisted run history; ambient city life
   (idle citizens, traffic along recently-committed paths, day/night).
+- **Library / dependency notes:** unknown
 - **Acceptance criteria:** every number on screen traces to a real source;
   the fiction→real mapping table in docs/v4-game-engine.md is fully checked.
 - **Test plan:** core RPC unit tests; autotest screenshots.
 - **Out of scope:** multiplayer/team anything.
+- **Bump:** minor
+- **Status:** shipped-pending-migration
 - **Implementation:** `godot/living_layer.gd` — built entirely from EXISTING
   real surfaces (no new protocol): activity feed merges `recentCommits` +
   live run lifecycle events (deduped); vitals chips show commits/day
@@ -269,12 +262,14 @@ Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
   LV 3 · 204 xp · 100% success · 10 runs. Deviation from the ticket noted:
   no new core vitals/activity RPCs were needed — client-side derivation
   from existing data was simpler and equally real.
-- **Status:** shipped-pending-migration
 
 ### [FEAT-027] v4 Phase F — parity gate + cutover packaging
 - [x] **Priority:** med
 - **Area:** build, godot, docs
 - **File(s):** VERIFICATION.md (v4 stages), godot/export_presets.cfg, docs/
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** the Electron shell retires only when the Godot app passes the
   same gate the v1 shell did.
 - **Approach:** a v4 parity checklist mirroring the v1 ship gate run against
@@ -282,10 +277,13 @@ Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
   in the export; Windows export verified (the Phase B leftover); signed
   macOS build folded in from FEAT-003's successor; `--legacy-shell` kept one
   release.
+- **Library / dependency notes:** unknown
 - **Acceptance criteria:** parity checklist green on macOS + Windows;
   a single distributable artifact boots city + core with no dev tooling.
 - **Test plan:** the checklist is the test; packaged-app autotest run.
 - **Out of scope:** auto-update.
+- **Bump:** minor
+- **Status:** shipped-pending-migration
 - **Implementation:** `npm run package:v4` (scripts/package-v4.mjs): esbuild
   bundles the core to one CJS file; Node 25.5+'s one-step `--build-sea`
   injects it into a cached OFFICIAL node binary (Homebrew node has no SEA
@@ -299,57 +297,35 @@ Phase B's gate passed 2026-07-08 (**GO**) — Phases C–F ticketed below.
   (acceptance is therefore partially open — tracked in the gate table, not
   silently dropped). esbuild added as a devDependency (justified: the SEA
   bundling step).
-- **Status:** shipped-pending-migration
-
-
-
----
-
-## v2.0 — "The Living City" epic
-
-The v1 wave shipped a solid but plain agent-dispatch shell and **deleted** the
-entire repository-as-city visualization (map/cityModel/hex/kanban/analysis are
-gone from `src`). v2.0 makes the founding promise real: the repo rendered as a
-living isometric city, fused with real agent runs, on top of v1's real-data
-foundation. This is the major-version content. Sequenced FEAT-013 → FEAT-019.
 
 ### [FEAT-017] Design system 2.0 — depth, motion, ambient
 - [ ] **Priority:** med
 - **Area:** renderer
 - **File(s):** src/game/palette.js, src/game/theme.jsx, src/index.css
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** the current system is flat and sparse. v2.0 needs elevation, motion,
   and an ambient backdrop to feel cohesive and alive.
 - **Approach:** extend tokens (elevation/shadow scale, spacing scale, motion
   durations, glow helpers); add reusable keyframes (pulse/scan/float) in index.css;
   an ambient gradient/grid backdrop behind the city; refine primitives. Additive —
   no breaking changes to existing components.
+- **Library / dependency notes:** unknown
 - **Acceptance criteria:** existing screens unbroken; new tokens used by the city;
   motion respects `prefers-reduced-motion`.
 - **Test plan:** visual via dev-capture; existing suite green.
 - **Out of scope:** a full component-library rewrite.
+- **Bump:** minor
 - **Status:** open
-
----
-
-## v3.0 — "Real-Time City" epic
-
-v2.0 made the city alive but runs are **buffered**: dispatch blocks ~10s, events
-appear all-at-once on completion, the city only refreshes on a 2.5s poll, and run
-history is lost on restart. v3.0 makes the workbench **real-time and durable** —
-streaming non-blocking dispatch, live token/line events, the city animating as the
-agent works, real cancel, and persistent runs. Functional core is the existing
-backlog: **FEAT-004** (streaming runner), **FEAT-005** (real streaming events incl.
-codex), **FEAT-008** (run persistence). New visual + release tickets below.
-
-
----
-
-## Shipped
 
 ### [FEAT-005] Real CLI integration: correct `claude` / `codex` argv + event normalization
 - [x] **Priority:** high
 - **Area:** agents
 - **File(s):** electron/main/agents/ClaudeAdapter.cjs, electron/main/agents/CodexAdapter.cjs, electron/main/agents/CliAgentAdapter.cjs, src/tests/ClaudeAdapter.test.js, src/tests/CodexAdapter.test.js
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** the current argv shapes match neither real CLI — `claude` wants
   `--print --output-format stream-json`, `codex` wants the `exec` subcommand — so
   every real run exits non-zero (SRS M18, acknowledged in-code). Ship gate FR-V6/FR-V7
@@ -369,13 +345,17 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
 - **Test plan:** unit tests against recorded stream fixtures per CLI; manual
   VERIFICATION.md Stage 3.6 walkthrough.
 - **Out of scope:** approval flow (BUG-004), runner internals (FEAT-004).
-- **Implementation:** ClaudeAdapter switched to `--output-format stream-json --verbose`; NDJSON parsed incrementally into live AgentEvents (assistant text + tool-use `file_path`), drained live by streamEvents; codex keeps its trail. Verified with the real CLI (claude-e2e 13/13, gui shows live events while RUNNING). The streamed touched paths light the exact city buildings.
+- **Bump:** minor
 - **Status:** shipped-pending-migration
+- **Implementation:** ClaudeAdapter switched to `--output-format stream-json --verbose`; NDJSON parsed incrementally into live AgentEvents (assistant text + tool-use `file_path`), drained live by streamEvents; codex keeps its trail. Verified with the real CLI (claude-e2e 13/13, gui shows live events while RUNNING). The streamed touched paths light the exact city buildings.
 
 ### [FEAT-001] Desktop-mode E2E smoke test that opens the app window
 - [x] **Priority:** high
 - **Area:** tests
 - **File(s):** `e2e/desktop.smoke.spec.js` (new), `package.json`, `.github/workflows/ci.yml`
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** ROADMAP Phase 1 work item "Add a 'desktop mode' smoke test that opens
   the app window" was never landed. The v1 ship gate requires "Build, lint,
   typecheck, and smoke tests are green", and today the Electron launch path
@@ -410,6 +390,8 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
 - **Out of scope:** E2E against the packaged app bundle (the CI packaging step only
   proves `electron-builder --dir` succeeds), multi-window flows, agent-run E2E
   against real CLIs, visual regression.
+- **Bump:** minor
+- **Status:** shipped-pending-migration
 - **Implementation:** `e2e/desktop.smoke.spec.js` (Playwright 1.60 `_electron`,
   serial worker, CI-only `--no-sandbox`) asserting title, live bridge,
   `getVersion()` over real IPC, sandboxed renderer, rendered `#root`, and detect
@@ -418,12 +400,14 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
   `electron-builder --dir`); VERIFICATION.md Stage 2.4 placeholder replaced;
   `index.html` title aligned to "Citybase". Captured the pre-wave bridge failure
   live before any fix existed.
-- **Status:** shipped-pending-migration
 
 ### [FEAT-002] README safety model and troubleshooting sections
 - [x] **Priority:** med
 - **Area:** docs
 - **File(s):** `README.md`
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** the v1 ship gate (ROADMAP) requires "README includes setup, app
   architecture, safety model, and troubleshooting". Setup and architecture
   exist; a user-facing safety-model section (approval boundaries, what agents
@@ -440,18 +424,22 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
   - No duplication drift: safety section links to docs/agent-runtime.md rather than restating the contract.
 - **Test plan:** n/a (docs); VERIFICATION.md Stage 1 doc-drift check covers it.
 - **Out of scope:** restructuring the rest of README; marketing copy.
+- **Bump:** minor
+- **Status:** shipped-pending-migration
 - **Implementation:** shipped upstream in the v1 operator-guide rewrite
   (a6a31bd) — README gained "Safety model" (isolation flags, allow-listed IPC,
   single spawn site, git-mutation validation, the bypassPermissions caveat) and
   a symptom/cause/fix "Troubleshooting" table. Verified present at merge time;
   the agent-runtime.md cross-link this ticket wanted is folded into BUG-019's
   doc pass.
-- **Status:** shipped-pending-migration
 
 ### [FEAT-013] City projection model
 - [x] **Priority:** high
 - **Area:** renderer
 - **File(s):** src/app/cityModel.js (new), src/game/hex.js (new), src/tests/cityModel.test.js (new)
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** the city renderer needs a pure projection from the live git snapshot
   (`repoTree` tracked paths + `files` dirty entries) to districts/buildings.
   Ports the deleted projection from history `1356437` and improves it.
@@ -460,19 +448,24 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
   root files → synthetic `core`; buildings carry path/type/dirty/status; district
   carries file count + dirty count + health. Deterministic ordering. Pointy-top
   hex math in `hex.js`.
+- **Library / dependency notes:** unknown
 - **Acceptance criteria:** pure + deterministic; empty/edge inputs safe; dirty
   files flagged on buildings and counted per district; unit tested incl. a
   unicode/quoted-path fixture (guards BUG-009 at the model boundary).
 - **Test plan:** `src/tests/cityModel.test.js` — projection shape, ordering,
   dirty propagation, ring overflow, empty tree.
 - **Out of scope:** rendering (FEAT-014), agent overlay (FEAT-016).
-- **Implementation:** `cityModel.js`/`hex.js`/`iso.js` projection + 17 unit tests.
+- **Bump:** minor
 - **Status:** shipped-pending-migration
+- **Implementation:** `cityModel.js`/`hex.js`/`iso.js` projection + 17 unit tests.
 
 ### [FEAT-014] Isometric City renderer
 - [x] **Priority:** high
 - **Area:** renderer
 - **File(s):** src/views/CityView.jsx (new), src/game/iso.js (new), src/tests/CityView.test.jsx (new)
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** the signature visual. A polished 2.5D isometric city is the
   centerpiece that makes Citybase a "2.0", not a form app.
 - **Approach:** SVG isometric projection; each district is a raised platform
@@ -482,72 +475,91 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
   overlap and no building lands on a center/label tile (shared spacing constant
   between model seats and renderer cluster radius). Pan/zoom, hover tooltips,
   building selection.
+- **Library / dependency notes:** unknown
 - **Acceptance criteria:** renders a real repo with no overlapping districts;
   dirty files visibly distinct; legible at 1480×960; selecting a building surfaces
   its path/status; no console errors.
 - **Test plan:** `src/tests/CityView.test.jsx` — renders from a fixture snapshot,
   building count matches model, dirty class applied, empty-tree empty state.
 - **Out of scope:** live agent avatars (FEAT-016).
-- **Implementation:** `CityView.jsx` isometric renderer + slabs/grid/lighting + tests.
+- **Bump:** minor
 - **Status:** shipped-pending-migration
+- **Implementation:** `CityView.jsx` isometric renderer + slabs/grid/lighting + tests.
 
 ### [FEAT-015] App shell navigation + canvas fill
 - [x] **Priority:** high
 - **Area:** renderer
 - **File(s):** src/App.jsx, src/views/TopBar.jsx, src/game/theme.jsx
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** v1 wastes most of the window and has no way to reach the city. Need a
   primary City ↔ Work navigation and a layout that fills the canvas.
 - **Approach:** a `view` state (`city` | `work`) with a segmented nav in the top
   bar; City is default when a workspace is open; Work hosts the existing
   run/commit/detail flow. Make main fill height; refine empty states.
+- **Library / dependency notes:** unknown
 - **Acceptance criteria:** toggling nav switches views with workspace state
   preserved; City is the default landing for an open workspace; no dead canvas;
   existing run/commit flow intact and tested.
 - **Test plan:** App-level tests for nav switching + default view; existing suite
   stays green.
 - **Out of scope:** command palette (later).
-- **Implementation:** City/Work SegNav in TopBar; city is the default open-workspace view.
+- **Bump:** minor
 - **Status:** shipped-pending-migration
+- **Implementation:** City/Work SegNav in TopBar; city is the default open-workspace view.
 
 ### [FEAT-016] Living agent runs in the city
 - [x] **Priority:** high
 - **Area:** renderer, agents
 - **File(s):** src/views/CityView.jsx, src/app/useRunEvents.js, src/app/runCity.js (new)
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** the differentiator — watch an agent work in your city. Fuses the
   visual upgrade with the real run stream.
 - **Approach:** while a run is active, derive touched paths from the run's
   `changed-area`/diff events (`useRunEvents`) and light up the corresponding
   buildings/districts; show a run "spark"/avatar and a pulse on completion;
   status color reflects running/done/failed. Pure mapping in `runCity.js`.
+- **Library / dependency notes:** unknown
 - **Acceptance criteria:** dispatching a run animates the affected city areas;
   completion/failure visibly resolves; no-op cleanly when the city view isn't open.
 - **Test plan:** unit-test the event→city mapping; component test that active-run
   props apply activity classes.
 - **Out of scope:** changing the agent protocol.
-- **Implementation:** `runCity.js` + active-run overlay/banner + live snapshot refresh.
+- **Bump:** minor
 - **Status:** shipped-pending-migration
+- **Implementation:** `runCity.js` + active-run overlay/banner + live snapshot refresh.
 
 ### [FEAT-018] Version 2.0 cut + docs
 - [x] **Priority:** med
 - **Area:** docs, build
 - **File(s):** package.json, src/views/TopBar.jsx, README.md, ROADMAP.md, CHANGELOG.md, VERIFICATION.md
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** the version bump and the docs that describe the living city are part of
   shipping a 2.0.
 - **Approach:** bump version to 2.0.0 and the TopBar label; README/ROADMAP describe
   the city + living runs as v2; CHANGELOG `2.0.0` release section; VERIFICATION
   gains City stages + refreshed baselines (done via /protocol-v-and-v on green).
+- **Library / dependency notes:** unknown
 - **Acceptance criteria:** version consistent across package.json + UI; docs match
   the shipped app; release notes accurate.
 - **Test plan:** version assertion; doc-drift check (VERIFICATION Stage 1).
 - **Out of scope:** production packaging (FEAT-003).
-- **Implementation:** package.json 2.0.0, TopBar v2.0 label, CHANGELOG/README/ROADMAP.
+- **Bump:** minor
 - **Status:** shipped-pending-migration
+- **Implementation:** package.json 2.0.0, TopBar v2.0 label, CHANGELOG/README/ROADMAP.
 
 ### [FEAT-004] Streaming process runner
 - [x] **Priority:** high
-- **Status note:** in-progress (v3.0) — `processService.spawnStream`.
 - **Area:** electron
 - **File(s):** electron/main/services/processService.cjs, src/tests/processService.test.js (new)
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** buffered `execFile` with 15 s / 4 MB defaults structurally cannot host agent
   sessions (SRS M4); cancel needs a live handle (M7); orphaned `npm` grandchildren and
   silent truncation (M15). Unlocks the whole agent-harness arc (SRS WS0.3 — rated L,
@@ -566,13 +578,19 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
   timeout, output truncation; full existing suite stays green.
 - **Out of scope:** adapter adoption (BUG-003), Windows `.cmd` strategy (BUG-006),
   real CLI argv (FEAT-005).
-- **Implementation:** `processService.spawnStream` (non-blocking, line-streamed, killable) adopted by the adapters for non-blocking dispatch + real cancel; tested + harness-verified (running→done).
+- **Bump:** minor
 - **Status:** shipped-pending-migration
+- **Implementation:** `processService.spawnStream` (non-blocking, line-streamed, killable) adopted by the adapters for non-blocking dispatch + real cancel; tested + harness-verified (running→done).
+- **Log:**
+  - Status note: in-progress (v3.0) — `processService.spawnStream`.
 
 ### [FEAT-008] Persist run history beside workspaces.json
 - [x] **Priority:** med
 - **Area:** agents, electron
 - **File(s):** electron/main/agents/agentManager.cjs, electron/main/services/ (new run store), src/tests/
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** ROADMAP Phase 3 work item "Store runs locally with timestamps, provider,
   prompt, and final result" — today runs are in-memory only and lost on restart (SRS
   FR-A2, WS2.6). Doubles as the eviction store BUG-014 needs.
@@ -587,13 +605,17 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
 - **Test plan:** unit tests for the store with injected fs; agentManager integration
   test.
 - **Out of scope:** run-review UI changes.
-- **Implementation:** `runStore` (atomic writes, terminal-only, capped) + manager seed/persist + graceful historical handling + ipc wiring; verified a real run persists to runs.json and seeds on next launch.
+- **Bump:** minor
 - **Status:** shipped-pending-migration
+- **Implementation:** `runStore` (atomic writes, terminal-only, capped) + manager seed/persist + graceful historical handling + ipc wiring; verified a real run persists to runs.json and seeds on next launch.
 
 ### [FEAT-019] Live real-time city animation
 - [x] **Priority:** high
 - **Area:** renderer
 - **File(s):** src/views/CityView.jsx, src/app/runCity.js
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** with streaming (FEAT-004) the city can react to each touched file the
   instant it changes, not on a 2.5s poll. A visible live agent presence is the v3
   "wow".
@@ -601,41 +623,54 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
   pulse/illuminate those buildings immediately; show a glowing "agent at work"
   presence and a completion ripple; smooth camera ease (optional focus on the
   active district). Respect `prefers-reduced-motion`.
+- **Library / dependency notes:** unknown
 - **Acceptance criteria:** during a streamed run, buildings light within ~1s of
   the edit; completion visibly resolves; no-op cleanly when idle/reduced-motion.
 - **Test plan:** unit-test the event→touched-paths mapping; component test that
   live touched paths apply the active class.
 - **Out of scope:** the streaming runner itself (FEAT-004).
-- **Implementation:** Live agent presence (scanning marker over the worked area) + completion ripple in CityView, reduced-motion respected; captured live during a real run.
+- **Bump:** minor
 - **Status:** shipped-pending-migration
+- **Implementation:** Live agent presence (scanning marker over the worked area) + completion ripple in CityView, reduced-motion respected; captured live during a real run.
 
 ### [FEAT-021] Version 3.0 cut + docs
 - [x] **Priority:** med
 - **Area:** docs, build
 - **File(s):** package.json, src/views/TopBar.jsx, README.md, ROADMAP.md, CHANGELOG.md, VERIFICATION.md
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** the version bump and docs that describe the real-time workbench are part
   of shipping v3.
 - **Approach:** bump to 3.0.0 + TopBar label; README/ROADMAP describe streaming +
   persistence; CHANGELOG 3.0.0 section; VERIFICATION baseline refreshed via V&V.
+- **Library / dependency notes:** unknown
 - **Acceptance criteria:** version consistent across manifest + UI; docs match the
   shipped app.
 - **Test plan:** version assertion; doc-drift check.
 - **Out of scope:** production packaging (FEAT-003).
-- **Implementation:** package.json 3.0.0, TopBar v3.0 label, CHANGELOG 3.0.0 section, README/ROADMAP real-time framing.
+- **Bump:** minor
 - **Status:** shipped-pending-migration
+- **Implementation:** package.json 3.0.0, TopBar v3.0 label, CHANGELOG 3.0.0 section, README/ROADMAP real-time framing.
 
 ### [FEAT-020] Streaming run detail
 - [x] **Priority:** high
 - **Area:** renderer
 - **File(s):** src/views/RunDetail.jsx
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** events should append live with progress, not appear all at once when
   the run finishes.
 - **Approach:** render the live `useRunEvents` stream incrementally; a context/
   progress bar from `reportUsage`; a live "running…" indicator; auto-scroll.
+- **Library / dependency notes:** unknown
 - **Acceptance criteria:** events appear as they stream; terminal state loads the
   diff/checks; backstop (`getEvents`) still covers re-mounts.
 - **Test plan:** component test with an incremental event stream.
 - **Out of scope:** changing the event protocol.
+- **Bump:** minor
+- **Status:** shipped-pending-migration
 - **Implementation:** running runs render a "Live Activity" panel — the
   `useRunEvents` stream appends incrementally, the container follows the tail
   (auto-scroll), and a pulsing "agent working" indicator (reduced-motion-safe)
@@ -644,12 +679,14 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
   backstop. The `reportUsage` progress bar was skipped — the adapter's
   `reportUsage` is still a placeholder envelope, so there is nothing real to
   render. Covered by `src/tests/RunDetail.test.jsx` (incremental stream case).
-- **Status:** shipped-pending-migration
 
 ### [FEAT-022] Extract `citybase-core`: headless daemon + WS JSON-RPC facade
 - [x] **Priority:** high
 - **Area:** electron, agents, ipc
 - **File(s):** core/ (new), electron/main/ipc.cjs, electron/main/ipcHandlers.cjs, src/tests/
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** v4 Phase A. The Godot frontend needs the agent harness behind a
   transport it can speak (localhost WebSocket); the Electron shell should
   become a thin client of the same handler map so both frontends share one
@@ -677,6 +714,8 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
   integration test driving a real core instance over WS against a fixture
   repo; conformance test.
 - **Out of scope:** Godot anything (FEAT-023); retiring Electron IPC.
+- **Bump:** minor
+- **Status:** shipped-pending-migration
 - **Implementation:** `workspaceService` split into the pure
   `workspaceServiceCore.cjs` factory (injected userData dir / dialog / fs;
   new `registerWorkspacePath` primitive) with the Electron singleton as thin
@@ -692,12 +731,14 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
   this repo, pulled a real snapshot (118 files, correct branch), detected the
   real claude CLI, got the correct headless `pick` error, and received the
   boot push. 432 tests + desktop E2E green (Electron shell unchanged).
-- **Status:** shipped-pending-migration
 
 ### [FEAT-023] Godot 4.7 spike — go/no-go gate for the engine frontend
 - [x] **Priority:** high
 - **Area:** build, renderer
 - **File(s):** godot/ (new project dir), docs/v4-game-engine.md (gate results)
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** v4 Phase B. Proves the engine can carry the product before any
   city/workbench investment: WS client to the core, JSON throughput, 3D
   render from a real snapshot, live event-driven animation, text UI
@@ -724,6 +765,8 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
   covered by FEAT-022's integration test.
 - **Out of scope:** full city visuals (Phase C), workbench panels (Phase D),
   packaging polish (Phase F).
+- **Bump:** minor
+- **Status:** shipped-pending-migration
 - **Implementation:** `godot/` project (Godot 4.7 stable, GDScript): spawns
   `core/server.cjs` with an env-passed session token, connects
   `WebSocketPeer` with retry-until-boot, renders the real snapshot as lit 3D
@@ -736,12 +779,14 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
   gate re-runnable. Gate results + gotchas (float JSON ids, ETC2/ASTC for
   arm64, `CITYBASE_REPO_ROOT` for exported builds) recorded in
   docs/v4-game-engine.md. **Verdict: GO.**
-- **Status:** shipped-pending-migration
 
 ### [FEAT-010] Bridge contract parity test
 - [x] **Priority:** med
 - **Area:** tests
 - **File(s):** src/tests/bridgeContract.test.js (new), shared manifest module
+- **Req:** unknown
+- **Depends on:** unknown
+- **UI:** unknown
 - **Why:** the renderer↔preload contract is tested against a hand-written mock, so
   drift between preload, the browser stub, and the tests is invisible (SRS §6.5,
   WS3.3).
@@ -753,9 +798,10 @@ codex), **FEAT-008** (run persistence). New visual + release tickets below.
   - Removing or renaming a preload method fails the test; stub parity enforced.
 - **Test plan:** this ticket is the test plan.
 - **Out of scope:** E2E (FEAT-001).
+- **Bump:** minor
+- **Status:** shipped-pending-migration
 - **Implementation:** realized by FEAT-022's `src/tests/coreProtocol.test.js`:
   the preload's invoked channels and `createIpcHandlers`' map are asserted
   against each other in both directions with an explicit headless-only
   whitelist. The browser stub this ticket wanted to include was deleted with
   the browser path, so preload ⇄ handlers is the whole contract.
-- **Status:** shipped-pending-migration

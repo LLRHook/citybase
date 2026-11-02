@@ -84,3 +84,6 @@ if [ ${#SUBJECT} -gt 72 ]; then
 fi
 
 exit 0
+
+# Jira key on line 1 of every work-branch commit, in Jira enforce mode (dev-cycle)
+"$(command -v python3 || command -v python)" .cycle/trackers.py commit-msg "$1" || exit $?

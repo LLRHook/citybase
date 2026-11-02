@@ -2,3 +2,6 @@
 # and on Windows via Git Bash. CRLF in shebang'd scripts breaks the interpreter lookup.
 hooks/* text eol=lf
 *.sh    text eol=lf
+bugs.md      merge=tracker text eol=lf
+features.md  merge=tracker text eol=lf
+CHANGELOG.md merge=tracker text eol=lf

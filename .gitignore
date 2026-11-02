@@ -38,3 +38,8 @@ playwright-report
 .claude/projects/
 .claude/file-history/
 build/
+
+# Local verification evidence and Python tooling caches
+.vv/
+__pycache__/
+*.pyc
