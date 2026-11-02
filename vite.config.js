@@ -16,6 +16,6 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/tests/setup.js'],
     // e2e/ belongs to Playwright (npm run test:e2e), not Vitest.
-    exclude: [...configDefaults.exclude, 'e2e/**'],
+    exclude: [...configDefaults.exclude, 'e2e/**', 'build/**'],
   },
 })

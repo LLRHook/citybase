@@ -268,10 +268,10 @@ describe('CodexAdapter — runChecks', () => {
   it('runs the npm scripts that exist and reports pass/fail with meta', async () => {
     const ps = makeProcessService({
       run: vi.fn(async (cmd, args) => {
-        if (cmd === 'npm' && args[1] === 'lint') {
+        if (/(^|[/\\])npm(?:\.cmd)?$/i.test(cmd) && args[1] === 'lint') {
           return { ok: true, code: 0, signal: null, stdout: '', stderr: '', timedOut: false, durationMs: 80, error: null };
         }
-        if (cmd === 'npm' && args[1] === 'test') {
+        if (/(^|[/\\])npm(?:\.cmd)?$/i.test(cmd) && args[1] === 'test') {
           return { ok: false, code: 1, signal: null, stdout: '', stderr: '', timedOut: false, durationMs: 200, error: { message: 'exit 1' } };
         }
         // codex startTask call
@@ -303,7 +303,7 @@ describe('CodexAdapter — runChecks', () => {
   it('reports timeout with a meta string when a script times out', async () => {
     const ps = makeProcessService({
       run: vi.fn(async (cmd, args) => {
-        if (cmd === 'npm' && args[1] === 'lint') {
+        if (/(^|[/\\])npm(?:\.cmd)?$/i.test(cmd) && args[1] === 'lint') {
           return { ok: false, code: null, signal: 'SIGTERM', stdout: '', stderr: '', timedOut: true, durationMs: 15_000, error: { message: 'ETIMEDOUT' } };
         }
         return { ok: true, code: 0, signal: null, stdout: '', stderr: '', timedOut: false, durationMs: 10, error: null };
@@ -323,7 +323,7 @@ describe('CodexAdapter — runChecks', () => {
     const run = await adapter.startTask(VALID_PARAMS);
     await adapter.runChecks(run.runId);
     const npmCalls = ps.run.mock.calls
-      .filter(([cmd]) => cmd === 'npm')
+      .filter(([cmd]) => /(^|[/\\])npm(?:\.cmd)?$/i.test(cmd))
       .map(([, argv]) => argv);
     const lint = npmCalls.find(a => a[1] === 'lint');
     const test = npmCalls.find(a => a[1] === 'test');

@@ -4,135 +4,146 @@
 
 ## What is this?
 
-Citybase is a local-first desktop app: open one Git repository from disk, **see it as a living isometric city**, dispatch a Claude Code run from the UI, and watch the agent work the city in real time — then review the result without staring at raw diffs.
+Citybase is a local desktop app: open a Git repository, see its folders and files as a city, dispatch an agent run, and review the changes and check results.
 
-**v3.0 — "Real-Time City."** Dispatch is **non-blocking and streaming**: the UI never freezes, the run shows as `running` the instant it starts, and **cancel actually terminates the agent**. While it works, a live **agent presence** scans the city and the buildings it touches light up, resolving with a completion ripple. Run history is **persisted across restarts**. Built on v2.0's foundation — the isometric city where top-level folders are districts on raised slabs, files are extruded buildings, and Git status lights the skyline (staged green, unstaged amber), with a City / Work toggle.
+The v4 frontend uses **Godot 4.7** for the 3D city and workbench. It starts a local Node daemon, `citybase-core`, which handles Git operations, agent processes, approval requests, and persisted run history. The city shows real file sizes and Git status; quests come from `features.md` and `bugs.md`; XP and levels come from recorded run outcomes.
 
-Claude Code runs inside the IDE end-to-end; Codex CLI is wired through the same provider contract as a fallback adapter.
+The Godot workbench currently dispatches Claude Code. The shared core also supports Codex CLI, available through the legacy Electron shell and scripted clients. The Electron shell remains in the repository while Windows export and parity work is completed. See [the v4 architecture and gate results](./docs/v4-game-engine.md).
 
 ## Prerequisites
 
-- **Node 20+** and **npm** for the renderer / Electron build.
-- **Git ≥ 1.8.5** — the workspace service uses the `git -C <path>` flag (released November 2013).
-- **Claude Code CLI** on `PATH`, authenticated. Citybase shells out to `claude --print --output-format json …` for non-interactive runs. Install per [docs.claude.com](https://docs.claude.com/en/docs/claude-code/overview) and confirm `claude --version` works in a terminal.
-- **GitHub CLI (`gh`)** on `PATH`, authenticated, if you intend to use the PR-creation surface. `gh auth status` must show a logged-in account.
-- **Codex CLI** is optional in v1. If installed, it's available as an alternative adapter; if not, Citybase falls back to Claude.
+- **Godot 4.7**, the version used for the recorded v4 validation. The commands below assume its executable is available as `godot` on `PATH`.
+- **Node 24+** and **npm** for a development checkout. Node must be available on `PATH` so Godot can start the core.
+- **Git** on `PATH` and a local Git repository to open.
+- **Claude Code CLI**, authenticated, for runs from the Godot workbench. Confirm `claude --version` works in the terminal used to launch Citybase. Codex CLI is optional for the core and Electron adapter.
+- **GitHub CLI (`gh`)**, authenticated, if you use the core or legacy shell's PR action. Confirm the account with `gh auth status`.
 
 ## Quick start
 
-```bash
-npm install
-npm run dev:desktop    # Electron shell with HMR against the Vite dev server
-```
-
-For a one-shot launch against the production build:
+From the repository root, including on Windows with Godot and Node on `PATH`:
 
 ```bash
-npm run build:desktop && npm run start:desktop
+npm ci
+godot --path godot
 ```
 
-**There is no standalone-browser path.** The renderer always runs inside Electron — `citybaseApi.js` throws on import when `window.citybase` is missing instead of silently degrading to a stub. The browser-only `dev` and `preview` scripts were removed on 2026-05-10.
+Godot starts and authenticates its own core process. A development launch restores the most recent workspace, or opens this checkout if no workspace has been saved. Use **OPEN WORKSPACE** to choose another local repository.
 
-## What v2 does
+Each core has its own connection port, but only one core may use a state directory at a time. A second launch using that directory fails before loading or writing history. For concurrent test instances, use a separate PowerShell terminal for each and give each instance a different `CITYBASE_CORE_USERDATA` directory:
 
-A normal session looks like this — every step is real activity, not seeded data:
+```powershell
+$env:CITYBASE_CORE_USERDATA = Join-Path $env:TEMP 'citybase-instance-a'
+godot --path godot
+```
 
-1. **Launch.** The main process restores the most recent workspace and runs `detectAgentBinaries()`. Both results are pushed to the renderer over the `BOOT_PAYLOAD_CHANNEL` before App.jsx mounts, so the UI lands populated with no extra clicks.
-2. **Open a workspace** if one isn't already restored: `File → Open Workspace…`. The Git service reads branch, status, file tree, and recent commits via `git status --porcelain=v2` / `git log` / `git ls-files`.
-3. **See the city.** The City view projects the tracked file tree into districts (folders) and buildings (files); dirty files glow green/amber by stage. Pan with drag, zoom with the wheel, hover for a path, click to inspect.
-4. **Pick a branch** in the top-bar selector. CHECKOUT runs when the workspace is clean; if it's dirty the selector shows a "commit first" pill instead.
-5. **Dispatch an agent** (switch to Work). The IPC handler resolves the right `AgentProvider` adapter (`auto` prefers Claude when installed) and starts a real `claude` process inside the workspace cwd. While it runs, the City view auto-refreshes and lights up the buildings being changed.
-6. **Review** the run detail: real CI checks, a real diff (parsed from `git diff --unified=3`), and the live event stream. A Run History sidebar lists every run started this session.
-7. **Commit.** With dirty files, the commit card opens. Type a message; the action runs `git add -A && git commit -m`, then `git rev-parse HEAD` for the new hash.
-8. **Open a PR** by pushing the branch yourself, then calling `agents.openPR` from the UI. The adapter shells out to `gh pr create --title --body --base --head` from the run cwd and parses the URL out of stdout.
+Use `citybase-instance-b` in the second terminal. These instances keep separate workspace lists, run histories, and XP. Closing an instance releases its profile; a later launch can also reclaim the profile after a forced process termination.
+
+For the legacy Electron shell:
+
+```bash
+npm run dev:desktop
+```
+
+For Electron against a production renderer build, run `npm run build:desktop` followed by `npm run start:desktop`. There is no standalone browser frontend; the React renderer requires Electron's `window.citybase` bridge.
+
+## Using the v4 workbench
+
+1. Open a workspace. The core reads its branch, Git status, tracked file tree, and recent commits. Drag to orbit the city and use the wheel to zoom.
+2. Switch to **CITY / WORK**. Select a quest from the workspace's `features.md` or `bugs.md`, or enter a prompt.
+3. Click **RUN (gated)** and review the approval dialog. Approving starts Claude in the selected workspace; rejecting starts no agent process. Live events move the avatar to files the agent touches.
+4. Review the outcome after the run settles: changed files grouped by district, additions and deletions, and results from the workspace's declared check scripts. Run history persists across restarts.
+5. Enter a commit message and click **COMMIT** when you want to stage and commit all workspace changes. Push the branch before using the core or legacy shell's PR action; automatic pushing is not implemented.
+
+The Godot workbench currently shows the branch but has no branch selector or PR button. Those operations remain available through the shared core and legacy shell.
 
 ## Available scripts
 
 | Script | What it does |
 |---|---|
-| `npm run dev:desktop` | Electron shell with HMR against the Vite dev server |
-| `npm run start:desktop` | Electron against the built renderer in `dist/` |
+| `npm run core -- --print-conn` | Headless core for scripted clients; prints the generated connection port and token |
+| `npm run package:v4` | Packages the Godot frontend and bundled core as a macOS app (requirements below) |
+| `npm run dev:desktop` | Legacy Electron shell with HMR against the Vite dev server |
+| `npm run start:desktop` | Legacy Electron shell against the built renderer in `dist/` |
 | `npm run build` / `build:desktop` | Production renderer build to `dist/` (alias of each other) |
 | `npm run package:dir` | Unpacked dev build under `dist-electron/` (no installer, no codesign) |
 | `npm run package:mac` | macOS `.app`, ad-hoc / unsigned for local dev |
 | `npm run lint` | ESLint over the project |
 | `npm test` | Vitest in watch mode (`npm test -- --run` for one pass) |
-| `npm run test:e2e` | Playwright desktop smoke test against the built `dist/` (run `npm run build` first) |
+| `npm run test:e2e` | Playwright Electron smoke test against the built `dist/` (run `npm run build` first) |
 
-`package:dir` and `package:mac` are dev-only — no DMG, no notarization, no signing. `electron-builder` config lives in the `build` field of `package.json`; output goes to gitignored `dist-electron/`.
+`package:v4` currently targets **macOS arm64 only**. Run it on a Mac with Node 25.5+ (`--build-sea`), Godot 4.7, and matching Godot export templates. The script uses `GODOT_BIN` when set, otherwise `/Applications/Godot.app/Contents/MacOS/Godot`. It bundles the core with esbuild, downloads the matching official macOS arm64 Node binary, builds a core executable, exports Godot, and ad-hoc signs `build/Citybase.app`. The resulting app includes its core runtime; the agent CLIs remain external prerequisites. This pipeline does not produce a Windows distributable; Windows development runs use the source launch above.
 
-**Windows dev note.** Running `package:*` from Windows requires Developer Mode (Settings → Privacy & Security → For Developers) or an admin shell — `electron-builder`'s first run extracts a 7z cache containing symlinks, which Windows refuses to create otherwise.
+`package:dir` and `package:mac` package the legacy Electron shell for development, without a DMG or notarization. The `electron-builder` config lives in the `build` field of `package.json`; output goes to gitignored `dist-electron/`.
+
+**Windows Electron packaging note.** `package:dir` may require Developer Mode or an admin shell because `electron-builder` extracts a cache containing symlinks.
 
 ## Project structure
 
 ```text
+godot/
+  project.godot / main.tscn        v4 engine project and entry scene
+  main.gd                         core lifecycle, WebSocket client, run events
+  city_builder.gd / camera_rig.gd  3D city projection and camera controls
+  agent_avatar.gd                 live run movement and completion animation
+  workbench.gd                    quests, approvals, run outcome, commit UI
+  living_layer.gd                 activity, vitals, XP, ambient animation
+
+core/
+  server.cjs                      headless daemon using the shared handlers
+  rpcServer.cjs                   authenticated localhost WebSocket transport
+  userData.cjs                    platform state-directory resolution
+
 electron/
   main/
-    main.cjs                       BrowserWindow lifecycle + did-finish-load boot push
-    ipc.cjs / ipcHandlers.cjs      typed IPC handlers (workspace, git, agents, checks)
-    bootPayload.cjs                pure factory for the BOOT_PAYLOAD_CHANNEL message
-    menu.cjs / menuTemplate.cjs    desktop menu + commands
-    windowConfig.cjs               BrowserWindow defaults
+    main.cjs / ipc.cjs             legacy Electron lifecycle and IPC wiring
+    ipcHandlers.cjs                handlers shared by Electron and the core
+    bootPayload.cjs                initial workspace and agent detection payload
     services/
-      processService.cjs           guarded execFile runner (argv arrays only, cwd pinned)
-      workspaceService.cjs         workspace pick / restore / persist
-      gitService.cjs               getSnapshot / getBranches / checkout / commit
-      workspaceChecks.cjs          runs declared npm scripts as CheckResult[]
+      processService.cjs           subprocess execution and streaming
+      workspaceServiceCore.cjs     workspace registration and persistence
+      workspaceService.cjs         Electron folder dialog wrapper
+      gitService.cjs               snapshots, branches, checkout, commit
+      workspaceChecks.cjs          declared workspace check scripts
+      runStore.cjs / questService.cjs  run persistence and ticket-file parsing
     agents/
-      AgentAdapter.cjs             the AgentProvider contract base class
-      CliAgentAdapter.cjs          shared CLI-wrapping implementation
-      ClaudeAdapter.cjs            real claude flags + JSON-result streamEvents
-      CodexAdapter.cjs             same shape, codex CLI
-      agentManager.cjs             registry + dispatcher + run history
-      detect.cjs                   PATH probe for claude / codex / gh
-      parseUnifiedDiff.cjs         git diff parser
-      constants.cjs                AGENT_EVENT_CHANNEL + BOOT_PAYLOAD_CHANNEL
+      AgentAdapter.cjs / CliAgentAdapter.cjs  provider contract and CLI runner
+      ClaudeAdapter.cjs / CodexAdapter.cjs   provider arguments and event parsing
+      agentManager.cjs             dispatch, approval gate, run registry
+      detect.cjs                   PATH and install-root probes for agent CLIs
   preload/
-    preload.cjs                    isolated window.citybase bridge
+    preload.cjs                    isolated Electron window.citybase bridge
 
 src/
-  App.jsx                          top-level shell + view switching
-  app/
-    citybaseApi.js                 renderer facade — desktop bridge re-export (throws if missing)
-    useWorkspace.js                workspace + Git snapshot state
-    useAgentDetect.js              hook reading the boot payload, IPC fallback
-    useApprovalRequests.js         pending-approval channel for write-capable runs
-    useRunHistory.js               Run History data via agents.listRuns
-  data/
-    seed.js                        test fixtures only — not imported by production paths
-  game/
-    palette.js / hex.js            non-component primitives (Fast Refresh-safe)
-    theme.jsx                      UI primitives
-    useTweaks.js                   runtime-toggles hook
-    map.jsx, kanban.jsx,
-    analysis.jsx (RunHistoryPanel,
-      CommitResultCard),
-    panels.jsx, modals.jsx,
-    command.jsx, branchSelector.jsx,
-    tweaks.jsx                     view + panel components
-    data.js                        slim re-export (SKILL_DEFS / hpFromContext / fmtTokens)
-  tests/
-    setup.js                       Vitest setup
-    *.test.{js,jsx}                unit + smoke tests under jsdom
+  App.jsx                          legacy React shell and view switching
+  app/                             bridge, hooks, city and review models
+  views/                           city, work, run history and detail views
+  game/                            shared React UI and projection primitives
+  tests/                           Vitest tests and in-test fixtures
+
+scripts/
+  package-v4.mjs                    macOS Godot + bundled-core packaging
 ```
+
+Production views use live data. Test fixtures belong in test files or helpers under `src/tests/`; the former `src/data/seed.js` and `src/game/data.js` modules have been deleted.
 
 ## Safety model
 
-- **No shell access from the renderer.** `webPreferences` sets `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. The renderer talks to the main process only through the typed `window.citybase` object exposed by `preload.cjs`.
-- **Allow-listed IPC channels.** Every channel in `ipcHandlers.cjs` validates inputs (workspace ids must be known, paths must resolve under workspace root) and returns plain serializable objects. The renderer can never pass arbitrary command strings.
-- **`processService.run` is the single execFile site.** Argv arrays only — no shell strings, no string concatenation. cwd is required and pinned to a workspace path. Timeouts and max-buffer caps are enforced.
+- **Authenticated local core.** The Godot frontend talks to a WebSocket server bound to `127.0.0.1`. A session token is required before a client receives the boot payload or can call a handler.
+- **Isolated Electron renderer.** The legacy shell sets `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true`. React accesses the shared services through the `window.citybase` bridge exposed by `preload.cjs`.
+- **Registered handlers.** Both transports expose the handler map in `ipcHandlers.cjs`. Workspace-scoped operations resolve known workspace IDs before calling services.
+- **Central process service.** `processService.cjs` handles subprocess execution, streaming, timeouts, and output limits for Git, workspace checks, and agent adapters.
 - **Mutating Git surfaces validate before they touch the world.** `gitService.checkout` refuses unknown branches (no `-b` auto-create); `gitService.commit` rejects empty messages; both return `{ ok: false, error }` instead of throwing into the main process.
-- **`--permission-mode bypassPermissions` is used only for non-interactive Claude runs** so the CLI doesn't hang waiting for an approval surface that doesn't exist yet. When the renderer's approval routing lands, this flips to `auto` or `default` and prompts pump through `useApprovalRequests`.
+- **Approval before dispatch.** Both UIs request `approvalMode: 'ask'`. The manager waits for an explicit approval before spawning the agent; rejection starts no CLI process. Claude then runs non-interactively with `--permission-mode bypassPermissions`. This is approval for the whole run, without separate prompts for individual CLI tool calls.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| "claude CLI not found on PATH" | `claude` isn't installed, or Citybase was launched from Finder on macOS without the right `PATH`. | Install per Anthropic's docs, then relaunch Citybase from a terminal so it inherits the right `PATH`. The processService augments `PATH` with `/opt/homebrew/bin` and `/usr/local/bin` on macOS but won't find a binary that lives somewhere else. |
+| "claude CLI not found on PATH" | The agent CLI is missing or cannot be found in Citybase's launch environment. | Confirm `claude --version` works, then launch Citybase from that terminal. Detection also checks common per-user install directories. |
 | Claude run fails immediately with "not authenticated" | The CLI hasn't logged in yet. | Run `claude login` once in a terminal, confirm `claude --print --output-format json -p "hi"` works, then retry inside Citybase. |
-| `openPR` throws "no upstream" or "branch not pushed" | The head branch hasn't been pushed to the remote. v1 deliberately doesn't auto-push — that side effect is deferred to v1.1. | `git push -u origin <branch>` from a terminal, then call openPR again. |
+| `openPR` throws "no upstream" or "branch not pushed" | The head branch hasn't been pushed to the remote; Citybase does not auto-push. | `git push -u origin <branch>` from a terminal, then call openPR again. |
 | `openPR` throws "GraphQL: must have admin rights" or similar | `gh` is authenticated as the wrong account, or doesn't have permission on the remote. | `gh auth status` to inspect; `gh auth login` to re-auth. |
-| `dev:desktop` hangs at "waiting for http://localhost:5173" | Vite couldn't bind 5173 — usually Docker. | Stop the conflicting process or change `server.port` in `vite.config.js` (and `dev:desktop`'s `wait-on` URL). `strictPort: true` is on purpose so a port collision fails loud. |
+| `dev:desktop` hangs at "waiting for http://localhost:5173" | Vite could not bind port 5173. | Stop the conflicting process or change `server.port` in `vite.config.js` and `dev:desktop`'s `wait-on` URL. |
 | Commit hook rejects "subject does not match the project convention" | Non-conventional subject. | See [CONTRIBUTING.md](./CONTRIBUTING.md). Format is `<type>(<scope>)?<!>?: <description>`, ≤72 chars, lowercase after the colon. |
 
 ## Testing & verification
@@ -141,7 +152,7 @@ src/
 
 ## Roadmap
 
-The full vision and phased plan live in [ROADMAP.md](./ROADMAP.md). Phase 5 is complete and the v1 ship-gate items are addressed across PRs #36 / #37 / #38 / #40 / #41. Remaining v1.1 work and deferred items are listed there.
+The original phased plan lives in [ROADMAP.md](./ROADMAP.md). The Godot migration, architecture, and recorded macOS gates are in [docs/v4-game-engine.md](./docs/v4-game-engine.md). Windows packaging and parity remain unfinished; the legacy Electron shell stays available during that work.
 
 ## Contributing
 
