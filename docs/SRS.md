@@ -78,4 +78,4 @@ records remain in [history](history/README.md).
 | Rev | Date | Commit | Mode | Summary |
 |---|---|---|---|---|---|---|
 | 1 | 2026-11-02T15:20:09-05:00 | 44a7ecdcbd86 | ADOPT | Current foundation baseline; historical sources retained |
-| 2 | 2026-11-02 | pending | REVISION | Normalize partial delivery for requirement indexing |
+| 2 | 2026-11-02T15:22:13-05:00 | 562acebfe691 | REVISION | Normalize partial delivery for requirement indexing |
