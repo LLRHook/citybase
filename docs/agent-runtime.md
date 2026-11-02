@@ -1,143 +1,67 @@
-# Agent Runtime Contract
+# Agent runtime contract
 
-This contract decouples Citybase from any specific AI provider. **Claude Agent SDK is the default adapter** — it is what ships in Phase 4 — but it is not the required runtime. OpenAI Codex, Gemini, Aider, OpenCode, and local models (e.g. via Ollama) may each implement the same `AgentProvider` interface and drop in.
+Citybase runs local CLIs through a provider-neutral JavaScript interface.
+`ClaudeAdapter` and `CodexAdapter` extend `CliAgentAdapter`; they do not embed a
+Claude SDK or OpenAI SDK. Implementation:
+[`electron/main/agents/`](../electron/main/agents/).
 
-The ROADMAP entry "Agent runtime: Claude Agent SDK (Sonnet/Opus), pluggable adapter for OpenAI later" should be read as: Claude is the **default adapter** and the first one we ship, not as the runtime layer itself. The runtime layer is provider-neutral.
+## Ownership and lifecycle
 
-## Why this exists
+The shared handler resolves a known workspace ID to a service-side directory.
+The manager assigns the run ID, selects an adapter, returns a running handle
+without waiting for completion, and owns history and approval state. The adapter
+owns the CLI child and output normalization. `processService.cjs` owns spawning,
+platform invocation, timeouts, streaming buffers and termination.
 
-Three things were true when this contract was written:
+Both UIs request approval. The manager waits before starting the provider;
+rejecting records a cancelled run without spawning it. Approval covers the whole
+run. There is no per-tool confirmation or automatic per-run Git worktree: work
+runs in the selected working tree. Do not describe it as an isolated sandbox.
 
-1. The roadmap originally hard-coded Claude model names and "wrapping Claude's SDK" into Phase 4.
-2. The user wanted the option to use Codex, Gemini, or local models for development today, without rewriting the dispatch layer.
-3. Free-tier AI tooling shifts every quarter — committing the runtime to one vendor would force a migration every time the math changes.
+## Provider methods
 
-Defining `AgentProvider` once, up front, lets every later phase treat the runtime as a swappable detail.
+| Method | Contract |
+|---|---|
+| `startTask(params)` | Start a task for the manager's run/workspace context; return the mutable run handle. |
+| `streamEvents(runId)` | Async iterable of flat events; Claude can stream while running. |
+| `reportUsage(runId)` | Usage envelope. CLI usage can be partial or unavailable; default values do not prove a live context-window meter. |
+| `produceDiff(runId)` | Inspect the working tree, including untracked additions, and return bounded structured changes. This is observation, not attribution. |
+| `runChecks(runId)` | Run declared lint/test/typecheck scripts. A successful CLI run and passing checks are separate facts. |
+| `openPR(runId, params)` | Invoke `gh` for the source/target branches. Push first; this operation does not auto-push or merge. |
+| `cancel(runId)` | Terminate the provider child; the manager coordinates approval and cancelled status. |
 
-## Capabilities
+The executable base interface is
+[`AgentAdapter.cjs`](../electron/main/agents/AgentAdapter.cjs). Manager-facing
+operations also include start/get/list runs, get events, approve/reject and
+pending approvals. Transport arguments are in
+[DATA_CONTRACTS.md](DATA_CONTRACTS.md).
 
-The interface below is expressed in TypeScript-style pseudocode for clarity. The codebase is JavaScript today; adapters can be implemented in JS without losing the contract.
+## Current adapters
 
-```typescript
-// Pseudocode — codebase is JS. This expresses the intent for future typed adapters.
+- Claude uses `claude --print --output-format stream-json --verbose`, a model,
+  and `--permission-mode bypassPermissions`. `DEFAULT_MODEL` in
+  `ClaudeAdapter.cjs` is authoritative; callers can override `model`. NDJSON
+  parsing produces real activity and terminal events.
+- Codex uses `codex exec --cd <workspace> --sandbox workspace-write`,
+  `approval_policy=never`, and stdin. A supplied model is forwarded; otherwise
+  the CLI selects its configured default. Its inherited synthesized trail is a
+  known limitation (BUG-003). Do not claim Claude-equivalent live tool events.
 
-interface AgentRun {
-  runId: string;
-  questId: string;
-  adventurerId: string;
-  status: 'running' | 'done' | 'failed' | 'cancelled';
-  contextUsed: number;   // tokens consumed so far
-  maxContext: number;
-  branch?: string;       // feature branch the run is committing to
-}
+Gemini, Aider and local-model adapters are future possibilities, not installed
+production adapters. Binary detection searches host installations/PATH; Citybase
+does not authenticate provider accounts for the user.
 
-interface AgentEvent {
-  runId: string;
-  t: string;             // HH:MM timestamp
-  kind: 'plan' | 'edit' | 'test' | 'lint' | 'pr' | 'error';
-  text: string;
-  payload?: unknown;     // diff hunks, check results, structured detail
-}
+## Events, history and failures
 
-interface DiffHunk {
-  line: number;
-  type: 'add' | 'del' | 'ctx';
-  code: string;
-}
+Events are flat `{runId, t, kind, text, payload?}` values, wrapped for transport
+as `{runId, event}`. Optional payloads can carry status, paths, usage or approval
+information. This display stream is neither hidden chain-of-thought nor an
+audit of every action performed by a provider.
 
-interface DiffFile {
-  file: string;
-  kind: 'add' | 'modify' | 'delete';
-  additions: number;
-  deletions: number;
-  hunks: DiffHunk[];
-}
+Only terminal summaries persist, with capped trails. Restarting does not resume
+a child or restore a complete diff. Storage limits and corruption behavior are
+in [DATA_CONTRACTS.md](DATA_CONTRACTS.md).
 
-interface CheckResult {
-  name: string;                              // 'lint · eslint', 'unit · vitest', etc.
-  state: 'pass' | 'fail' | 'warn';
-  meta: string;                              // human-readable summary
-}
-
-interface PullRequest {
-  prNumber: number;
-  url: string;
-}
-
-interface AgentProvider {
-  /** Start a new agent run for a quest. Returns a run handle. */
-  startTask(params: {
-    questId: string;
-    adventurerId: string;
-    skill: 'bugfix' | 'refactor' | 'tests' | 'review' | 'lint' | 'docs';
-    repoUrl: string;
-    branch: string;            // base branch to fork from
-    promptContext: string;     // quest description + errand list, pre-built
-    model?: string;            // optional override (e.g. 'claude-opus-4-7', 'gpt-5-codex')
-  }): Promise<AgentRun>;
-
-  /** Stream reasoning events for a run. Caller iterates the async iterable. */
-  streamEvents(runId: string): AsyncIterable<AgentEvent>;
-
-  /** Report current context usage for the HP bar. Polled, e.g. every 2s. */
-  reportUsage(runId: string): Promise<{ contextUsed: number; maxContext: number }>;
-
-  /** Produce a structured diff for the Analysis view once the run completes. */
-  produceDiff(runId: string): Promise<{ files: DiffFile[] }>;
-
-  /** Run checks (lint, tests, typecheck) inside the sandbox and return results. */
-  runChecks(runId: string): Promise<CheckResult[]>;
-
-  /** Open a pull request on the remote. Returns PR identifier. */
-  openPR(runId: string, params: {
-    title: string;
-    body: string;
-    sourceBranch: string;
-    targetBranch: string;
-  }): Promise<PullRequest>;
-
-  /** Cancel a running task (user abort or budget cap hit). */
-  cancel(runId: string): Promise<void>;
-}
-```
-
-## Adapter responsibilities
-
-Every adapter must:
-
-- Implement all 7 methods. `startTask`, `streamEvents`, `reportUsage`, `produceDiff`, `runChecks`, `openPR`, `cancel`.
-- Surface token-limit errors gracefully — fail the run with a clear `error` event, never silently truncate.
-- Set `status: 'failed'` on unrecoverable errors and emit a final `error` event with a human-readable message.
-- Strip secrets from event payloads. The reasoning trail must not contain `.env` contents, OAuth tokens, or PR-creation credentials.
-- Be cancellable. `cancel(runId)` must terminate the underlying model call and any sandbox process within a few seconds.
-- Report usage continuously. `contextUsed` should reflect post-call token counts, not pre-call estimates.
-
-Adapters should not:
-
-- Mutate state outside the run's sandbox.
-- Open PRs as a side effect of `produceDiff` — the orchestrator decides when to call `openPR`.
-- Retry indefinitely. Bubble failures up so the orchestrator can apply budget rules.
-
-## Default adapter
-
-`ClaudeAdapter` wraps the [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview) and ships in Phase 4. It uses Claude Sonnet 4.6 by default with optional override to Opus 4.7 for high-complexity quests and Haiku 4.5 for cheap routine work.
-
-## Other adapters (planned)
-
-- `CodexAdapter` — OpenAI Codex CLI / GPT-5 family.
-- `GeminiAdapter` — Gemini CLI / Code Assist API.
-- `AiderAdapter` — local development; Aider CLI driving any model.
-- `OllamaAdapter` — fully local (privacy-sensitive flows, dev experiments).
-
-Each adapter implements the same `AgentProvider` interface. Selection is per-adventurer in the user's configuration, not global.
-
-## Where this fits in the ROADMAP
-
-This document affects:
-
-- **Phase 3 (Guilds & adventurers)** — the adventurer config UI exposes `model` and `adapter` choices.
-- **Phase 4 (Dispatch & sandbox)** — the agent runner calls `AgentProvider` rather than the Claude Agent SDK directly.
-- **Phase 5 (PR + review loop)** — `openPR` is the only PR-creation surface.
-- **Phase 6 (Metrics)** — `reportUsage` and `runChecks` feed the HP bar and check rows respectively.
-
-The contract is intentionally minimal. New methods should be added only when a real product need cannot be met by composing the existing ones.
+Tests use deterministic injected boundaries and labeled CLI fixtures. A fixture
+pass proves Citybase's lifecycle; real provider availability, quota, generated
+output quality and cost are separate evidence.

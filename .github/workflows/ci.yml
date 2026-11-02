@@ -9,6 +9,10 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -18,12 +22,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
-          node-version: '20'
+          node-version-file: .nvmrc
           cache: 'npm'
       - run: npm ci
       - run: npm run lint
       - run: npm run build
-      - run: npm test -- --run
+      - run: npm run test:coverage
+      - run: python .cycle/trackers.py lint
+      - run: node scripts/check-doc-links.mjs
 
   # Desktop smoke (FEAT-001): boots the real Electron app under xvfb and proves
   # the main â†’ preload â†’ renderer glue, then packages an unpacked dir so a broken
@@ -34,9 +40,49 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
-          node-version: '20'
+          node-version-file: .nvmrc
           cache: 'npm'
       - run: npm ci
       - run: npm run build
       - run: xvfb-run -a npm run test:e2e
       - run: npx electron-builder --dir
+
+  platform-smoke:
+    name: platform-smoke (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test -- --run
+      - run: npm run test:e2e
+
+  godot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install checksum-pinned Godot 4.7.2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          engine_dir="$RUNNER_TEMP/citybase-godot"
+          gh release download 4.7.2-stable --repo godotengine/godot-builds --pattern Godot_v4.7.2-stable_linux.x86_64.zip --dir "$engine_dir"
+          echo "9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65  $engine_dir/Godot_v4.7.2-stable_linux.x86_64.zip" | sha512sum --check
+          unzip -q "$engine_dir/Godot_v4.7.2-stable_linux.x86_64.zip" -d "$engine_dir"
+          chmod +x "$engine_dir/Godot_v4.7.2-stable_linux.x86_64"
+          echo "GODOT_BIN=$engine_dir/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - run: npm run test:godot

@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# Trackers: format-2 schema and integrity (dev-cycle)
+"$(command -v python3 || command -v python)" .cycle/trackers.py lint --staged || exit $?
