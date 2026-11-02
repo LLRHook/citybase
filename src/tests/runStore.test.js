@@ -1,4 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { createRunStore, sanitizeRun, MAX_EVENTS_PER_RUN } from '../../electron/main/services/runStore.cjs';
 
 const terminal = (over = {}) => ({
@@ -102,6 +105,61 @@ describe('createRunStore', () => {
     expect(await store.load()).toEqual([]);
     files.set(store.file, 'not json{');
     expect(await store.load()).toEqual([]);
+  });
+
+  it('restores valid runs and events when one saved trail contains malformed entries', async () => {
+    const userDataDir = await mkdtemp(path.join(tmpdir(), 'citybase-runs-'));
+    try {
+      const store = createRunStore({ userDataDir });
+      const validEvent = terminal().events[0];
+      await writeFile(store.file, JSON.stringify([
+        terminal({ runId: 'before' }),
+        terminal({ runId: 'damaged', events: [null, 42, 'noise', [], validEvent, false] }),
+        terminal({ runId: 'after' }),
+      ]));
+
+      for (const restored of [await store.load(), store.loadSync()]) {
+        expect(restored.map((r) => r.runId)).toEqual(['before', 'damaged', 'after']);
+        expect(restored[1].events).toEqual([validEvent]);
+      }
+    } finally {
+      await rm(userDataDir, { recursive: true, force: true });
+    }
+  });
+
+  it('saves valid history despite malformed events and caps the valid trail', async () => {
+    const { store, files } = memStore();
+    const events = Array.from({ length: MAX_EVENTS_PER_RUN }, (_, i) => ({
+      runId: 'r1', t: '00:00', kind: 'edit', text: `event ${i}`,
+    }));
+    await store.save([
+      terminal({ runId: 'before' }),
+      terminal({ events: [null, ...events, ...Array(100).fill(null)] }),
+    ]);
+
+    const saved = JSON.parse(files.get(store.file));
+    expect(saved.map((r) => r.runId)).toEqual(['before', 'r1']);
+    expect(saved[1].events).toEqual(events);
+    expect(await store.load()).toEqual(saved);
+  });
+
+  it('preserves the last valid file when an atomic replacement fails', async () => {
+    const userDataDir = await mkdtemp(path.join(tmpdir(), 'citybase-runs-'));
+    try {
+      const store = createRunStore({ userDataDir });
+      await store.save([terminal({ runId: 'saved' })]);
+      const before = await readFile(store.file, 'utf8');
+      const failing = createRunStore({
+        userDataDir,
+        rename: async () => { throw new Error('rename failed'); },
+      });
+
+      await expect(failing.save([terminal({ runId: 'new' })])).rejects.toThrow('rename failed');
+      expect(await readFile(store.file, 'utf8')).toBe(before);
+      expect(store.loadSync().map((r) => r.runId)).toEqual(['saved']);
+    } finally {
+      await rm(userDataDir, { recursive: true, force: true });
+    }
   });
 
   it('requires userDataDir', () => {

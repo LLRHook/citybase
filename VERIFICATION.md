@@ -151,16 +151,16 @@ A failure in this stage is a hard block.
   ```bash
   npm test -- --run
   ```
-  Expected: `Test Files  40 passed (40)`, `Tests  464 passed (464)`, exit 0.
+  Expected: `Test Files  40 passed (40)`, `Tests  477 passed (477)`, exit 0.
 - [ ] 2.3 Test-count baseline matches the collector:
   ```bash
-  npx vitest list | wc -l   # expect: 464
+  npx vitest list | wc -l   # expect: 477
   ```
   A mismatch with the table below means tests appeared or disappeared without
   a deliberate decision — investigate before ticking, then update the table
   in the same change as the run.
 
-**Baseline (2026-09-09, Windows multi-instance validation): 40 test files / 464 test cases, all Vitest. The desktop launch path is covered by the Playwright smoke (2.4), and GDScript behavior by the separate Godot regression checks (2.5). Generated `build/` output and disposable fixture projects are excluded from Citybase's lint and test collection.**
+**Baseline (2026-11-02, combined Windows and persistence fixes): 40 test files / 477 test cases, all Vitest. The desktop launch path is covered by the Playwright smoke (2.4), and GDScript behavior by the separate Godot regression checks (2.5). Generated `build/` output and disposable fixture projects are excluded from Citybase's lint and test collection.**
 
 | Test file | Cases | | Test file | Cases |
 |---|---|---|---|---|
@@ -175,13 +175,13 @@ A failure in this stage is a hard block.
 | `CliAgentAdapter.test.js` | 19 | | `reviewModel.test.js` | 9 |
 | `cityModel.test.js` | 9 | | `RunDetail.test.jsx` | 7 |
 | `CityView.test.jsx` | 8 | | `runCity.test.js` | 17 |
-| `citybaseApi.test.js` | 2 | | `runStore.test.js` | 9 |
+| `citybaseApi.test.js` | 2 | | `runStore.test.js` | 12 |
 | `CodexAdapter.test.js` | 25 | | `useAgentDetect.test.jsx` | 8 |
 | `coreProtocol.test.js` | 2 | | `useRunHistory.test.jsx` | 6 |
 | `coreRpcServer.test.js` | 7 | | `windowConfig.test.js` | 10 |
 | `detectAgentBinaries.test.js` | 19 | | `workspaceChecks.test.js` | 17 |
 | `gitMutations.test.js` | 14 | | `WorkspaceErrorStates.test.jsx` | 6 |
-| `ipcHandlers.test.js` | 36 | | `workspaceServiceCore.test.js` | 9 |
+| `ipcHandlers.test.js` | 36 | | `workspaceServiceCore.test.js` | 19 |
 | `parseLsTreeSizes.test.js` | 4 | | `questService.test.js` | 6 |
 | `coreStartup.test.js` | 5 | | `coreUserDataLock.test.js` | 5 |
 

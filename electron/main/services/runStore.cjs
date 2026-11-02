@@ -22,7 +22,9 @@ function sanitizeRun(r) {
   if (!r || typeof r !== 'object' || typeof r.runId !== 'string') return null;
   if (!isTerminal(r.status)) return null;
   const events = Array.isArray(r.events)
-    ? r.events.slice(-MAX_EVENTS_PER_RUN).map((e) => ({
+    ? r.events
+      .filter((e) => e && typeof e === 'object' && !Array.isArray(e))
+      .slice(-MAX_EVENTS_PER_RUN).map((e) => ({
         runId: e.runId, t: e.t, kind: e.kind,
         text: typeof e.text === 'string' ? e.text.slice(0, 2000) : '',
       }))

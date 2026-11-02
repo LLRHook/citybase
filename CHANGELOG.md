@@ -41,6 +41,13 @@ sections under each release/date heading.
 
 ### Verified
 
+- 2026-10-22 Persistence regression validation: 463 Vitest cases across 38 root
+  test files passed (13 new cases), ESLint clean, production renderer build clean.
+  The existing nested `.claude/worktrees` checkout was excluded from this local
+  Vitest run because its Playwright suite is outside the root unit-test suite.
+  This is an automated gate pass; desktop/real-agent release walkthroughs were
+  not rerun.
+
 - 2026-09-09 Windows source validation: 464 Vitest cases across 40 files,
   24 GDScript regression checks, 13 real WebSocket transport checks,
   ESLint, the Vite production build, and the Electron smoke pass.
@@ -71,6 +78,15 @@ sections under each release/date heading.
   multi-agent review of the v3 changes and fixed this cycle (BUG-025..029).
 
 ### Fixed
+
+- BUG-043 Malformed saved event entries no longer erase otherwise valid run
+  history during async/synchronous restoration or reject an entire history save;
+  the trail cap retains the latest 60 valid events.
+- BUG-044 Workspace mutations reject unreadable/corrupt saved state before any
+  write, preserving the existing registry and allowing recovery after transient
+  read failures without losing prior workspaces.
+- BUG-045 Stage 2's automated-test baseline includes the previously omitted
+  parseLsTreeSizes/questService tests and this sprint's persistence regressions.
 
 - BUG-006: Resolve the Windows npm shim to its absolute PATH location;
   workspace checks now execute from paths containing spaces.
