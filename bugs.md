@@ -199,3 +199,15 @@ Active work only. Format and rules: [`.cycle/TRACKERS.md`](.cycle/TRACKERS.md). 
 - **Status:** fixed-pending-migration
 - **Fix:** Living instructions, domain/runtime docs, roadmap and verification match the shared Godot/Node and legacy Electron implementation; historical source text is preserved.
 - **Docs:** AGENTS.md, CLAUDE.md, README.md, CONTRIBUTING.md, ROADMAP.md, VERIFICATION.md, docs/domain-model.md, docs/agent-runtime.md
+
+### [BUG-1793651435] Godot reports 100 percent success without completed runs
+- [ ] **Severity:** low
+- **Area:** ui
+- **File(s):** godot/living_layer.gd
+- **Observation:** A fresh profile with zero runs displays 100% success; after one rejected/cancelled run and restart it still displays 100% success, with zero successful or failed provider completions.
+- **Expected:** Show an unavailable or clearly scoped value while the completed-outcome denominator is zero; a measured success percentage needs a positive denominator.
+- **Req:** CB-FR-010; output claims must reflect observed run state
+- **Depends on:** none
+- **Repro / Notes:** Native Windows Godot walkthrough at ff9e150: start a fresh profile, reject one fixture run, restart; screenshots and cancelled runs.json are in the verification evidence.
+- **Bump:** patch
+- **Status:** open

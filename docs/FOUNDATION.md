@@ -52,12 +52,20 @@ On Windows with Node 24.15.0 and checksum-verified Godot 4.7.2:
 | Unpacked Windows Electron artifact | Explicit unsigned verification package launches; zero duplicate React package entries in app.asar |
 | Godot regressions | 24 checks pass |
 | Real Godot/WS transport | 13 checks pass, including oversized results, disconnect and explicit reconnect without replay |
+| Fresh committed checkout | All automated layers pass at `ff9e1505d5e0`; same 477 cases, no skips, tracker lint and local Markdown links clean |
+| Native Godot GUI | Actual source city, fixture selection, WORK, approval/reject, cancelled history and selected workspace restored after restart; fixture Git tree unchanged |
 
 Raw logs and machine reports are kept in private verification evidence, and the
 final local run records the tested commit in `.vv/last-run.md`. These observations
 must be reconciled with the final committed checkout; current CI results belong
 to that PR head. No fresh real-model generation trial or all-platform release
 validation is implied.
+
+The native walkthrough exposed a low-severity existing HUD claim: it displays
+100% success with no successful/failed completed runs, including a cancelled-only
+history. That finding is filed in `bugs.md`. Accessibility inspection exposed
+only the engine window in the native control tree; no screen-reader compliance
+claim follows from the visual/interaction checks.
 
 ## Release readiness
 

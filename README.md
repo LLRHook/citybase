@@ -17,6 +17,8 @@ godot --path godot
 ```
 
 Godot discovers Node on PATH; `CITYBASE_NODE` selects an explicit executable.
+With no remembered workspace, a source/development launch opens the Citybase
+checkout; an exported app prompts for a workspace.
 Each frontend starts a core on its own OS-assigned port. The default profile is
 shared with legacy Electron, so close the other frontend before using it. To run
 multiple Godot instances, use separate terminals and profiles:

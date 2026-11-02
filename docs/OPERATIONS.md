@@ -18,6 +18,10 @@ Use `CITYBASE_NODE` if Godot must use a specific Node executable. Use
 The legacy development path is `npm run dev:desktop`; a built legacy run uses
 `npm run build` then `npm run start:desktop`.
 
+Godot source/development launches register the Citybase checkout when the profile
+has no selected workspace. Exported first-run builds prompt instead. To inspect
+a different project, use OPEN WORKSPACE; this is not a production seed fixture.
+
 ## Profiles and backups
 
 Default state directories: `%APPDATA%/Citybase` on Windows,
