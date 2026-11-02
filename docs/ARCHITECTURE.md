@@ -41,6 +41,9 @@ without the token. After authenticated WS connection, the core pushes boot state
 The profile lock prevents another core from owning the same state directory;
 separate profiles permit concurrent instances.
 
+For source development, Godot auto-registers its Citybase checkout when the
+profile is empty. Exported builds prompt for a workspace instead.
+
 Dispatch resolves the workspace ID in CMP-003, then CMP-005 returns a run handle
 and waits for explicit UI approval before spawning CMP-006. Events flow back
 through the transport. Settlement updates the shared record and persists a
@@ -96,3 +99,4 @@ Current renderer navigation/CSP gaps remain FEAT-006.
 | Rev | Date | Commit | Mode | Summary |
 |---|---|---|---|---|
 | 1 | 2026-11-02T15:20:09-05:00 | 44a7ecdcbd86 | ADOPT | As-built components, boundaries and supported toolchain |
+| 2 | 2026-11-02 | pending | REVISION | Clarify source-development first-run behavior |

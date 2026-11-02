@@ -62,6 +62,10 @@ records remain in [history](history/README.md).
 3. Resolve provider-event truth, progression, camera and remaining security gaps.
 4. Re-run full native parity on each claimed platform before a release decision.
 
+Godot source/development starts may auto-register the Citybase checkout for an
+empty profile; exported first-run builds show the open prompt. CB-FR-001's
+empty-profile prompt acceptance refers to that packaged-user flow.
+
 ## 5. Open decisions and evidence gaps
 
 - PR #69's Electron model-shop direction requires an explicit decision against
@@ -79,3 +83,4 @@ records remain in [history](history/README.md).
 |---|---|---|---|---|---|---|
 | 1 | 2026-11-02T15:20:09-05:00 | 44a7ecdcbd86 | ADOPT | Current foundation baseline; historical sources retained |
 | 2 | 2026-11-02T15:22:13-05:00 | 562acebfe691 | REVISION | Normalize partial delivery for requirement indexing |
+| 3 | 2026-11-02 | pending | REVISION | Clarify source-development first-run behavior |
