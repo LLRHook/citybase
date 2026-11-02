@@ -26,7 +26,8 @@ record substitutes for testing a new candidate.
 ## Next work
 
 1. Resolve the PR #69 product-direction decision against the Godot charter.
-2. Finish the dependency PR against the supported Node baseline.
+2. Maintain the supported dependency/runtime baseline and the cross-platform
+   gates established by the combined foundation delivery.
 3. Close correctness and trust gaps: truthful Codex events (BUG-003), durable
    progression (BUG-037), initial camera framing (BUG-042), renderer
    navigation/CSP/fonts (FEAT-006), and re-confirm older residual bug findings.

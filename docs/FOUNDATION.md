@@ -3,6 +3,12 @@
 This record covers the November 2, 2026 foundation work. It is not a new product
 release or a claim that every historical feature and native parity gate is done.
 
+Delivery: [foundation PR #72](https://github.com/LLRHook/citybase/pull/72).
+The GitHub merge/check history owns its final status. All five CI jobs passed
+at `eaf02cc` in run `41521776236`: main static/coverage, Linux desktop/package,
+Windows smoke, macOS smoke and Linux Godot. Final bookkeeping commits run the
+same gates before merge.
+
 ## Scope and PR disposition
 
 - PRs #63, #64, #65, #70 and #71 are merged. Action pins and production patches
