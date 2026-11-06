@@ -19,7 +19,7 @@ record substitutes for testing a new candidate.
 | v1 desktop and Git | Live workspace/Git projection, CLI adapters, approvals, checks, commit/PR surfaces | Legacy shell retained; auto-push/per-run worktrees absent |
 | v2/v3 living and durable workbench | Streaming Claude activity, live city, restartable terminal history | Codex event fidelity and older residual findings remain tracked |
 | v4 A/B | Shared authenticated loopback core and Godot spike | Original Mac spike is dated evidence |
-| v4 C/D/E | 3D city/camera, workbench, quests, approvals, outcomes, living layer | Source regressions pass; camera and lifetime XP findings remain |
+| v4 C/D/E | 3D city/camera, workbench, quests, approvals, outcomes, living layer | Recorded XP and initial framing have regressions; full native parity remains |
 | v4 F | macOS arm64 bundled-core/export script and parity checklist | Windows Godot distribution and fresh native parity are not complete |
 | Foundation | Supported Node, separated test environments, coverage, platform CI, maintained trackers and canonical docs | Exact-head evidence and remaining gates in docs/FOUNDATION.md |
 
@@ -32,8 +32,7 @@ each PR's disposition are recorded in [docs/FOUNDATION.md](docs/FOUNDATION.md).
 
 1. Maintain the supported dependency/runtime baseline and the cross-platform
    gates established by the combined foundation delivery.
-2. Close correctness and trust gaps: truthful Codex events (BUG-003), durable
-   progression (BUG-037), initial camera framing (BUG-042), renderer
+2. Close correctness and trust gaps: truthful Codex events (BUG-003), renderer
    navigation/CSP/fonts (FEAT-006), and re-confirm older residual bug findings.
 3. Add focused workspace-hook coverage (FEAT-009) and assess remaining inherited
    test gaps from actual behavior rather than the historical review alone.

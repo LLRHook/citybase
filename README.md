@@ -8,13 +8,16 @@ The package version is 3.0.0; the Godot work is the v4 engineering milestone.
 ## Start locally
 
 Prerequisites: Git, Node **24.15.0+ in the 24.x line or Node 26.x**, npm and
-Godot **4.7.2**. `.nvmrc` selects Node 24. Install/authenticate Claude Code or
+Godot **4.7.2**, plus Rust/Cargo **1.85+** for source builds. `.nvmrc` selects Node 24. Install/authenticate Claude Code or
 Codex separately for real agent work. `gh` is needed for opening PRs.
 
 ```sh
 npm ci
 godot --path godot
 ```
+
+Source installation builds the required Rust snapshot processor. Packaged apps
+bundle it; see [native build and protocol](native/README.md).
 
 Godot discovers Node on PATH; `CITYBASE_NODE` selects an explicit executable.
 With no remembered workspace, a source/development launch opens the Citybase
@@ -48,8 +51,11 @@ frontend; React requires Electron's preload bridge.
    Push before opening a PR through the core/legacy shell; auto-push is absent.
 
 Godot currently has no branch selector or PR button. The shared core and legacy
-shell retain those operations. Current progression is based on recent history
-(BUG-037); default small-city framing has BUG-042. These remain open findings.
+shell retain those operations. Recorded profile XP survives history pruning and
+restart. Legacy profiles recover only XP supported by their retained runs.
+Success measures done / (done + failed) in the recent profile history; rejected
+and cancelled runs do not enter that denominator. With zero completions it is
+unavailable. Initial city framing leaves room for the HUD.
 
 ## Commands
 
@@ -59,6 +65,7 @@ shell retain those operations. Current progression is based on recent history
 | `npm run dev:desktop` | Legacy Electron HMR development on strict Vite port 5173 |
 | `npm run build` / `npm run build:desktop` | Build the legacy renderer into `dist/` |
 | `npm run start:desktop` | Launch Electron against the built renderer |
+| `npm run build:native` / `npm run test:native` | Build/test the required Rust snapshot processor |
 | `npm run lint` | ESLint for renderer, core, Electron and tooling |
 | `npm test` | One Node/renderer Vitest run |
 | `npm run test:watch` | Interactive Vitest watch |

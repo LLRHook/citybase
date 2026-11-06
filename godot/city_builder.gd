@@ -36,6 +36,14 @@ var reduced_motion := false
 var _buildings := {}        # repo path -> { node, mat, base_color, base_energy }
 var _district_centers := {} # district name -> Vector3
 var _bounds_radius := 12.0
+var _framing_points: Array = []
+var _framing_bounds := AABB(Vector3(-1, -0.5, -1), Vector3(2, 1, 2))
+
+func framing_points() -> Array:
+	return _framing_points
+
+func framing_bounds() -> AABB:
+	return _framing_bounds
 
 func bounds_radius() -> float:
 	return _bounds_radius
@@ -87,6 +95,22 @@ func build(snapshot: Dictionary) -> Dictionary:
 		var color: Color = DISTRICT_COLORS[i % DISTRICT_COLORS.size()]
 		_build_district(district_name, files, sizes, color, seats[i])
 
+	var first := true
+	_framing_points.clear()
+	for child in get_children():
+		if child is MeshInstance3D and not child.is_queued_for_deletion():
+			var bounds: AABB = child.transform * child.get_aabb()
+			for corner in 8:
+				_framing_points.append(bounds.get_endpoint(corner))
+			_framing_bounds = bounds if first else _framing_bounds.merge(bounds)
+			first = false
+		elif child is Label3D and not child.is_queued_for_deletion():
+			# Billboard labels extend beyond the platforms, regardless of orbit.
+			var label_bounds := AABB(child.position - Vector3(3, 1, 3), Vector3(6, 2, 6))
+			for corner in 8:
+				_framing_points.append(label_bounds.get_endpoint(corner))
+			_framing_bounds = label_bounds if first else _framing_bounds.merge(label_bounds)
+			first = false
 	_apply_dirty(snapshot.get("files", []))
 	return { "districts": names.size(), "buildings": _buildings.size() }
 

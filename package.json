@@ -9,7 +9,7 @@
     "node": "^24.15.0 || ^26.0.0"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "npm run build:native && vite build",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -17,13 +17,15 @@
     "test:godot": "node scripts/test-godot.mjs",
     "test:e2e": "playwright test",
     "dev:desktop": "concurrently -k -n vite,electron -c blue,magenta \"vite\" \"wait-on http://localhost:5173 && electron . --dev\"",
-    "build:desktop": "vite build",
+    "build:desktop": "npm run build",
     "start:desktop": "electron .",
     "core": "node core/server.cjs",
     "package:dir": "npm run build:desktop && electron-builder --dir",
     "package:mac": "npm run build:desktop && electron-builder --mac --config.mac.identity=null",
-    "postinstall": "git config core.hooksPath hooks || exit 0",
-    "package:v4": "node scripts/package-v4.mjs"
+    "postinstall": "node scripts/build-native.mjs && (git config core.hooksPath hooks || exit 0)",
+    "package:v4": "node scripts/package-v4.mjs",
+    "build:native": "node scripts/build-native.mjs",
+    "test:native": "cargo test --locked --manifest-path native/Cargo.toml"
   },
   "build": {
     "appId": "com.llrhook.citybase",
@@ -35,7 +37,8 @@
     "files": [
       "package.json",
       "electron/**/*",
-      "dist/**/*"
+      "dist/**/*",
+      "native/bin/*/citybase-snapshot*"
     ],
     "mac": {
       "target": [
@@ -49,7 +52,11 @@
       ],
       "category": "public.app-category.developer-tools",
       "identity": null
-    }
+    },
+    "asarUnpack": [
+      "native/bin/*/citybase-snapshot*"
+    ],
+    "beforePack": "./scripts/before-pack-native.cjs"
   },
   "dependencies": {
     "ws": "^8.21.1"

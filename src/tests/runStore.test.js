@@ -137,7 +137,7 @@ describe('createRunStore', () => {
       terminal({ events: [null, ...events, ...Array(100).fill(null)] }),
     ]);
 
-    const saved = JSON.parse(files.get(store.file));
+    const saved = JSON.parse(files.get(store.file)).runs;
     expect(saved.map((r) => r.runId)).toEqual(['before', 'r1']);
     expect(saved[1].events).toEqual(events);
     expect(await store.load()).toEqual(saved);

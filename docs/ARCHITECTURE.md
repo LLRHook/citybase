@@ -14,6 +14,7 @@ flowchart LR
   C --> H[Shared handler map and services]
   E --> H
   H --> S[Process service]
+  S --> N[Rust snapshot processor]
   S --> Git[Git and npm]
   S --> CLI[Claude or Codex CLI]
   H --> D[Local JSON state]
@@ -31,6 +32,7 @@ This is a component diagram, not a claim of per-run filesystem isolation.
 | CMP-004 | `electron/main/services/` | Workspace registry, Git, checks, tracker projection and run storage |
 | CMP-005 | `electron/main/agents/` | Provider selection, nonblocking lifecycle, approval, event stream and bounded history |
 | CMP-006 | `processService.cjs` | Production Node subprocess invocation, timeout/output bounds and termination |
+| CMP-008 | `native/`, `snapshotProcessor.cjs` | Required Rust Git snapshot parsing/metrics; one bounded invocation per snapshot, no Git writes or provider authority |
 | CMP-007 | `electron/main/`, `electron/preload/`, `src/` | Legacy lifecycle/bridge and React hook-based presentation |
 
 ## 3. Runtime views
@@ -38,6 +40,12 @@ This is a component diagram, not a claim of per-run filesystem isolation.
 Godot discovers Node or a bundled core, sets a fresh token, and starts a core on
 an OS-assigned port. A per-launch readiness file reports `{port,pid}` or an error
 without the token. After authenticated WS connection, the core pushes boot state.
+Node collects bounded Git output and invokes the Rust snapshot processor before
+returning the existing public snapshot. There is no production JavaScript parser
+fallback. Missing/failed native processors surface a snapshot error. The native
+[build/protocol](../native/README.md) is internal; RPC and save formats are unchanged
+by that processor.
+
 The profile lock prevents another core from owning the same state directory;
 separate profiles permit concurrent instances.
 
@@ -46,8 +54,8 @@ profile is empty. Exported builds prompt for a workspace instead.
 
 Dispatch resolves the workspace ID in CMP-003, then CMP-005 returns a run handle
 and waits for explicit UI approval before spawning CMP-006. Events flow back
-through the transport. Settlement updates the shared record and persists a
-bounded terminal summary. Review reads the current tree and declared checks.
+through the transport. Settlement updates the shared record and atomically persists bounded terminal
+history with recorded profile XP. Progression does not depend on the history cap. Review reads the current tree and declared checks.
 On disconnection Godot preserves unknown outcomes and requires explicit retry;
 requests are not automatically replayed.
 
@@ -58,6 +66,7 @@ requests are not automatically replayed.
 | Tier | Language/runtime | Build/test tools | State |
 |---|---|---|---|
 | Primary presentation | GDScript, Godot 4.7.2 | Godot import/regression and real loopback harness | Detected |
+| Snapshot processing | Rust 1.85+, pinned serde_json | Cargo build/test/clippy/fmt; differential Node integration tests | Required helper shared by both frontends, bundled with native packages |
 | Shared core/services | JavaScript, CommonJS; Node 24.15+ in 24.x or Node 26.x | npm, ESLint, Vitest Node project | Detected |
 | Legacy presentation | JavaScript/JSX, React 19, Electron | Vite, Vitest jsdom, Playwright Electron | Detected |
 | Core transport | `ws` | RPC/startup integration tests | Only npm runtime dependency; React is bundled by Vite |
@@ -90,8 +99,8 @@ Current renderer navigation/CSP gaps remain FEAT-006.
 - ADR-003: Use supported Node LTS lines and separate real Node tests from DOM
   component tests. Coverage reports measure the inspected source; no threshold
   is invented by this change.
-- Limits requiring future work: recent-window progression, Codex event fidelity,
-  initial camera framing, renderer hardening, final native distribution and
+- Limits requiring future work: Codex event fidelity, renderer hardening,
+  final native distribution and
   complete current-platform manual parity. See the active trackers.
 
 ## Revision history

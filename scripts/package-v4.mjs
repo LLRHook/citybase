@@ -17,6 +17,9 @@ import { existsSync, mkdirSync, copyFileSync, writeFileSync, chmodSync, rmSync }
 import path from 'node:path';
 import process from 'node:process';
 
+if (process.platform !== 'darwin' || process.arch !== 'arm64') {
+  throw new Error('The v4 bundle pipeline requires a macOS arm64 host');
+}
 const repoRoot = process.cwd();
 const outDir = path.resolve(repoRoot, process.argv[2] || 'build');
 const godotBin = process.env.GODOT_BIN || '/Applications/Godot.app/Contents/MacOS/Godot';
@@ -25,6 +28,9 @@ const seaBase = path.join(outDir, `node-official-${nodeVersion}`);
 
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: 'inherit', ...opts });
 mkdirSync(outDir, { recursive: true });
+
+// Native Git snapshot processor is required by the shared core.
+run(process.execPath, ['scripts/build-native.mjs']);
 
 // 1. Official Node binary (cached).
 if (!existsSync(seaBase)) {
@@ -66,6 +72,8 @@ run(godotBin, ['--headless', '--path', 'godot', '--export-release', 'macOS', app
 // 4. Embed the core.
 copyFileSync(coreBinary, path.join(appPath, 'Contents', 'Resources', 'citybase-core'));
 chmodSync(path.join(appPath, 'Contents', 'Resources', 'citybase-core'), 0o755);
+copyFileSync(path.join(repoRoot, 'native', 'bin', `${process.platform}-${process.arch}`, 'citybase-snapshot'), path.join(appPath, 'Contents', 'Resources', 'citybase-snapshot'));
+chmodSync(path.join(appPath, 'Contents', 'Resources', 'citybase-snapshot'), 0o755);
 // The embedded binary changes the bundle contents — re-sign the app ad-hoc.
 run('codesign', ['--force', '--deep', '-s', '-', appPath]);
 

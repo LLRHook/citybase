@@ -59,6 +59,7 @@ var _bench: Workbench
 var _living: LivingLayer
 var _last_snapshot: Dictionary = {}
 var _last_runs: Array = []
+var _last_progression: Dictionary = {}
 var _autotest_run_dispatched := false
 
 func _ready() -> void:
@@ -291,7 +292,7 @@ func _load_snapshot(workspace_id: String) -> void:
 		])
 		_bench.set_workspace(str(s.get("rootPath", "")).get_file(), str(s.get("branch", "?")), (s.get("files", []) as Array).size())
 		var stats: Dictionary = _city.build(s)
-		_rig.frame_radius(_city.bounds_radius())
+		_rig.frame_points(_city.framing_points())
 		_log("city built · %d districts · %d buildings" % [stats["districts"], stats["buildings"]])
 		_refresh_quests()
 		_refresh_runs()
@@ -304,7 +305,9 @@ func _load_snapshot(workspace_id: String) -> void:
 		elif _spike_out != "" and not _autotest_run_dispatched:
 			# Give the living layer (ambient motes, flicker, vitals) time to
 			# appear in the city-04 shot before the idle autotest exits.
-			_quit_soon(4.5))
+			_quit_soon(4.5),
+		func(message: String) -> void:
+			_bench.show_error("GIT SNAPSHOT FAILED", message))
 
 func _refresh_quests() -> void:
 	if _workspace_id == "":
@@ -315,11 +318,21 @@ func _refresh_quests() -> void:
 			_bench.set_quests(quests))
 
 func _refresh_runs() -> void:
+	_call_rpc("agent.getProgression", [], func(progression: Variant) -> void:
+		if not progression is Dictionary:
+			return
+		var value: Variant = progression.get("xp")
+		if not (value is int or value is float):
+			return
+		var xp := float(value)
+		if is_finite(xp) and xp >= 0.0 and xp == floor(xp):
+			_last_progression = {"xp": max(int(xp), int(_last_progression.get("xp", 0)))}
+			_living.update_snapshot(_last_snapshot, _last_runs, _last_progression))
 	_call_rpc("agent.listRuns", [{}], func(runs: Variant) -> void:
 		if runs is Array:
 			_last_runs = runs
 			_bench.set_runs(runs)
-			_living.update_snapshot(_last_snapshot, _last_runs)
+			_living.update_snapshot(_last_snapshot, _last_runs, _last_progression)
 			# A run may settle while disconnected. Reconcile the form only from
 			# authoritative history, without inferring an outcome from socket loss.
 			for run: Dictionary in runs:
@@ -413,7 +426,7 @@ func _on_run_settled(status: String) -> void:
 			if snap is Dictionary and not (snap as Dictionary).get("error"):
 				_last_snapshot = snap
 				_city.set_dirty((snap as Dictionary).get("files", []))
-				_living.update_snapshot(_last_snapshot, _last_runs))
+				_living.update_snapshot(_last_snapshot, _last_runs, _last_progression))
 	# The no-code review surface: diff + checks feed the Outcome panel.
 	# Checks run the repo's real npm scripts and can take ~30s+, so the
 	# autotest quits after the outcome lands (with a generous backstop).

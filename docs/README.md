@@ -8,6 +8,7 @@ This index owns documentation routing. The manifest version is still 3.0.0;
 | [SRS](SRS.md) | Current product boundary, requirements, acceptance and delivery gaps |
 | [Architecture](ARCHITECTURE.md) | Components, trust boundaries, stack decision and rationale |
 | [Data contracts](DATA_CONTRACTS.md) | RPC operations, events, disk formats, limits and compatibility |
+| [Native snapshot processor](../native/README.md) | Required Rust build, packaging, internal protocol and parity tests |
 | [Agent runtime](agent-runtime.md) | Provider interface, CLI behavior and run lifecycle |
 | [Domain model](domain-model.md) | Meaning of the city and workbench concepts |
 | [Operations](OPERATIONS.md) | Setup, profiles, backups, troubleshooting and release procedure |

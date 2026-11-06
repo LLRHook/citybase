@@ -15,6 +15,7 @@
 // It does NOT run any agent CLI itself — that is each adapter's job.
 const crypto = require('node:crypto');
 const { resolveProvider } = require('./resolveProvider.cjs');
+const { xpForStatus, normalizeProgression } = require('./progression.cjs');
 
 function defaultGenerateRunId() {
   return crypto.randomUUID();
@@ -51,6 +52,7 @@ function createAgentManager({
   now = defaultNow,
   historyLimit = 100,
   initialRuns = [],
+  initialProgression,
   persist,
 } = {}) {
   const registry = new Map();
@@ -60,6 +62,7 @@ function createAgentManager({
   // cancel() so the Run History panel can render every run from this session,
   // and is seeded from persisted runs so it also shows past sessions (FEAT-008).
   const history = new Map();
+  const progression = normalizeProgression(initialProgression, initialRuns);
   // runId -> { resolve, summary }; resolve('approved' | 'rejected')
   const pendingApprovals = new Map();
 
@@ -75,6 +78,7 @@ function createAgentManager({
       startedAt: r.startedAt,
       events: Array.isArray(r.events) ? r.events : [],
       historical: true,
+      progressionCounted: true,
     });
   }
 
@@ -94,8 +98,19 @@ function createAgentManager({
 
   function doPersist() {
     if (typeof persist === 'function') {
-      try { persist(serializeRuns()); } catch { /* persistence is best-effort */ }
+      try { persist(serializeRuns(), getProgression()); } catch { /* persistence is best-effort */ }
     }
+  }
+
+  function getProgression() {
+    return { ...progression };
+  }
+
+  function recordProgression(entry) {
+    const xp = xpForStatus(entry.run.status);
+    if (entry.progressionCounted || xp === 0) return;
+    progression.xp = Math.min(Number.MAX_SAFE_INTEGER, progression.xp + xp);
+    entry.progressionCounted = true;
   }
 
   function register(name, adapter) {
@@ -173,8 +188,9 @@ function createAgentManager({
         maxContext: 0,
         branch: rest.branch,
       };
-      inFlight.set(preRunId, { provider, adapter, run: placeholder });
-      history.set(preRunId, { run: { ...placeholder }, provider, startedAt: now() });
+      const pendingEntry = { run: placeholder, provider, adapter, startedAt: now() };
+      inFlight.set(preRunId, pendingEntry);
+      history.set(preRunId, pendingEntry);
       trimHistory();
       const promptText = typeof rest.promptContext === 'string' ? rest.promptContext.slice(0, 240) : '';
       const summary = {
@@ -192,8 +208,8 @@ function createAgentManager({
       const verdict = await requestApproval(preRunId, summary);
       if (verdict !== 'approved') {
         inFlight.delete(preRunId);
-        const h = history.get(preRunId);
-        if (h) h.run = { ...h.run, status: 'cancelled' };
+        pendingEntry.run.status = 'cancelled';
+        recordProgression(pendingEntry);
         // Persist the rejection: the run never spawns (so captureWhenDone is
         // never reached), but the cancelled record should survive a restart to
         // match the in-session history rather than vanishing.
@@ -221,15 +237,16 @@ function createAgentManager({
     if (inFlight.has(run.runId)) {
       throw new Error(`agentManager.startRun: runId collision: ${run.runId}`);
     }
-    inFlight.set(run.runId, { provider, adapter, run });
+    const entry = { run, provider, adapter, startedAt: now() };
+    inFlight.set(run.runId, entry);
     // Hold the LIVE run reference (not a copy) in history so listRuns reflects
     // status flips as the non-blocking run progresses (running → done/failed/
     // cancelled). The entry persists across cancel/eviction, so the record
     // isn't lost. Trim to historyLimit (FIFO) to bound memory.
-    history.set(run.runId, { run, provider, startedAt: now() });
+    history.set(run.runId, entry);
     trimHistory();
     // Snapshot the run's events once it settles, then persist (best-effort).
-    captureWhenDone(run.runId);
+    captureWhenDone(run.runId, entry);
     return run;
   }
 
@@ -238,16 +255,20 @@ function createAgentManager({
   // Also announce the terminal transition: the renderer refreshes run status
   // on incoming events, and without a settle event the last streamed event
   // can leave the UI showing `running` forever (BUG-031).
-  function captureWhenDone(runId) {
+  function captureWhenDone(runId, entry) {
+    const settle = () => {
+      recordProgression(entry);
+      doPersist();
+      announceSettled(runId, entry.run.status);
+    };
     getEvents(runId).then(
-      (events) => { const h = history.get(runId); if (h) h.events = events; doPersist(); announceSettled(runId); },
-      () => { doPersist(); announceSettled(runId); },
+      (events) => { entry.events = events; settle(); },
+      settle,
     );
   }
 
-  function announceSettled(runId) {
-    if (typeof emitEvent !== 'function') return;
-    const status = history.get(runId)?.run?.status || 'done';
+  function announceSettled(runId, status) {
+    if (typeof emitEvent !== 'function' || !['done', 'failed', 'cancelled'].includes(status)) return;
     emitEvent({
       runId,
       event: { runId, t: hhmm(now()), kind: 'plan', text: `agent run settled · ${status}`, payload: { status } },
@@ -371,6 +392,12 @@ function createAgentManager({
    */
   async function cancel(runId) {
     const adapter = adapterFor(runId);
+    const entry = inFlight.get(runId);
+    if (['done', 'failed', 'cancelled'].includes(entry.run.status)) return;
+    if (entry.run.status === 'awaiting-approval' && pendingApprovals.has(runId)) {
+      rejectRun(runId);
+      return;
+    }
     if (pendingApprovals.has(runId)) {
       const entry = pendingApprovals.get(runId);
       pendingApprovals.delete(runId);
@@ -379,9 +406,10 @@ function createAgentManager({
     await adapter.cancel(runId);
     // Guarantee the cancelled status on the shared run reference (the real
     // adapter also does this; this makes the manager correct regardless).
-    const histEntry = history.get(runId);
-    if (histEntry && histEntry.run) histEntry.run.status = 'cancelled';
+    entry.run.status = 'cancelled';
+    recordProgression(entry);
     inFlight.delete(runId);
+    doPersist();
   }
 
   /**
@@ -420,6 +448,7 @@ function createAgentManager({
     startRun,
     getRun,
     listRuns,
+    getProgression,
     streamEvents,
     getEvents,
     reportUsage,

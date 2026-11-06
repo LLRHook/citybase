@@ -25,6 +25,9 @@ for this project's subject convention.
 npm ci
 python .cycle/trackers.py install
 npm run lint
+cargo fmt --manifest-path native/Cargo.toml -- --check
+cargo clippy --locked --manifest-path native/Cargo.toml --all-targets -- -D warnings
+npm run test:native
 npm run build
 npm test
 npm run test:coverage

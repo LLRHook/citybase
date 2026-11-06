@@ -47,7 +47,9 @@ function run(command, args, { cwd, timeoutMs, maxBuffer, env, stdin } = {}) {
   return new Promise((resolve) => {
     const start = Date.now();
     let child = null;
+    let stdinError = null;
     const finish = (err, stdout, stderr) => {
+      err = err || stdinError;
       const durationMs = Date.now() - start;
       const code = err && typeof err.code === 'number' ? err.code
         : err && err.code === 'ETIMEDOUT' ? null
@@ -80,6 +82,7 @@ function run(command, args, { cwd, timeoutMs, maxBuffer, env, stdin } = {}) {
         windowsVerbatimArguments: invocation.windowsVerbatimArguments === true,
       }, finish);
       if (stdin !== undefined && child.stdin) {
+        child.stdin.once('error', (err) => { stdinError = err; });
         child.stdin.end(stdin);
       }
     } catch (err) {
@@ -124,6 +127,7 @@ function spawnStream(command, args, {
   let settled = false;
   let timer = null;
   let killTimer = null;
+  let stdinError = null;
 
   if (process.env.CITYBASE_PROCESS_TRACE === '1') {
     console.log('[processService.spawnStream]', JSON.stringify({ command, args, cwd, timeoutMs }));
@@ -139,7 +143,8 @@ function spawnStream(command, args, {
   // Close stdin unless the caller pipes something — otherwise some CLIs
   // (e.g. claude) block for seconds waiting on stdin that never comes.
   if (child.stdin) {
-    try { child.stdin.end(stdin === undefined ? undefined : stdin); } catch { /* ignore */ }
+    child.stdin.once('error', (err) => { stdinError = err; });
+    try { child.stdin.end(stdin === undefined ? undefined : stdin); } catch (err) { stdinError = err; }
   }
 
   const accumulate = (chunk, which) => {
@@ -185,6 +190,7 @@ function spawnStream(command, args, {
 
   const done = new Promise((resolve) => {
     const finish = (code, signal, err) => {
+      err = err || stdinError;
       if (settled) return;
       settled = true;
       if (timer) clearTimeout(timer);
