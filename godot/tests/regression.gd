@@ -60,7 +60,7 @@ func _run() -> void:
 		for index in 7:
 			fixture_tree.append("%s/file-%d.js" % [district, index])
 	main._city.build({"repoTree": fixture_tree})
-	main._rig.frame_bounds(main._city.framing_bounds())
+	main._rig.frame_points(main._city.framing_points())
 	var all_in_view := true
 	var viewport_size := root.get_visible_rect().size
 	for child in main._city.get_children():
@@ -133,7 +133,7 @@ func _run() -> void:
 		for size in [Vector2i(1480, 960), Vector2i(960, 640), Vector2i(640, 960)]:
 			viewport.size = size
 			await process_frame
-			rig.frame_bounds(city.framing_bounds())
+			rig.frame_points(city.framing_points())
 			var safe_rect := Rect2(Vector2(size) * Vector2(0.04, 0.16), Vector2(size) * Vector2(0.92, 0.44))
 			var contained := true
 			for child in city.get_children():
@@ -143,5 +143,8 @@ func _run() -> void:
 						contained = contained and not rig._camera.is_position_behind(point) and safe_rect.has_point(rig._camera.unproject_position(point))
 			check(contained, "HUD-free perspective framing: %d districts at %s" % [district_count, size])
 		viewport.queue_free()
+	main._load_snapshot("fixture-workspace")
+	main.respond_error("git.getSnapshot", "Rust snapshot processor missing")
+	check(main._bench._error_panel.visible and main._bench._error_text.get_parsed_text().contains("Rust snapshot processor missing"), "native processor errors appear in the workbench instead of a fake city")
 	print("REGRESSION_FAILURES=%d" % failures)
 	quit(1 if failures > 0 else 0)

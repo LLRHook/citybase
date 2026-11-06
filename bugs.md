@@ -236,3 +236,17 @@ Active work only. Format and rules: [`.cycle/TRACKERS.md`](.cycle/TRACKERS.md). 
 - **Status:** fixed-pending-migration
 - **Fix:** Track pre-commit as executable and compose the cycle guard before the conventional validator exits successfully. Hook syntax and valid/invalid conventional subjects pass.
 - **Docs:** AGENTS.md, CONTRIBUTING.md, docs/FOUNDATION.md
+
+### [BUG-1793986192] Closed subprocess stdin crashes the buffered process runner
+- [x] **Severity:** high
+- **Area:** core,process
+- **File(s):** electron/main/services/processService.cjs
+- **Observation:** A synthetic child that exits with code 2 before reading a 4 MiB stdin payload causes an unhandled write EPIPE and terminates the Node host instead of resolving the guarded process result. The required Rust snapshot processor uses this stdin boundary.
+- **Expected:** The buffered runner must return a failed process envelope when the input pipe closes; the app/core must remain alive.
+- **Req:** CB-NFR-002; preserve native processor error handling
+- **Depends on:** FEAT-1793985588
+- **Repro / Notes:** Invoke processService.run(process.execPath, ["-e", "process.exit(2)"], {cwd: a temporary directory, stdin: a synthetic 4 MiB string}). Observe unhandled EPIPE before the fix; use only disposable data.
+- **Bump:** patch
+- **Status:** fixed-pending-migration
+- **Fix:** Capture asynchronous stdin pipe errors in buffered and streaming subprocess runners and return a failed envelope while preserving the child exit code. Two real Node-child regressions cover a 4 MiB synthetic payload and early exit without crashing the host.
+- **Docs:** native/README.md

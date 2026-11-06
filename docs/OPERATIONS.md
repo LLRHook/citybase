@@ -2,6 +2,10 @@
 
 ## Setup and local runs
 
+Source builds also require Rust/Cargo 1.85+; packaged apps bundle the Rust
+snapshot processor. `npm ci` builds it and renderer/native packaging rebuilds
+the selected architecture. See [native build details](../native/README.md).
+
 Install Git, Node from the supported `package.json` range, npm, and Godot 4.7.2.
 `.nvmrc` selects the default Node 24 line; Node 26 is also supported. Install and
 authenticate the provider CLI separately if real agent work is needed. `gh` is
@@ -70,6 +74,7 @@ local gate. Preserve the executed SHA and full logs under gitignored `.vv/`.
 | Corrupt workspace registry | Stop writers, back up the file, restore/repair its JSON shape, then restart. Mutations intentionally refuse to overwrite it. |
 | Electron cannot launch from an Electron-based host | Clear `ELECTRON_RUN_AS_NODE` in that terminal. The smoke runner removes the inherited value itself. |
 | City partly outside viewport | Initial framing fits the city above the lower HUD; after manual orbit/fly-to, use wheel zoom to inspect. |
+| Rust snapshot processor missing/failed | Rebuild with `npm run build:native` on source installs; reinstall the matching packaged app otherwise. The core does not substitute a JS parser. |
 | XP unavailable | Check core connectivity and the profile backup. XP requires the recorded aggregate; recent history is not substituted. |
 
 ## Packaging and release

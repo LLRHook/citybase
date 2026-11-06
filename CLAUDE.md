@@ -7,8 +7,9 @@ Use `gh` for PRs, checks and reviews. Follow conventional commits and the
 squash-merge convention; the global `/commit` skill does not produce subjects
 this repository accepts. Never bypass hooks.
 
-The primary app is Godot plus the Node core. The legacy Electron renderer
-requires its preload bridge; there is no browser-only frontend. Keep production
+The primary app is Godot plus the Node core and the required Rust snapshot
+processor. Read [native/README.md](native/README.md) for snapshot/build work.
+The legacy Electron renderer requires its preload bridge; there is no browser-only frontend. Keep production
 services as pure factories where possible and keep native glue thin.
 
 <!-- cycle:project-cycle begin (written by trackers.py install) -->

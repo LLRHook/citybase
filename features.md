@@ -326,6 +326,8 @@ Active work only. Format and rules: [`.cycle/TRACKERS.md`](.cycle/TRACKERS.md). 
   (acceptance is therefore partially open — tracked in the gate table, not
   silently dropped). esbuild added as a devDependency (justified: the SEA
   bundling step).
+- **Log:**
+  - 2026-11-06 Parity: Current source still dispatches Claude directly from the Godot workbench and has no in-engine cancel control; cancellation is available through the shared core RPC. Synthetic native rejection, approval, RPC cancellation and restart are source-journey evidence, not a new packaged parity pass. Provider selection, full native packaging and Windows Godot distribution remain open.
 
 ### [FEAT-017] Design system 2.0 — depth, motion, ambient
 - [ ] **Priority:** med
@@ -347,3 +349,25 @@ Active work only. Format and rules: [`.cycle/TRACKERS.md`](.cycle/TRACKERS.md). 
 - **Out of scope:** a full component-library rewrite.
 - **Bump:** minor
 - **Status:** open
+
+### [FEAT-1793985588] Port the shared Git snapshot processor to Rust
+- [x] **Priority:** high
+- **Area:** core,git,tooling
+- **File(s):** native/, electron/main/services/gitService.cjs, scripts/build-native.mjs, package.json, scripts/package-v4.mjs
+- **Req:** CB-FR-002, CB-CON-004; owner priority for production Rust ports
+- **Depends on:** none
+- **UI:** none; preserve existing Godot and Electron snapshot consumers
+- **Why:** Move deterministic non-UI snapshot parsing and metrics to a native processor used by both normal hosts, preserving the provider and approval boundary.
+- **Approach:** Build a required Rust CLI that processes one versioned JSON request per Git snapshot. Node continues to own bounded Git/process execution and writes, and the Rust processor handles porcelain branch/status, tracked tree, recent commits and file sizes. Bundle the executable in supported packaging paths.
+- **Library / dependency notes:** serde_json is pinned to cached 1.0.149 after checking its primary API docs and latest stable 1.0.154; reuse existing offline Cargo caches and lock transitive dependencies. No new npm dependencies.
+- **Acceptance criteria:** Normal Git snapshots use the Rust executable with no JavaScript fallback; RPC snapshot and persisted history shapes remain compatible; malformed input, missing processor and non-Git errors are explicit; provider spawning and approval stay in Node. Builds and packages include the native executable. No performance benefit is claimed without measurement.
+- **Test plan:** Rust unit/error tests; existing status/size regressions execute the native processor; differential fixtures against the previous JS implementation; real synthetic Git repos and authenticated core RPC; native Godot synthetic rejection/restart journey. Check actual counts, skips and platform/runtime limitations.
+- **Out of scope:** Moving UI, provider adapters, approval, persistence, Git mutations, signing or release; per-agent-event native subprocesses; complete Rust core rewrite.
+- **Bump:** minor
+- **Status:** shipped-pending-migration
+- **Implementation:** Replace the shared Git snapshot parsers with a required Rust executable behind processService. Build during source installation/renderer build and before each Electron package architecture; embed alongside the Godot core. Preserve public snapshots and Node provider/approval/save ownership. Differential, real Git, CLI error, binary resolution and packaging-plan tests exercise the production boundary.
+- **Docs:** AGENTS.md, CLAUDE.md, README.md, CONTRIBUTING.md, VERIFICATION.md, docs/README.md, docs/ARCHITECTURE.md, docs/DATA_CONTRACTS.md, docs/OPERATIONS.md, native/README.md
+- **Log:**
+  - 2026-11-06 Validation: Local Node/renderer suite: 515 passed, 0 failed/skipped; required native parser parity and synthetic native Godot journey passed. Shared disk guard blocked the final Rust unit/clippy rerun below 3 GiB headroom; final extra Godot error check and native packaging remain unverified. Installed Godot 4.7 and npm cache differ from the documented pinned baseline. No performance improvement is claimed.
+  - 2026-11-06 Validation: Disk headroom subsequently recovered. The final gated Cargo run passed 9 tests; clippy with warnings denied, formatting, the integrated native-plus-Vite production build, 44 Godot regressions and 13 real transport assertions passed. The fresh native synthetic journey passed all 25 checks. This resolves the earlier disk refusal; npm lockfile/runtime drift, missing coverage/Electron tooling and unrun native export/Windows/hosted gates remain separate limitations.
+  - 2026-11-06 Validation: Count correction from the raw journey markers: 8 reject-phase + 12 restart/approve/cancel + 4 final-restart assertions = 24 passed, not the previously stated 25. Final small (25 tracked files) and large (281 tracked files) native captures use the required Rust snapshot path. No real model run was used.

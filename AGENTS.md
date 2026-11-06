@@ -1,8 +1,8 @@
 # Citybase agent handbook
 
 Citybase is a local repository-as-city workbench. The primary frontend is Godot
-(`godot/`), backed by the Node daemon (`core/`). The React/Electron shell remains
-the legacy fallback. Both reuse the CommonJS services in `electron/main/`.
+(`godot/`), backed by the Node daemon (`core/`) and required Rust snapshot
+processor (`native/`). The React/Electron shell remains the legacy fallback. Both reuse the CommonJS services in `electron/main/`.
 Start with [docs/README.md](docs/README.md) for current requirements,
 architecture, contracts, operations and release gates.
 
@@ -23,13 +23,16 @@ architecture, contracts, operations and release gates.
 
 ## Build and verification
 
-Use the supported Node version in `.nvmrc` / `package.json`. Commands and
-prerequisites are in [README.md](README.md), and the executable procedure is
+Use the supported Node version in `.nvmrc` / `package.json` and Rust/Cargo 1.85+.
+`npm ci` and renderer builds compile the required host snapshot processor;
+packaging builds its selected architecture. Read [native/README.md](native/README.md)
+when changing snapshot processing or packaging. Commands and prerequisites are in [README.md](README.md), and the executable procedure is
 [VERIFICATION.md](VERIFICATION.md).
 
 ```sh
 npm ci
 npm run lint
+npm run test:native
 npm run build
 npm test
 npm run test:coverage

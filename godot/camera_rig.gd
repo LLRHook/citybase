@@ -15,7 +15,7 @@ var _dragging := false
 var _user_drove_recently := 0.0
 var _fly_tween: Tween
 var _auto_frame := false
-var _framing_bounds: AABB
+var _framing_points: Array = []
 var _max_distance := 90.0
 
 # The lower panels begin at 62% height; leave space above them and below vitals.
@@ -34,8 +34,19 @@ func frame_radius(radius: float) -> void:
 	frame_bounds(AABB(Vector3(-radius, -0.5, -radius), Vector3(radius * 2.0, 7, radius * 2.0)))
 
 func frame_bounds(bounds: AABB) -> void:
-	_framing_bounds = bounds
+	var points: Array = []
+	for corner in 8:
+		points.append(bounds.get_endpoint(corner))
+	frame_points(points)
+
+func frame_points(points: Array) -> void:
+	if points.is_empty():
+		return
+	_framing_points = points
 	_auto_frame = true
+	var bounds := AABB(points[0], Vector3.ZERO)
+	for point: Vector3 in points:
+		bounds = bounds.expand(point)
 	var center := bounds.get_center()
 	_target = center
 	_apply()
@@ -47,8 +58,8 @@ func frame_bounds(bounds: AABB) -> void:
 	var bottom := 2.0 * FRAME_RECT.end.y - 1.0
 	var center_y := 1.0 - 2.0 * FRAME_RECT.get_center().y
 	_distance = 10.0
-	for index in 8:
-		var p: Vector3 = basis.inverse() * (bounds.get_endpoint(index) - center)
+	for point: Vector3 in points:
+		var p: Vector3 = basis.inverse() * (point - center)
 		# Fit the actual perspective depth of each corner in the HUD-free rect.
 		_distance = maxf(_distance, p.z + absf(p.x) / (tan_horizontal * FRAME_RECT.size.x))
 		_distance = maxf(_distance, (p.y / tan_vertical + top * p.z) / (top - center_y))
@@ -61,7 +72,7 @@ func frame_bounds(bounds: AABB) -> void:
 
 func _on_viewport_resized() -> void:
 	if _auto_frame:
-		frame_bounds(_framing_bounds)
+		frame_points(_framing_points)
 
 func fly_to(world_point: Vector3) -> void:
 	if _user_drove_recently > 0.0:

@@ -86,6 +86,7 @@ describe('recorded progression across pruning and restart (BUG-037)', () => {
     const endings = [];
     fake.streamEvents = () => (async function* () {
       await new Promise((resolve) => endings.push(resolve));
+      yield { kind: 'plan', text: 'synthetic fixture settled' };
     })();
     const mgr = createAgentManager({ adapters: { fake }, historyLimit: 1 });
     await mgr.startRun({ provider: 'fake' });
@@ -114,7 +115,10 @@ describe('recorded progression across pruning and restart (BUG-037)', () => {
   it('records cancellation once even when the event stream finishes later', async () => withProfile(async (dir) => {
     const fake = adapter();
     let finish;
-    fake.streamEvents = () => (async function* () { await new Promise((resolve) => { finish = resolve; }); })();
+    fake.streamEvents = () => (async function* () {
+      await new Promise((resolve) => { finish = resolve; });
+      yield { kind: 'plan', text: 'synthetic fixture settled' };
+    })();
     const current = host(dir, { adapters: { fake }, historyLimit: 0 });
     const run = await current.mgr.startRun({ provider: 'fake', status: 'running' });
     await current.mgr.cancel(run.runId);

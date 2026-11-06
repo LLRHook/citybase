@@ -27,3 +27,12 @@ func respond(method: String, result: Variant) -> void:
 			callback.call(result)
 			return
 	assert(false, "No pending request for " + method)
+
+func respond_error(method: String, message: String) -> void:
+	for index in requests.size():
+		if requests[index]["method"] == method:
+			var callback: Callable = requests[index]["err"]
+			requests.remove_at(index)
+			callback.call(message)
+			return
+	assert(false, "No pending error request for " + method)

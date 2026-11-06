@@ -11,7 +11,7 @@
 import process from 'node:process';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import { buildInvocation, spawnStream } from '../../electron/main/services/processService.cjs';
+import { buildInvocation, spawnStream, run } from '../../electron/main/services/processService.cjs';
 
 // Exercise the streaming runner against the real node binary (cross-platform,
 // always present in the test env). node.exe is not a .cmd, so no shim wrap.
@@ -150,5 +150,16 @@ describe('processService.buildInvocation — Windows .cmd / .bat wrap', () => {
       'win32',
     );
     expect(out.args[3]).toContain('"" ');
+  });
+});
+
+
+describe('closed subprocess stdin (BUG-1793986192)', () => {
+  it.each(['buffered', 'streaming'])('%s runner survives a child closing its input early', async (mode) => {
+    const options = { cwd, stdin: 'synthetic'.repeat(512 * 1024) };
+    const args = ['-e', 'process.exit(2)'];
+    const result = await (mode === 'buffered' ? run(NODE, args, options) : spawnStream(NODE, args, options).done);
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe(2);
   });
 });

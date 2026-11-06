@@ -292,7 +292,7 @@ func _load_snapshot(workspace_id: String) -> void:
 		])
 		_bench.set_workspace(str(s.get("rootPath", "")).get_file(), str(s.get("branch", "?")), (s.get("files", []) as Array).size())
 		var stats: Dictionary = _city.build(s)
-		_rig.frame_bounds(_city.framing_bounds())
+		_rig.frame_points(_city.framing_points())
 		_log("city built · %d districts · %d buildings" % [stats["districts"], stats["buildings"]])
 		_refresh_quests()
 		_refresh_runs()
@@ -305,7 +305,9 @@ func _load_snapshot(workspace_id: String) -> void:
 		elif _spike_out != "" and not _autotest_run_dispatched:
 			# Give the living layer (ambient motes, flicker, vitals) time to
 			# appear in the city-04 shot before the idle autotest exits.
-			_quit_soon(4.5))
+			_quit_soon(4.5),
+		func(message: String) -> void:
+			_bench.show_error("GIT SNAPSHOT FAILED", message))
 
 func _refresh_quests() -> void:
 	if _workspace_id == "":

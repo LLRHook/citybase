@@ -49,6 +49,10 @@ discards renderer-supplied `repoUrl` and resolves cwd from the workspace registr
 The UIs use approval mode `ask`; the manager also has internal/non-UI modes.
 Do not claim every authenticated RPC client is forced through the UI modal.
 
+The required Rust snapshot processor sits behind `git.getSnapshot` / `refresh`;
+it does not change their public fields, error shape or workspace resolution.
+Its [internal protocol](../native/README.md) is distinct from frontend RPC.
+
 ## 3. Entities and events
 
 | ID | Shape and meaning |

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseFiles } from '../../electron/main/services/gitService.cjs';
+import { processSnapshot } from '../../electron/main/services/snapshotProcessor.cjs';
+const parseFiles = async (value) => (await processSnapshot({ status: value })).files;
 
 // Helper to build the porcelain v2 line shape.
 //   1 XY sub mH mI mW hH hI path
@@ -14,22 +15,22 @@ const lineU = (path) =>
   `u UU N... 100644 100644 100644 100644 h1 h2 h3 ${path}`;
 
 describe('parseFiles — legacy fields', () => {
-  it('returns [] for empty input', () => {
-    expect(parseFiles('')).toEqual([]);
+  it('returns [] for empty input', async () => {
+    expect(await parseFiles('')).toEqual([]);
   });
 
-  it('preserves the path and the legacy status field', () => {
-    const out = parseFiles(line1('.M', 'src/foo.js'));
+  it('preserves the path and the legacy status field', async () => {
+    const out = await parseFiles(line1('.M', 'src/foo.js'));
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({ path: 'src/foo.js', status: 'modified' });
   });
 
-  it('handles untracked files (?) and renamed (line 2)', () => {
+  it('handles untracked files (?) and renamed (line 2)', async () => {
     const stdout = [
       '? new.js',
       line2('R.', 'lib/now-here.js', 'lib/old.js'),
     ].join('\n');
-    const out = parseFiles(stdout);
+    const out = await parseFiles(stdout);
     expect(out).toHaveLength(2);
     expect(out[0]).toMatchObject({ path: 'new.js', status: 'untracked' });
     expect(out[1]).toMatchObject({ path: 'lib/now-here.js' });
@@ -38,8 +39,8 @@ describe('parseFiles — legacy fields', () => {
 });
 
 describe('parseFiles — staged / unstaged classification', () => {
-  it('classifies M. as staged-only', () => {
-    const out = parseFiles(line1('M.', 'src/foo.js'));
+  it('classifies M. as staged-only', async () => {
+    const out = await parseFiles(line1('M.', 'src/foo.js'));
     expect(out[0]).toMatchObject({
       staged: true,
       unstaged: false,
@@ -48,8 +49,8 @@ describe('parseFiles — staged / unstaged classification', () => {
     });
   });
 
-  it('classifies .M as unstaged-only', () => {
-    const out = parseFiles(line1('.M', 'src/foo.js'));
+  it('classifies .M as unstaged-only', async () => {
+    const out = await parseFiles(line1('.M', 'src/foo.js'));
     expect(out[0]).toMatchObject({
       staged: false,
       unstaged: true,
@@ -58,8 +59,8 @@ describe('parseFiles — staged / unstaged classification', () => {
     });
   });
 
-  it('classifies MM as both staged and unstaged', () => {
-    const out = parseFiles(line1('MM', 'src/foo.js'));
+  it('classifies MM as both staged and unstaged', async () => {
+    const out = await parseFiles(line1('MM', 'src/foo.js'));
     expect(out[0]).toMatchObject({
       staged: true,
       unstaged: true,
@@ -68,8 +69,8 @@ describe('parseFiles — staged / unstaged classification', () => {
     });
   });
 
-  it('classifies A. as staged add', () => {
-    const out = parseFiles(line1('A.', 'src/new.js'));
+  it('classifies A. as staged add', async () => {
+    const out = await parseFiles(line1('A.', 'src/new.js'));
     expect(out[0]).toMatchObject({
       staged: true,
       unstaged: false,
@@ -77,8 +78,8 @@ describe('parseFiles — staged / unstaged classification', () => {
     });
   });
 
-  it('classifies .D as unstaged delete', () => {
-    const out = parseFiles(line1('.D', 'src/gone.js'));
+  it('classifies .D as unstaged delete', async () => {
+    const out = await parseFiles(line1('.D', 'src/gone.js'));
     expect(out[0]).toMatchObject({
       staged: false,
       unstaged: true,
@@ -86,8 +87,8 @@ describe('parseFiles — staged / unstaged classification', () => {
     });
   });
 
-  it('untracked entries are unstaged-only', () => {
-    const out = parseFiles('? new.js');
+  it('untracked entries are unstaged-only', async () => {
+    const out = await parseFiles('? new.js');
     expect(out[0]).toMatchObject({
       staged: false,
       unstaged: true,
@@ -96,8 +97,8 @@ describe('parseFiles — staged / unstaged classification', () => {
     });
   });
 
-  it('unmerged (u) entries are flagged staged AND unstaged with status="conflicted"', () => {
-    const out = parseFiles(lineU('lib/conflicted.js'));
+  it('unmerged (u) entries are flagged staged AND unstaged with status="conflicted"', async () => {
+    const out = await parseFiles(lineU('lib/conflicted.js'));
     expect(out[0]).toMatchObject({
       path: 'lib/conflicted.js',
       status: 'conflicted',
@@ -108,8 +109,8 @@ describe('parseFiles — staged / unstaged classification', () => {
     });
   });
 
-  it('renamed line (2 R.) carries staging fields too', () => {
-    const out = parseFiles(line2('R.', 'lib/now.js', 'lib/old.js'));
+  it('renamed line (2 R.) carries staging fields too', async () => {
+    const out = await parseFiles(line2('R.', 'lib/now.js', 'lib/old.js'));
     expect(out[0]).toMatchObject({
       path: 'lib/now.js',
       staged: true,
@@ -119,22 +120,22 @@ describe('parseFiles — staged / unstaged classification', () => {
     });
   });
 
-  it('skips header lines starting with "# "', () => {
+  it('skips header lines starting with "# "', async () => {
     const stdout = [
       '# branch.head main',
       '# branch.ab +0 -0',
       line1('.M', 'src/foo.js'),
     ].join('\n');
-    expect(parseFiles(stdout)).toHaveLength(1);
+    expect(await parseFiles(stdout)).toHaveLength(1);
   });
 
-  it('unicode paths pass through raw with quotePath=false (BUG-009)', () => {
-    const out = parseFiles(line1('.M', 'src/café/résumé.js'));
+  it('unicode paths pass through raw with quotePath=false (BUG-009)', async () => {
+    const out = await parseFiles(line1('.M', 'src/café/résumé.js'));
     expect(out[0].path).toBe('src/café/résumé.js');
   });
 
-  it('unicode rename keeps both sides raw (BUG-009)', () => {
-    const out = parseFiles(line2('R.', 'docs/über.md', 'docs/uber.md'));
+  it('unicode rename keeps both sides raw (BUG-009)', async () => {
+    const out = await parseFiles(line2('R.', 'docs/über.md', 'docs/uber.md'));
     expect(out[0].path).toBe('docs/über.md');
   });
 });
