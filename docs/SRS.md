@@ -22,7 +22,7 @@ delivery state. "Implemented" alone does not mean release-verified.
 | ID | Priority | Requirement and acceptance | Verification | Delivery / evidence | Acceptance criteria (derived) | UI |
 |---|---|---|---|---|---|---|
 | CB-FR-001 | Must | The app shall restore the recent workspace or show an actionable open prompt. Invalid or non-Git directories shall produce an intelligible state. | Boot/workspace tests; fresh-profile GUI journey | Implemented; `bootPayload`, `AppAutoBoot`, `WorkspaceErrorStates`, Godot `main.gd` | Given a fresh profile, when it boots or an invalid folder is selected, then it shows an actionable open/error state without hanging. | Godot open prompt and legacy workspace states |
-| CB-FR-002 | Must | The city shall project real Git files/status into districts and buildings. Camera controls shall let the user inspect the city. | Projection tests; Godot small/large-repo GUI journey | Implemented with BUG-042 initial framing limitation; `city_builder.gd`, `cityModel` tests | Given a known Git fixture, when opened and inspected, then buildings/status match the fixture and camera controls reach its districts. | Godot city/camera and legacy city |
+| CB-FR-002 | Must | The city shall project real Git files/status into districts and buildings. Camera controls shall let the user inspect the city. | Projection tests; Godot small/large-repo GUI journey | Implemented with viewport-aware initial framing; `city_builder.gd`, `cityModel` tests | Given a known Git fixture, when opened and inspected, then buildings/status match the fixture and camera controls reach its districts. | Godot city/camera and legacy city |
 | CB-FR-003 | Must | The workbench shall show local tracker quests and permit a freeform task. Completed tracker items shall not appear as open quests. | `questService` tests; WORK GUI journey | Implemented; `questService.cjs`, `workbench.gd` | Given open and completed tracker entries, when WORK loads, then only active quests appear and a prompt can be entered. | Godot WORK quest list and task form |
 | CB-FR-004 | Must | Git operations shall resolve a registered workspace, reject invalid branch/message input, and report failures. | `gitMutations`, `ipcHandlers`, branch tests | Implemented core API; Godot has commit but lacks a branch selector. | Given a registered workspace, when an invalid branch/message or unknown workspace is submitted, then the operation is refused with no unintended Git mutation. | Godot commit form; legacy branch and commit controls |
 | CB-FR-005 | Must | Provider detection shall report installed Claude/Codex CLIs and actionable missing-provider errors. | Detection, resolver and adapter tests | Implemented; account authentication remains the user's provider setup | Given installed or missing CLIs, when detection runs, then each result reflects the host and failed dispatch is actionable. | Provider status and dispatch errors |
@@ -30,7 +30,7 @@ delivery state. "Implemented" alone does not mean release-verified.
 | CB-FR-007 | Must | Displayed agent activity shall reflect observed provider output and terminal status. | Provider-event and settlement tests; live-provider evidence | Claude streams real NDJSON; Codex fidelity remains partial (BUG-003) | Given provider output and settlement, when events render, then displayed activity/status match observed output without invented edits. | City activity and run events |
 | CB-FR-008 | Must | Review shall show outcome, observed changed areas and declared checks without making raw code the default experience. | Review model/detail tests; WORK GUI journey | Implemented; observations do not prove authorship or generated-code correctness | Given a settled run, when review opens, then outcome, observed changed areas and available checks are visible without raw code by default. | Godot outcome and legacy run review |
 | CB-FR-009 | Must | Terminal history shall survive restart and tolerate malformed event entries without discarding valid history. | `runStore`, manager tests and restart journey | Implemented, bounded; PRs #70/#71 regressions | Given valid runs surrounding malformed events, when saved/restored or restarted, then valid terminal neighbors survive within documented caps. | Run history and restored detail |
-| CB-FR-010 | Should | The living layer shall derive activity/vitals/progression from observed repository and run state. Earned progression shall not regress when history is pruned. | Godot regressions; long-history/restart tests | Partial: current recent-window XP has BUG-037; no durable lifetime aggregate | Given more runs than the activity window, when old summaries leave it, then earned lifetime progression remains stable; this currently fails BUG-037. | Godot living-layer HUD |
+| CB-FR-010 | Should | The living layer shall derive activity/vitals/progression from observed repository and run state. Earned progression shall not regress when history is pruned. | Godot regressions; long-history/restart tests | Implemented for recorded profile XP; legacy migration recovers only retained evidence | Given more runs than the activity window, when old summaries leave it, then earned recorded progression remains stable across pruning and restart. | Godot living-layer HUD |
 | CB-FR-011 | Must | Connection failure shall be visible, permit explicit retry and avoid replaying unknown pending actions. | Real WebSocket transport harness | Implemented; 1 MiB Godot buffer limit | Given a lost acknowledgement or oversized response, when disconnected and retried, then the error is visible and pending actions are not replayed. | Godot connection error and Retry |
 | CB-FR-012 | Must | A distributable shall launch with its required runtimes bundled and satisfy the platform parity checklist. | Native export/package and fresh-machine GUI journey | Partial: historical macOS arm64 package evidence; Windows Godot packaging/parity pending | Given an exported artifact on a claimed platform, when launched without dev tooling, then the bundled core and complete required parity work. | Native installed app |
 
@@ -59,7 +59,7 @@ records remain in [history](history/README.md).
 
 1. Finish the existing PR queue and retain the shared Windows/persistence fixes.
 2. Establish the supported toolchain, test environments, CI and current docs.
-3. Resolve provider-event truth, progression, camera and remaining security gaps.
+3. Resolve provider-event truth and remaining security gaps.
 4. Re-run full native parity on each claimed platform before a release decision.
 
 Godot source/development starts may auto-register the Citybase checkout for an
@@ -74,7 +74,8 @@ empty-profile prompt acceptance refers to that packaged-user flow.
   direction is unchanged.
 - Windows Godot distribution and a fresh macOS package are not proven by Windows
   source tests or the legacy Electron smoke.
-- Durable progression, full Codex event fidelity, external-navigation/CSP/fonts,
+- Legacy runs already pruned before XP migration cannot be recovered.
+- Full Codex event fidelity, external-navigation/CSP/fonts,
   and older residual findings remain tracked; do not mark them complete by adoption.
 - No quantitative scale, startup/memory, comprehensive accessibility or blanket
   secret-redaction guarantee is accepted or proven by this baseline.

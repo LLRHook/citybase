@@ -18,8 +18,8 @@ history; the former seed-data module no longer exists.
 | Approval | Permission for the whole run before its CLI starts. Rejection starts no provider process. An approved unattended CLI can execute tools throughout the run. |
 | Outcome | A review of observed changes, declared checks and events. It does not prove exclusive authorship or generated-project correctness. |
 | History | Recent terminal summaries in `runs.json`, with capped trails. It is not a complete saved session or live process handle. |
-| XP/level | A game display calculated from recent run statuses. BUG-037 tracks truncation; this is not yet durable lifetime progression. |
-| Vitals | Git/check/run summaries. A clean tree is not a code-quality or coverage score. |
+| XP/level | A durable aggregate of recorded terminal runs in the profile: done 25, failed 5, cancelled (including rejected) 2 XP. Level is floor(sqrt(XP / 50)) + 1. Legacy migration cannot recover already-pruned runs. |
+| Vitals | Git/check/run summaries. Success is done / (done + failed) in the recent profile history and is unavailable with no completed outcomes. Cancellation/rejection is excluded. A clean tree is not a code-quality or coverage score. |
 
 Guilds, sagas, external ticket sync, per-adventurer accounts and context-window
 HP belong to the original vision and are not complete current services. The

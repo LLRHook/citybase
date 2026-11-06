@@ -5,7 +5,7 @@ Active work only. Format and rules: [`.cycle/TRACKERS.md`](.cycle/TRACKERS.md). 
 ## Open
 
 ### [BUG-042] Default Godot camera clips the edge of a small city
-- [ ] **Severity:** low
+- [x] **Severity:** low
 - **Area:** renderer
 - **File(s):** `godot/camera_rig.gd`, `godot/main.gd`
 - **Observation:** At the default 1480×960 viewport, the final 23-file Minecraft trial cities have three and four districts respectively, but part of the outer `core` district falls below the bottom edge on initial load. The complete level/XP HUD remains visible. This occurred in both concurrent frontend captures using the unmodified production camera.
@@ -14,10 +14,13 @@ Active work only. Format and rules: [`.cycle/TRACKERS.md`](.cycle/TRACKERS.md). 
 - **Depends on:** none documented in original finding
 - **Repro / Notes:** Open either completed 23-file trial workspace with its copied eight-run profile. Default screenshots are preserved under `build/minecraft-validation-20260909/godot/final-a-20260909-015927-shots/city-99-final.png` and `final-b-20260909-015927-shots/city-99-final.png`. Seven steps of the existing wheel-zoom-out control bring the district platforms into the viewport; separately labeled `city-zoomed-out.png` captures preserve that workaround. The `frame_radius()` distance factor is a suspected cause, not a confirmed diagnosis. No production camera changes were made during validation.
 - **Bump:** patch
-- **Status:** open
+- **Assignee:** Victor Ivanov
+- **Status:** fixed-pending-migration
+- **Fix:** Frame actual city mesh/label bounds using perspective depth and viewport aspect in the HUD-free region; resize while automatically framed and retain manual orbit/zoom. Godot regressions cover 1/4/14 districts at three viewport shapes.
+- **Docs:** README.md, ROADMAP.md, VERIFICATION.md, docs/ARCHITECTURE.md, docs/SRS.md, docs/OPERATIONS.md
 
 ### [BUG-037] XP is calculated from a truncated run-history window
-- [ ] **Severity:** med
+- [x] **Severity:** med
 - **Area:** agents
 - **File(s):** `godot/living_layer.gd`, `godot/main.gd`, `electron/main/agents/agentManager.cjs`, `electron/main/services/runStore.cjs`
 - **Observation:** Godot derives XP from `agent.listRuns` with its default 50-run limit. Fifty successful runs yield only 1,250 XP (level 6); newer unsuccessful runs can displace successful ones and reduce the level. Persisted history is also capped at 100 terminal records.
@@ -26,7 +29,10 @@ Active work only. Format and rules: [`.cycle/TRACKERS.md`](.cycle/TRACKERS.md). 
 - **Depends on:** none documented in original finding
 - **Repro / Notes:** Boundary checks are separate from the live eight-task Minecraft trials. This validation does not implement a new progression store.
 - **Bump:** patch
-- **Status:** open
+- **Assignee:** Victor Ivanov
+- **Status:** fixed-pending-migration
+- **Fix:** Persist a version 2 runs.json envelope with recorded profile XP independent of the 50/100 history windows; seed legacy arrays only from unique retained terminal records; count settlement and cancellation once, including after eviction. Keep the existing XP weights and read/write support in both hosts.
+- **Docs:** README.md, ROADMAP.md, VERIFICATION.md, docs/ARCHITECTURE.md, docs/DATA_CONTRACTS.md, docs/SRS.md, docs/OPERATIONS.md, docs/domain-model.md
 - **Log:**
   - Status note:
 
@@ -203,7 +209,7 @@ Active work only. Format and rules: [`.cycle/TRACKERS.md`](.cycle/TRACKERS.md). 
   - 2026-11-02 Docs: Recorded the owner-approved PR #69 closure with its branch preserved, the merged PR #72 final-head/main CI evidence, and the completed #68 disposition in the living roadmap, SRS and foundation record.
 
 ### [BUG-1793651435] Godot reports 100 percent success without completed runs
-- [ ] **Severity:** low
+- [x] **Severity:** low
 - **Area:** ui
 - **File(s):** godot/living_layer.gd
 - **Observation:** A fresh profile with zero runs displays 100% success; after one rejected/cancelled run and restart it still displays 100% success, with zero successful or failed provider completions.
@@ -212,7 +218,10 @@ Active work only. Format and rules: [`.cycle/TRACKERS.md`](.cycle/TRACKERS.md). 
 - **Depends on:** none
 - **Repro / Notes:** Native Windows Godot walkthrough at ff9e150: start a fresh profile, reject one fixture run, restart; screenshots and cancelled runs.json are in the verification evidence.
 - **Bump:** patch
-- **Status:** open
+- **Assignee:** Victor Ivanov
+- **Status:** fixed-pending-migration
+- **Fix:** Display success unavailable with zero done/failed outcomes; exclude cancelled, rejected, pending and running rows. Show completed and recent profile sample counts and keep missing aggregate XP unavailable.
+- **Docs:** README.md, VERIFICATION.md, docs/DATA_CONTRACTS.md, docs/domain-model.md
 
 ### [BUG-1793652065] Cycle hooks are not fully active across platforms
 - [x] **Severity:** med

@@ -1,8 +1,8 @@
 # Citybase data contracts
 
 Contract baseline: the shared handler map, preload surface, RPC server and JSON
-stores. This document records the existing unversioned protocol; it does not
-introduce a wire-version field or change stored schemas.
+stores. The RPC protocol remains unversioned. Run storage uses a versioned envelope
+for atomic history and progression, with backward reading of legacy arrays.
 
 ## 1. Transport
 
@@ -39,7 +39,7 @@ JavaScript shapes, not a generated TypeScript API.
 | Workspace checks | `checks.run(workspaceId)` | Check rows for declared scripts only |
 | Quests | `quests.list(workspaceId)` | Open/in-progress local tracker entries; channel present only with quest service, used by the core |
 | Detection | `agents.detect()`, `agents.list()` | Installed CLI information / provider names |
-| Run lifecycle | `agent.startRun(params)`, `cancel(runId)`, `getRun(runId)`, `getEvents(runId)`, `listRuns(options?)` | Run handle / events / newest-first summaries; default list limit 50 |
+| Run lifecycle | `agent.startRun(params)`, `cancel(runId)`, `getRun(runId)`, `getEvents(runId)`, `listRuns(options?)`, `getProgression()` | Run handle / events / newest-first summaries (default limit 50) / `{xp}` recorded profile aggregate |
 | Run inspection | `agent.reportUsage(runId)`, `produceDiff(runId)`, `runChecks(runId)`, `openPR(runId,prParams)` | Provider/inspection result; errors follow the shared handler behavior |
 | Approval | `agent.approve(runId)`, `reject(runId)`, `listPendingApprovals()` | Decision or pending approvals; unknown pending run rejects |
 
@@ -68,7 +68,14 @@ starts empty; unreadable/corrupt/invalid-shape files reject mutations before
 writing. Read-only boot can fall back to an empty view. Repair or restore the
 original file before registering/forgetting again.
 
-`runs.json` is an array of at most 100 terminal summaries. A stored record keeps
+`runs.json` is `{version:2,runs:[...],progression:{xp}}`. The aggregate covers
+recorded terminal runs across the profile, independent of retained history.
+It uses the existing rewards: done 25, failed 5, cancelled (including rejected)
+2 XP. Participation XP is not a success claim. The level is
+`floor(sqrt(xp / 50)) + 1`. An event stream ending without a terminal status
+adds no XP. Repeated settlement/cancellation does not recount a run.
+
+`runs` retains at most 100 terminal summaries. A stored record keeps
 runId, questId, adventurerId, status, provider, branch, startedAt, events and
 historical. Each trail retains up to 60 valid event objects; text is truncated to
 2,000 characters per event, and event payloads are not persisted. Malformed event
@@ -83,10 +90,22 @@ before backup/restore; see [OPERATIONS.md](OPERATIONS.md).
 
 ## 5. Compatibility and open work
 
-Preserve backward reading of the current JSON shapes. New required fields,
-changed meaning or new retention semantics need a migration and restart tests.
-The current recent-run list and the stored history are bounded activity views;
-they cannot act as a durable lifetime XP ledger (BUG-037).
+Legacy array files are read without rewriting during boot. Unique valid terminal
+records establish a conservative XP baseline before the retention cap; missing
+or already-pruned runs are not estimated. A successful save atomically replaces
+history and aggregate together with the version 2 envelope. Invalid/missing XP
+falls back to the observed retained records. Unreadable/corrupt files retain the
+existing empty-restore behavior; this is not a corruption-repair guarantee.
+
+Older executables that expect an array cannot read version 2. Back up the profile
+before changing versions; do not use an old executable to write a migrated profile.
+The core and legacy Electron in this version both read/write the envelope.
+
+Recent history remains a bounded activity view. The Godot success percentage uses
+only done and failed rows from the most recent 50 profile runs, not lifetime
+outcomes or only the selected workspace. Zero completed rows display unavailable;
+rejected, cancelled, running and pending-approval rows are never successes.
+A successful provider completion does not establish generated-code correctness.
 
 Truth owners: `ipcHandlers.cjs`, `preload.cjs`, `rpcServer.cjs`, `runStore.cjs`,
 `workspaceServiceCore.cjs`, `questService.cjs`. Conformance tests compare the

@@ -75,6 +75,7 @@ async function createCore({ token, port, userDataDir }) {
   const sendAgentEvent = (payload) => { if (rpc) rpc.broadcast(payload); };
 
   const runStore = createRunStore({ userDataDir });
+  const initialState = runStore.loadStateSync();
   const agentManager = createAgentManager({
     adapters: {
       codex: new CodexAdapter({ processService }),
@@ -82,9 +83,10 @@ async function createCore({ token, port, userDataDir }) {
     },
     detect: () => detectAgentBinaries(),
     emitEvent: sendAgentEvent,
-    initialRuns: runStore.loadSync(),
-    persist: (runs) => {
-      runStore.save(runs).catch((err) => { console.error('[runStore] persist failed', err); });
+    initialRuns: initialState.runs,
+    initialProgression: initialState.progression,
+    persist: (runs, progression) => {
+      runStore.save(runs, progression).catch((err) => { console.error('[runStore] persist failed', err); });
     },
   });
 

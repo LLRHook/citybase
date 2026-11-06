@@ -53,19 +53,19 @@ loopback binding/token check and that production Node spawn remains centralized.
 
 ## Stage 2: Automated test matrix
 
-Current collector baseline: **40 files / 477 Vitest cases**, zero skips.
+Current collector baseline: **41 files / 490 Vitest cases**, zero skips.
 Node and renderer counts below are from runner reports, not source grep. The
 coverage command runs both projects together, so do not count its cases twice.
 
 | Layer | Command / selector | Baseline / prerequisites |
 |---|---|---|
-| Node unit/integration | `npm test -- --project node` | 30 files / 404 cases; real Node environment. Includes real loopback, core subprocess and filesystem seams. |
+| Node unit/integration | `npm test -- --project node` | 31 files / 417 cases; real Node environment. Includes real loopback, core subprocess and filesystem seams. |
 | Renderer/component | `npm test -- --project renderer` | 10 files / 73 cases; jsdom + test bridge |
-| Combined coverage (CI) | `npm run test:coverage` | Same 477 cases; text, HTML and coverage-summary.json in coverage/; no new threshold |
+| Combined coverage (CI) | `npm run test:coverage` | Same 490 cases; text, HTML and coverage-summary.json in coverage/; no new threshold |
 | Renderer build | `npm run build` | Dist index uses relative assets; fresh output required for Electron |
 | Electron smoke | `npm run test:e2e` | 1 case; real bridge, version roundtrip, renderer isolation and rendered root |
 | Unpacked Electron artifact | `npx electron-builder --dir` then smoke with `CITYBASE_ELECTRON_EXECUTABLE` | Native host prerequisites; see operations for explicit unsigned Windows verification |
-| Godot import/regression/transport | `npm run test:godot` | Godot 4.7.2 via GODOT_BIN/PATH; 24 regression checks on Windows (one Windows-specific path case), 13 real WS assertions |
+| Godot import/regression/transport | `npm run test:godot` | Godot 4.7.2 via GODOT_BIN/PATH; 43 regression checks on macOS/Linux, plus one Windows-specific path case; 13 real WS assertions |
 
 `npm test` is a single pass; `npm run test:watch` watches. `npm test -- --run`
 also remains compatible. Enumerate with `npx vitest list --json`. Update the
@@ -83,7 +83,8 @@ as GUI evidence. Use gui-walkthrough in verification mode with best-effort a11y.
 1. Empty boot and invalid/non-Git selection: an actionable state appears and
    loading finishes. Register D-002, reopen, and verify its branch/files/city.
 2. Inspect/zoom/orbit the city. Check that all districts of a small fixture can
-   be reached and note initial clipping against BUG-042.
+   be reached; default framing must contain platform/building corners above the
+   lower HUD in small/large fixtures and portrait/landscape viewports.
 3. Inspect WORK and local quests; completed tracker entries are absent. Submit a
    task, reject approval, and verify no provider child starts and cancellation
    appears. Approve a separate disposable task only when live-provider acceptance
@@ -106,6 +107,13 @@ as GUI evidence. Use gui-walkthrough in verification mode with best-effort a11y.
 - Corrupt/unreadable workspace registry rejects all three mutations without
   replacement; malformed run events preserve valid neighbors; failed atomic
   replacement preserves prior disk state. Run the real-filesystem regressions.
+- Run `progression.test.js`: exceed the 50/100 activity/history limits, displace
+  successes, restart, and preserve aggregate XP and level. Cover legacy migration,
+  duplicate records, invalid aggregates, rejection without spawn, cancellation
+  before stream drain and after eviction, and failed atomic replacement.
+- Check Godot with zero, pending-only and cancelled-only history: success is
+  unavailable. Mixed done/failed rows use only that completed denominator; the
+  HUD states both completed and recent counts. XP never falls back to recent rows.
 - Confirm resource/time/history bounds and forced-stop recovery. Check supplied
   hostile branch/message/path cases in the process/Git tests.
 - Measure hot paths only against approved workloads/budgets. There is no accepted

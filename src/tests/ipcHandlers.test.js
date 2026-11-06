@@ -36,6 +36,7 @@ function makeStubs(overrides = {}) {
     })()),
     cancel: vi.fn(async () => undefined),
     getRun: vi.fn((runId) => (runId === 'run-1' ? { runId, status: 'running' } : null)),
+    getProgression: vi.fn(() => ({ xp: 1250 })),
     listRuns: vi.fn(() => [
       { runId: 'run-1', questId: 'Q', adventurerId: 'A', status: 'running',
         branch: 'main', contextUsed: 0, maxContext: 200_000,
@@ -97,12 +98,17 @@ describe('createIpcHandlers — required deps', () => {
 });
 
 describe('createIpcHandlers — channel set', () => {
+  it('returns profile progression independently of recent-run pagination', () => {
+    const { handlers } = build(makeStubs());
+    expect(handlers['citybase:agent.getProgression']()).toEqual({ xp: 1250 });
+  });
   it('exposes the full citybase: channel surface', () => {
     const { handlers } = build(makeStubs());
     expect(Object.keys(handlers).sort()).toEqual([
       'citybase:agent.approve',
       'citybase:agent.cancel',
       'citybase:agent.getEvents',
+      'citybase:agent.getProgression',
       'citybase:agent.getRun',
       'citybase:agent.listPendingApprovals',
       'citybase:agent.listRuns',

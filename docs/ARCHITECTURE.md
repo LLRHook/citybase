@@ -46,8 +46,8 @@ profile is empty. Exported builds prompt for a workspace instead.
 
 Dispatch resolves the workspace ID in CMP-003, then CMP-005 returns a run handle
 and waits for explicit UI approval before spawning CMP-006. Events flow back
-through the transport. Settlement updates the shared record and persists a
-bounded terminal summary. Review reads the current tree and declared checks.
+through the transport. Settlement updates the shared record and atomically persists bounded terminal
+history with recorded profile XP. Progression does not depend on the history cap. Review reads the current tree and declared checks.
 On disconnection Godot preserves unknown outcomes and requires explicit retry;
 requests are not automatically replayed.
 
@@ -90,8 +90,8 @@ Current renderer navigation/CSP gaps remain FEAT-006.
 - ADR-003: Use supported Node LTS lines and separate real Node tests from DOM
   component tests. Coverage reports measure the inspected source; no threshold
   is invented by this change.
-- Limits requiring future work: recent-window progression, Codex event fidelity,
-  initial camera framing, renderer hardening, final native distribution and
+- Limits requiring future work: Codex event fidelity, renderer hardening,
+  final native distribution and
   complete current-platform manual parity. See the active trackers.
 
 ## Revision history

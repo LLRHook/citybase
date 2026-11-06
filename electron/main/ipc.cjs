@@ -22,12 +22,14 @@ function buildAgentManager(emitEvent) {
   const claude = new ClaudeAdapter({ processService });
   // Persist run history across restarts (FEAT-008): seed from disk, save on change.
   const runStore = createRunStore({ userDataDir: app.getPath('userData') });
+  const initialState = runStore.loadStateSync();
   return createAgentManager({
     adapters: { codex, claude },
     detect: () => detectAgentBinaries(),
     emitEvent,
-    initialRuns: runStore.loadSync(),
-    persist: (runs) => { runStore.save(runs).catch((err) => { console.error('[runStore] persist failed', err); }); },
+    initialRuns: initialState.runs,
+    initialProgression: initialState.progression,
+    persist: (runs, progression) => { runStore.save(runs, progression).catch((err) => { console.error('[runStore] persist failed', err); }); },
   });
 }
 

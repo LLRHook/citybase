@@ -14,21 +14,59 @@ var _target := Vector3.ZERO
 var _dragging := false
 var _user_drove_recently := 0.0
 var _fly_tween: Tween
+var _auto_frame := false
+var _framing_bounds: AABB
+var _max_distance := 90.0
+
+# The lower panels begin at 62% height; leave space above them and below vitals.
+const FRAME_RECT := Rect2(0.04, 0.16, 0.92, 0.44)
 
 func _ready() -> void:
 	_camera = Camera3D.new()
 	_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 	_camera.fov = 38.0
+	_camera.keep_aspect = Camera3D.KEEP_HEIGHT
 	add_child(_camera)
 	_apply()
+	get_viewport().size_changed.connect(_on_viewport_resized)
 
 func frame_radius(radius: float) -> void:
-	_distance = clampf(radius * 1.85, 14.0, 90.0)
+	frame_bounds(AABB(Vector3(-radius, -0.5, -radius), Vector3(radius * 2.0, 7, radius * 2.0)))
+
+func frame_bounds(bounds: AABB) -> void:
+	_framing_bounds = bounds
+	_auto_frame = true
+	var center := bounds.get_center()
+	_target = center
 	_apply()
+	var basis := _camera.transform.basis
+	var aspect := get_viewport().get_visible_rect().size.aspect()
+	var tan_vertical := tan(deg_to_rad(_camera.fov) * 0.5)
+	var tan_horizontal := tan_vertical * aspect
+	var top := 1.0 - 2.0 * FRAME_RECT.position.y
+	var bottom := 2.0 * FRAME_RECT.end.y - 1.0
+	var center_y := 1.0 - 2.0 * FRAME_RECT.get_center().y
+	_distance = 10.0
+	for index in 8:
+		var p: Vector3 = basis.inverse() * (bounds.get_endpoint(index) - center)
+		# Fit the actual perspective depth of each corner in the HUD-free rect.
+		_distance = maxf(_distance, p.z + absf(p.x) / (tan_horizontal * FRAME_RECT.size.x))
+		_distance = maxf(_distance, (p.y / tan_vertical + top * p.z) / (top - center_y))
+		_distance = maxf(_distance, (bottom * p.z - p.y / tan_vertical) / (bottom + center_y))
+	_distance *= 1.04
+	_target = center - basis.y * center_y * _distance * tan_vertical
+	_max_distance = maxf(90.0, _distance * 2.0)
+	_camera.far = maxf(1000.0, _max_distance + bounds.size.length())
+	_apply()
+
+func _on_viewport_resized() -> void:
+	if _auto_frame:
+		frame_bounds(_framing_bounds)
 
 func fly_to(world_point: Vector3) -> void:
 	if _user_drove_recently > 0.0:
 		return
+	_auto_frame = false
 	if reduced_motion:
 		_target = world_point
 		_apply()
@@ -52,14 +90,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			_dragging = mb.pressed
+			_auto_frame = false
 			if mb.pressed:
 				_user_drove_recently = 4.0
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
-			_distance = clampf(_distance * 0.92, 10.0, 90.0)
+			_auto_frame = false
+			_distance = clampf(_distance * 0.92, 10.0, _max_distance)
 			_user_drove_recently = 4.0
 			_apply()
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
-			_distance = clampf(_distance * 1.08, 10.0, 90.0)
+			_auto_frame = false
+			_distance = clampf(_distance * 1.08, 10.0, _max_distance)
 			_user_drove_recently = 4.0
 			_apply()
 	elif event is InputEventMouseMotion and _dragging:

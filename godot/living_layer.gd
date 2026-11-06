@@ -4,8 +4,8 @@ extends Node
 # Every number on screen traces to a real source:
 #   velocity      — commits/day from the snapshot's recentCommits timestamps
 #   dirty/files   — the live snapshot
-#   runs + rate   — agentManager's persisted run history
-#   XP / level    — derived from that same history (done 25 · failed 5 · cancelled 2)
+#   runs + rate   — recent history, done / (done + failed); cancelled is excluded
+#   XP / level    — core aggregate of recorded profile runs, independent of retention
 #   activity feed — real commits + live run lifecycle events, merged
 # Ambient city life (building window flicker, drifting motes between
 # districts) is decorative but driven by the real building set; everything
@@ -38,6 +38,7 @@ func build_hud(canvas: CanvasLayer, world: Node3D) -> void:
 	_vitals_label = RichTextLabel.new()
 	_vitals_label.bbcode_enabled = true
 	_vitals_label.fit_content = true
+	_vitals_label.tooltip_text = "XP covers recorded terminal runs in this profile. Success is done / (done + failed) in recent profile history; rejected and cancelled runs are excluded. Provider success does not establish code correctness."
 	vitals_panel.add_child(_vitals_label)
 
 	var feed_panel := PanelContainer.new()
@@ -76,28 +77,29 @@ func attach_city(city: Node3D) -> void:
 
 # ── vitals + XP (all real data) ──
 
-func update_snapshot(snap: Dictionary, runs: Array) -> void:
+func update_snapshot(snap: Dictionary, runs: Array, progression: Dictionary = {}) -> void:
 	var commits: Array = snap.get("recentCommits", [])
 	var velocity := _commits_per_day(commits)
 	var dirty := (snap.get("files", []) as Array).size()
 	var tracked := (snap.get("repoTree", []) as Array).size()
 	var done := 0
 	var failed := 0
-	var cancelled := 0
 	for r_variant in runs:
 		match String((r_variant as Dictionary).get("status", "")):
 			"done": done += 1
 			"failed": failed += 1
-			"cancelled": cancelled += 1
 	var total := done + failed
-	var rate := int(round(100.0 * done / total)) if total > 0 else 100
-	var xp := done * 25 + failed * 5 + cancelled * 2
-	var level := int(floor(sqrt(float(xp) / 50.0))) + 1
+	var success := "%d%% success" % int(round(100.0 * done / total)) if total > 0 else "success unavailable"
+	var progress_text := "XP unavailable"
+	if progression.has("xp"):
+		var xp := int(progression["xp"])
+		var level := int(floor(sqrt(float(xp) / 50.0))) + 1
+		progress_text = "LV %d · %d recorded xp" % [level, xp]
 
 	_vitals_label.clear()
 	_vitals_label.append_text(
-		" [color=#5dd4ff]LV %d[/color] [color=#8b93c0]· %d xp[/color]   [color=#5fe39a]%d%%[/color] [color=#8b93c0]success · %d runs[/color]   [color=#ffb84a]%.1f[/color] [color=#8b93c0]commits/day[/color]   [color=#e8ecff]%d[/color] [color=#8b93c0]files · %d dirty[/color]" % [
-			level, xp, rate, runs.size(), velocity, tracked, dirty,
+		" [color=#5dd4ff]%s[/color]   [color=#5fe39a]%s[/color] [color=#8b93c0]· %d completed / %d recent runs[/color]   [color=#ffb84a]%.1f[/color] [color=#8b93c0]commits/day[/color]   [color=#e8ecff]%d[/color] [color=#8b93c0]files · %d dirty[/color]" % [
+			progress_text, success, total, runs.size(), velocity, tracked, dirty,
 		])
 
 	for c_variant in commits.slice(0, 5):

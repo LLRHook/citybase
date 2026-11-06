@@ -48,8 +48,11 @@ frontend; React requires Electron's preload bridge.
    Push before opening a PR through the core/legacy shell; auto-push is absent.
 
 Godot currently has no branch selector or PR button. The shared core and legacy
-shell retain those operations. Current progression is based on recent history
-(BUG-037); default small-city framing has BUG-042. These remain open findings.
+shell retain those operations. Recorded profile XP survives history pruning and
+restart. Legacy profiles recover only XP supported by their retained runs.
+Success measures done / (done + failed) in the recent profile history; rejected
+and cancelled runs do not enter that denominator. With zero completions it is
+unavailable. Initial city framing leaves room for the HUD.
 
 ## Commands
 

@@ -8,6 +8,7 @@
 const fs = require('node:fs/promises');
 const fsSync = require('node:fs');
 const path = require('node:path');
+const { normalizeProgression } = require('../agents/progression.cjs');
 
 const STATE_FILENAME = 'runs.json';
 const MAX_RUNS = 100;
@@ -59,36 +60,47 @@ function createRunStore({ userDataDir, readFile, writeFile, mkdir, rename } = {}
   // the chain; the caller still sees its own write's real outcome via `result`.
   let queue = Promise.resolve();
 
-  async function load() {
+  function decodeState(parsed) {
+    const source = Array.isArray(parsed) ? parsed : (parsed?.version === 2 ? parsed.runs : []);
+    const unique = new Map();
+    for (const r of Array.isArray(source) ? source : []) {
+      const run = sanitizeRun(r);
+      if (run) unique.set(run.runId, run);
+    }
+    const runs = [...unique.values()];
+    // Legacy arrays establish only a recoverable baseline. Never guess XP for
+    // runs already lost to pruning, or count a restored summary a second time.
+    const progression = normalizeProgression(parsed?.version === 2 ? parsed.progression : null, runs);
+    return { runs: runs.slice(-MAX_RUNS), progression };
+  }
+
+  async function loadState() {
     try {
-      const raw = await read(file, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      return parsed.map(sanitizeRun).filter(Boolean).slice(-MAX_RUNS);
-    } catch (err) {
-      if (err && err.code === 'ENOENT') return [];
-      // Corrupt file: start empty rather than crash the boot path.
-      return [];
+      return decodeState(JSON.parse(await read(file, 'utf8')));
+    } catch {
+      return decodeState([]);
     }
   }
 
-  async function writeOnce(runs) {
-    const records = (Array.isArray(runs) ? runs : [])
-      .map(sanitizeRun)
-      .filter(Boolean)
-      .slice(-MAX_RUNS);
+  async function load() {
+    return (await loadState()).runs;
+  }
+
+  async function writeOnce(runs, progression) {
+    const state = decodeState({ version: 2, runs, progression });
     await ensureDir(userDataDir, { recursive: true });
     // Temp-file + rename for an atomic write that can't truncate on crash.
     // (Node's fs.rename uses MoveFileEx/MOVEFILE_REPLACE_EXISTING on Windows,
     // so it overwrites the destination — no unlink dance needed.)
     const tmp = `${file}.tmp`;
-    await write(tmp, JSON.stringify(records, null, 2), 'utf8');
+    await write(tmp, JSON.stringify({ version: 2, ...state }, null, 2), 'utf8');
     await moveInto(tmp, file);
-    return records;
+    return state.runs;
   }
 
-  function save(runs) {
-    const result = queue.then(() => writeOnce(runs));
+  function save(runs, progression) {
+    const snapshot = decodeState({ version: 2, runs, progression });
+    const result = queue.then(() => writeOnce(snapshot.runs, snapshot.progression));
     // Keep the chain alive even if this write rejects, so the next save runs.
     queue = result.catch(() => {});
     return result;
@@ -96,16 +108,19 @@ function createRunStore({ userDataDir, readFile, writeFile, mkdir, rename } = {}
 
   // Synchronous load for the boot path (the manager wants seed runs at
   // construction, before the event loop is doing async work).
-  function loadSync() {
+  function loadStateSync() {
     try {
-      const parsed = JSON.parse(fsSync.readFileSync(file, 'utf8'));
-      return Array.isArray(parsed) ? parsed.map(sanitizeRun).filter(Boolean).slice(-MAX_RUNS) : [];
+      return decodeState(JSON.parse(fsSync.readFileSync(file, 'utf8')));
     } catch {
-      return [];
+      return decodeState([]);
     }
   }
 
-  return { load, loadSync, save, file };
+  function loadSync() {
+    return loadStateSync().runs;
+  }
+
+  return { load, loadSync, loadState, loadStateSync, save, file };
 }
 
 module.exports = { createRunStore, sanitizeRun, isTerminal, MAX_RUNS, MAX_EVENTS_PER_RUN };

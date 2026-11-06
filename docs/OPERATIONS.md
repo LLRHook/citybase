@@ -49,6 +49,12 @@ frontend, and confirm recent workspace and terminal history. Do not edit stale
 lock claims while an owning process is alive. JSON files may contain local paths,
 prompts/events and repository details; treat backups accordingly.
 
+Run history and recorded XP share one version 2 `runs.json` envelope. Boot reads
+legacy arrays conservatively; the next successful save writes the envelope.
+An older executable cannot read that migrated file, so restore a matching backup
+before downgrading. Deleting history must not discard the aggregate. Runs pruned
+before migration cannot be reconstructed.
+
 ## Verification and recovery
 
 Follow [VERIFICATION.md](../VERIFICATION.md). In brief: install from the lockfile,
@@ -63,8 +69,8 @@ local gate. Preserve the executed SHA and full logs under gitignored `.vv/`.
 | Disconnected / oversized result | Inspect the visible close reason. Retry explicitly; reconcile history before repeating any mutating action whose acknowledgement was lost. |
 | Corrupt workspace registry | Stop writers, back up the file, restore/repair its JSON shape, then restart. Mutations intentionally refuse to overwrite it. |
 | Electron cannot launch from an Electron-based host | Clear `ELECTRON_RUN_AS_NODE` in that terminal. The smoke runner removes the inherited value itself. |
-| City partly outside viewport | Zoom out; BUG-042 tracks initial framing. |
-| XP stops growing or falls | BUG-037: current progression derives from a recent bounded window. |
+| City partly outside viewport | Initial framing fits the city above the lower HUD; after manual orbit/fly-to, use wheel zoom to inspect. |
+| XP unavailable | Check core connectivity and the profile backup. XP requires the recorded aggregate; recent history is not substituted. |
 
 ## Packaging and release
 
